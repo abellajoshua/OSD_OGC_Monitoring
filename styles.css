@@ -523,6 +523,16 @@ tbody td {
   color: var(--muted);
 }
 
+.form-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.is-hidden {
+  display: none;
+}
+
 @keyframes fadeUp {
   from {
     opacity: 0;
@@ -645,6 +655,29 @@ tbody td {
 
 .auth .form-status {
   margin-top: 10px;
+}
+
+.btn-delete {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(164, 19, 33, 0.3);
+  background: rgba(164, 19, 33, 0.08);
+  color: #a41321;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-edit {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.2);
+  background: #fff;
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-right: 6px;
 }
 
 .tag {

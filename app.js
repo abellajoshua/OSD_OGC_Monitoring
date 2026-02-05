@@ -18,7 +18,6 @@ const statActive = document.querySelector("[data-stat='active']");
 const statPending = document.querySelector("[data-stat='pending']");
 const statResolved = document.querySelector("[data-stat='resolved']");
 const statFollowups = document.querySelector("[data-stat='followups']");
-const archiveButtons = document.querySelectorAll("[data-archive]");
 
 const minorFilter = document.querySelector("[data-filter-scope='minor']");
 const uniformFilter = document.querySelector("[data-filter-scope='uniform']");
@@ -54,7 +53,7 @@ function renderRows(records) {
   tableBody.innerHTML = "";
   if (!records.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="11">No records yet. Create the first entry below.</td>`;
+    row.innerHTML = `<td colspan="12">No records yet. Create the first entry below.</td>`;
     tableBody.appendChild(row);
     return;
   }
@@ -73,6 +72,10 @@ function renderRows(records) {
       <td>${record.offense || ""}</td>
       <td>${record.sanction || ""}</td>
       <td>${formatDate(record.date_of_sanction)}</td>
+      <td>
+        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
+        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+      </td>
     `;
     tableBody.appendChild(row);
   });
@@ -82,7 +85,7 @@ function renderUniformRows(records) {
   uniformTableBody.innerHTML = "";
   if (!records.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="10">No records yet. Create the first entry below.</td>`;
+    row.innerHTML = `<td colspan="11">No records yet. Create the first entry below.</td>`;
     uniformTableBody.appendChild(row);
     return;
   }
@@ -100,6 +103,10 @@ function renderUniformRows(records) {
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.reason || ""}</td>
+      <td>
+        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
+        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+      </td>
     `;
     uniformTableBody.appendChild(row);
   });
@@ -109,7 +116,7 @@ function renderGatepassRows(records) {
   gatepassTableBody.innerHTML = "";
   if (!records.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="10">No records yet. Create the first entry below.</td>`;
+    row.innerHTML = `<td colspan="11">No records yet. Create the first entry below.</td>`;
     gatepassTableBody.appendChild(row);
     return;
   }
@@ -127,6 +134,10 @@ function renderGatepassRows(records) {
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.reason || ""}</td>
+      <td>
+        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
+        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+      </td>
     `;
     gatepassTableBody.appendChild(row);
   });
@@ -136,7 +147,7 @@ function renderGoodmoralRows(records) {
   goodmoralTableBody.innerHTML = "";
   if (!records.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="10">No records yet. Create the first entry below.</td>`;
+    row.innerHTML = `<td colspan="11">No records yet. Create the first entry below.</td>`;
     goodmoralTableBody.appendChild(row);
     return;
   }
@@ -157,6 +168,10 @@ function renderGoodmoralRows(records) {
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.purpose || ""}</td>
+      <td>
+        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
+        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+      </td>
     `;
     goodmoralTableBody.appendChild(row);
   });
@@ -263,6 +278,91 @@ function setupFilters(scopeElement, applyFn) {
   });
 }
 
+function setFormEditState(form, isEditing) {
+  if (!form) return;
+  const submitButton = form.querySelector("[data-submit-label]");
+  const cancelButton = form.querySelector("[data-edit-cancel]");
+
+  if (isEditing) {
+    if (submitButton) {
+      submitButton.textContent = "Update Record";
+    }
+    if (cancelButton) {
+      cancelButton.classList.remove("is-hidden");
+    }
+  } else {
+    delete form.dataset.editId;
+    if (submitButton) {
+      submitButton.textContent = submitButton.dataset.submitLabel || "Save Record";
+    }
+    if (cancelButton) {
+      cancelButton.classList.add("is-hidden");
+    }
+    form.reset();
+  }
+}
+
+function fillForm(form, record, fields) {
+  if (!form || !record) return;
+  fields.forEach((field) => {
+    if (field === "sex") {
+      const radio = form.querySelector(`input[name="sex"][value="${record.sex}"]`);
+      if (radio) radio.checked = true;
+      return;
+    }
+    const input = form.querySelector(`[name="${field}"]`);
+    if (input) {
+      input.value = record[field] ?? "";
+    }
+  });
+}
+
+function attachRowActions({ tableElement, endpoint, getRecords, form, fields, reloadFn }) {
+  if (!tableElement) return;
+  tableElement.addEventListener("click", async (event) => {
+    const editButton = event.target.closest("[data-action='edit']");
+    const deleteButton = event.target.closest("[data-action='delete']");
+
+    if (editButton) {
+      const id = editButton.dataset.id;
+      const records = getRecords();
+      const record = records.find((item) => String(item.id) === String(id));
+      if (!record) return;
+      form.dataset.editId = id;
+      fillForm(form, record, fields);
+      setFormEditState(form, true);
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    if (deleteButton) {
+      const id = deleteButton.dataset.id;
+      if (!id) return;
+      const confirmed = window.confirm("Delete this record?");
+      if (!confirmed) return;
+
+      try {
+        const response = await fetch(`/api/${endpoint}/${id}`, { method: "DELETE" });
+        if (!response.ok) {
+          const details = await response.json().catch(() => null);
+          throw new Error(details?.error || "Delete failed.");
+        }
+        await reloadFn();
+        await loadDashboard();
+      } catch (error) {
+        alert(error.message || "Unable to delete record.");
+      }
+    }
+  });
+}
+
+function attachCancelEdit(form) {
+  if (!form) return;
+  const cancelButton = form.querySelector("[data-edit-cancel]");
+  if (!cancelButton) return;
+  cancelButton.addEventListener("click", () => setFormEditState(form, false));
+}
+
 async function loadRecords() {
   try {
     const response = await fetch("/api/minor-offenses");
@@ -347,10 +447,13 @@ if (recordForm) {
     formStatus.textContent = "Saving record...";
     const formData = new FormData(recordForm);
     const payload = Object.fromEntries(formData.entries());
+    const editId = recordForm.dataset.editId;
+    const method = editId ? "PUT" : "POST";
+    const url = editId ? `/api/minor-offenses/${editId}` : "/api/minor-offenses";
 
     try {
-      const response = await fetch("/api/minor-offenses", {
-        method: "POST",
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -360,8 +463,8 @@ if (recordForm) {
         throw new Error(details?.error || "Unable to save record.");
       }
 
-      recordForm.reset();
-      formStatus.textContent = "Record saved.";
+      setFormEditState(recordForm, false);
+      formStatus.textContent = editId ? "Record updated." : "Record saved.";
       await loadRecords();
       await loadDashboard();
     } catch (error) {
@@ -379,10 +482,15 @@ if (uniformForm) {
     uniformStatus.textContent = "Saving record...";
     const formData = new FormData(uniformForm);
     const payload = Object.fromEntries(formData.entries());
+    const editId = uniformForm.dataset.editId;
+    const method = editId ? "PUT" : "POST";
+    const url = editId
+      ? `/api/non-wearing-uniform/${editId}`
+      : "/api/non-wearing-uniform";
 
     try {
-      const response = await fetch("/api/non-wearing-uniform", {
-        method: "POST",
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -392,8 +500,8 @@ if (uniformForm) {
         throw new Error(details?.error || "Unable to save record.");
       }
 
-      uniformForm.reset();
-      uniformStatus.textContent = "Record saved.";
+      setFormEditState(uniformForm, false);
+      uniformStatus.textContent = editId ? "Record updated." : "Record saved.";
       await loadUniformRecords();
       await loadDashboard();
     } catch (error) {
@@ -411,10 +519,13 @@ if (gatepassForm) {
     gatepassStatus.textContent = "Saving record...";
     const formData = new FormData(gatepassForm);
     const payload = Object.fromEntries(formData.entries());
+    const editId = gatepassForm.dataset.editId;
+    const method = editId ? "PUT" : "POST";
+    const url = editId ? `/api/gatepass/${editId}` : "/api/gatepass";
 
     try {
-      const response = await fetch("/api/gatepass", {
-        method: "POST",
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -424,8 +535,8 @@ if (gatepassForm) {
         throw new Error(details?.error || "Unable to save record.");
       }
 
-      gatepassForm.reset();
-      gatepassStatus.textContent = "Record saved.";
+      setFormEditState(gatepassForm, false);
+      gatepassStatus.textContent = editId ? "Record updated." : "Record saved.";
       await loadGatepassRecords();
       await loadDashboard();
     } catch (error) {
@@ -443,10 +554,13 @@ if (goodmoralForm) {
     goodmoralStatus.textContent = "Saving record...";
     const formData = new FormData(goodmoralForm);
     const payload = Object.fromEntries(formData.entries());
+    const editId = goodmoralForm.dataset.editId;
+    const method = editId ? "PUT" : "POST";
+    const url = editId ? `/api/good-moral/${editId}` : "/api/good-moral";
 
     try {
-      const response = await fetch("/api/good-moral", {
-        method: "POST",
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -456,8 +570,8 @@ if (goodmoralForm) {
         throw new Error(details?.error || "Unable to save record.");
       }
 
-      goodmoralForm.reset();
-      goodmoralStatus.textContent = "Record saved.";
+      setFormEditState(goodmoralForm, false);
+      goodmoralStatus.textContent = editId ? "Record updated." : "Record saved.";
       await loadGoodmoralRecords();
       await loadDashboard();
     } catch (error) {
@@ -486,11 +600,54 @@ setupFilters(uniformFilter, applyUniformFilters);
 setupFilters(gatepassFilter, applyGatepassFilters);
 setupFilters(goodmoralFilter, applyGoodmoralFilters);
 
-archiveButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    const endpoint = button.dataset.archive;
-    if (endpoint) {
-      window.location.href = `/api/${endpoint}/archive`;
-    }
-  });
+attachRowActions({
+  tableElement: tableBody,
+  endpoint: "minor-offenses",
+  getRecords: () => minorRecords,
+  form: recordForm,
+  fields: [
+    "date_of_complaint",
+    "name_of_student",
+    "sr_code",
+    "year_program",
+    "contact_number",
+    "reported_by",
+    "sex",
+    "offense",
+    "sanction",
+    "date_of_sanction",
+  ],
+  reloadFn: loadRecords,
 });
+
+attachRowActions({
+  tableElement: uniformTableBody,
+  endpoint: "non-wearing-uniform",
+  getRecords: () => uniformRecords,
+  form: uniformForm,
+  fields: ["date", "time_in", "time_out", "name", "sr_code", "course", "sex", "reason"],
+  reloadFn: loadUniformRecords,
+});
+
+attachRowActions({
+  tableElement: gatepassTableBody,
+  endpoint: "gatepass",
+  getRecords: () => gatepassRecords,
+  form: gatepassForm,
+  fields: ["date", "time_in", "time_out", "name", "sr_code", "course", "sex", "reason"],
+  reloadFn: loadGatepassRecords,
+});
+
+attachRowActions({
+  tableElement: goodmoralTableBody,
+  endpoint: "good-moral",
+  getRecords: () => goodmoralRecords,
+  form: goodmoralForm,
+  fields: ["date", "time_in", "time_out", "name", "sr_code", "course", "sex", "purpose"],
+  reloadFn: loadGoodmoralRecords,
+});
+
+attachCancelEdit(recordForm);
+attachCancelEdit(uniformForm);
+attachCancelEdit(gatepassForm);
+attachCancelEdit(goodmoralForm);

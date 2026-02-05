@@ -192,6 +192,60 @@ const insertGoodMoralStmt = db.prepare(`
   )
 `);
 
+const updateMinorStmt = db.prepare(`
+  UPDATE minor_offenses SET
+    date_of_complaint = @date_of_complaint,
+    name_of_student = @name_of_student,
+    sr_code = @sr_code,
+    year_program = @year_program,
+    contact_number = @contact_number,
+    reported_by = @reported_by,
+    sex = @sex,
+    offense = @offense,
+    sanction = @sanction,
+    date_of_sanction = @date_of_sanction
+  WHERE id = @id
+`);
+
+const updateUniformStmt = db.prepare(`
+  UPDATE non_wearing_uniform SET
+    date = @date,
+    time_in = @time_in,
+    time_out = @time_out,
+    name = @name,
+    sr_code = @sr_code,
+    course = @course,
+    sex = @sex,
+    reason = @reason
+  WHERE id = @id
+`);
+
+const updateGatepassStmt = db.prepare(`
+  UPDATE gatepass SET
+    date = @date,
+    time_in = @time_in,
+    time_out = @time_out,
+    name = @name,
+    sr_code = @sr_code,
+    course = @course,
+    sex = @sex,
+    reason = @reason
+  WHERE id = @id
+`);
+
+const updateGoodMoralStmt = db.prepare(`
+  UPDATE good_moral SET
+    date = @date,
+    time_in = @time_in,
+    time_out = @time_out,
+    name = @name,
+    sr_code = @sr_code,
+    course = @course,
+    sex = @sex,
+    purpose = @purpose
+  WHERE id = @id
+`);
+
 const countMinorStmt = db.prepare(`SELECT COUNT(*) as count FROM minor_offenses`);
 const countUniformStmt = db.prepare(`SELECT COUNT(*) as count FROM non_wearing_uniform`);
 const countGatepassStmt = db.prepare(`SELECT COUNT(*) as count FROM gatepass`);
@@ -254,6 +308,15 @@ app.get("/api/minor-offenses/archive", (_req, res) => {
   res.send(csv);
 });
 
+app.delete("/api/minor-offenses/:id", (req, res) => {
+  const { id } = req.params;
+  const info = db.prepare("DELETE FROM minor_offenses WHERE id = ?").run(id);
+  if (!info.changes) {
+    return res.status(404).json({ error: "Record not found." });
+  }
+  res.json({ deleted: info.changes });
+});
+
 app.get("/api/non-wearing-uniform", (_req, res) => {
   const rows = listUniformStmt.all();
   res.json(rows);
@@ -275,6 +338,15 @@ app.get("/api/non-wearing-uniform/archive", (_req, res) => {
   res.setHeader("Content-Type", "text/csv");
   res.setHeader("Content-Disposition", "attachment; filename=non-wearing-uniform.csv");
   res.send(csv);
+});
+
+app.delete("/api/non-wearing-uniform/:id", (req, res) => {
+  const { id } = req.params;
+  const info = db.prepare("DELETE FROM non_wearing_uniform WHERE id = ?").run(id);
+  if (!info.changes) {
+    return res.status(404).json({ error: "Record not found." });
+  }
+  res.json({ deleted: info.changes });
 });
 
 app.get("/api/gatepass", (_req, res) => {
@@ -300,6 +372,15 @@ app.get("/api/gatepass/archive", (_req, res) => {
   res.send(csv);
 });
 
+app.delete("/api/gatepass/:id", (req, res) => {
+  const { id } = req.params;
+  const info = db.prepare("DELETE FROM gatepass WHERE id = ?").run(id);
+  if (!info.changes) {
+    return res.status(404).json({ error: "Record not found." });
+  }
+  res.json({ deleted: info.changes });
+});
+
 app.get("/api/good-moral", (_req, res) => {
   const rows = listGoodMoralStmt.all();
   res.json(rows);
@@ -321,6 +402,15 @@ app.get("/api/good-moral/archive", (_req, res) => {
   res.setHeader("Content-Type", "text/csv");
   res.setHeader("Content-Disposition", "attachment; filename=good-moral.csv");
   res.send(csv);
+});
+
+app.delete("/api/good-moral/:id", (req, res) => {
+  const { id } = req.params;
+  const info = db.prepare("DELETE FROM good_moral WHERE id = ?").run(id);
+  if (!info.changes) {
+    return res.status(404).json({ error: "Record not found." });
+  }
+  res.json({ deleted: info.changes });
 });
 
 app.get("/api/dashboard", (_req, res) => {
@@ -367,6 +457,34 @@ app.post("/api/minor-offenses", (req, res) => {
   res.status(201).json({ id: info.lastInsertRowid });
 });
 
+app.put("/api/minor-offenses/:id", (req, res) => {
+  const payload = req.body || {};
+  const { id } = req.params;
+  const requiredFields = [
+    "date_of_complaint",
+    "name_of_student",
+    "sr_code",
+    "year_program",
+    "contact_number",
+    "reported_by",
+    "sex",
+    "offense",
+    "sanction",
+    "date_of_sanction",
+  ];
+
+  const missing = requiredFields.filter((field) => !payload[field]);
+  if (missing.length) {
+    return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
+  }
+
+  const info = updateMinorStmt.run({ ...payload, id });
+  if (!info.changes) {
+    return res.status(404).json({ error: "Record not found." });
+  }
+  res.json({ updated: info.changes });
+});
+
 app.post("/api/non-wearing-uniform", (req, res) => {
   const payload = req.body || {};
   const requiredFields = [
@@ -387,6 +505,32 @@ app.post("/api/non-wearing-uniform", (req, res) => {
 
   const info = insertUniformStmt.run(payload);
   res.status(201).json({ id: info.lastInsertRowid });
+});
+
+app.put("/api/non-wearing-uniform/:id", (req, res) => {
+  const payload = req.body || {};
+  const { id } = req.params;
+  const requiredFields = [
+    "date",
+    "time_in",
+    "time_out",
+    "name",
+    "sr_code",
+    "course",
+    "sex",
+    "reason",
+  ];
+
+  const missing = requiredFields.filter((field) => !payload[field]);
+  if (missing.length) {
+    return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
+  }
+
+  const info = updateUniformStmt.run({ ...payload, id });
+  if (!info.changes) {
+    return res.status(404).json({ error: "Record not found." });
+  }
+  res.json({ updated: info.changes });
 });
 
 app.post("/api/gatepass", (req, res) => {
@@ -411,6 +555,32 @@ app.post("/api/gatepass", (req, res) => {
   res.status(201).json({ id: info.lastInsertRowid });
 });
 
+app.put("/api/gatepass/:id", (req, res) => {
+  const payload = req.body || {};
+  const { id } = req.params;
+  const requiredFields = [
+    "date",
+    "time_in",
+    "time_out",
+    "name",
+    "sr_code",
+    "course",
+    "sex",
+    "reason",
+  ];
+
+  const missing = requiredFields.filter((field) => !payload[field]);
+  if (missing.length) {
+    return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
+  }
+
+  const info = updateGatepassStmt.run({ ...payload, id });
+  if (!info.changes) {
+    return res.status(404).json({ error: "Record not found." });
+  }
+  res.json({ updated: info.changes });
+});
+
 app.post("/api/good-moral", (req, res) => {
   const payload = req.body || {};
   const requiredFields = [
@@ -431,6 +601,32 @@ app.post("/api/good-moral", (req, res) => {
 
   const info = insertGoodMoralStmt.run(payload);
   res.status(201).json({ id: info.lastInsertRowid });
+});
+
+app.put("/api/good-moral/:id", (req, res) => {
+  const payload = req.body || {};
+  const { id } = req.params;
+  const requiredFields = [
+    "date",
+    "time_in",
+    "time_out",
+    "name",
+    "sr_code",
+    "course",
+    "sex",
+    "purpose",
+  ];
+
+  const missing = requiredFields.filter((field) => !payload[field]);
+  if (missing.length) {
+    return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
+  }
+
+  const info = updateGoodMoralStmt.run({ ...payload, id });
+  if (!info.changes) {
+    return res.status(404).json({ error: "Record not found." });
+  }
+  res.json({ updated: info.changes });
 });
 
 app.get("/print/minor-offenses", (_req, res) => {
