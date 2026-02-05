@@ -32,8 +32,46 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS non_wearing_uniform (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    time_in TEXT NOT NULL,
+    time_out TEXT NOT NULL,
+    name TEXT NOT NULL,
+    sr_code TEXT NOT NULL,
+    course TEXT NOT NULL,
+    sex TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    signature TEXT
+  );
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS gatepass (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    time_in TEXT NOT NULL,
+    time_out TEXT NOT NULL,
+    name TEXT NOT NULL,
+    sr_code TEXT NOT NULL,
+    course TEXT NOT NULL,
+    sex TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    signature TEXT
+  );
+`);
+
 const listStmt = db.prepare(
   `SELECT * FROM minor_offenses ORDER BY date(date_of_complaint) DESC, id DESC`
+);
+
+const listUniformStmt = db.prepare(
+  `SELECT * FROM non_wearing_uniform ORDER BY date(date) DESC, id DESC`
+);
+
+const listGatepassStmt = db.prepare(
+  `SELECT * FROM gatepass ORDER BY date(date) DESC, id DESC`
 );
 
 const insertStmt = db.prepare(`
@@ -64,12 +102,113 @@ const insertStmt = db.prepare(`
   )
 `);
 
+const insertUniformStmt = db.prepare(`
+  INSERT INTO non_wearing_uniform (
+    date,
+    time_in,
+    time_out,
+    name,
+    sr_code,
+    course,
+    sex,
+    reason,
+    signature
+  ) VALUES (
+    @date,
+    @time_in,
+    @time_out,
+    @name,
+    @sr_code,
+    @course,
+    @sex,
+    @reason,
+    @signature
+  )
+`);
+
+const insertGatepassStmt = db.prepare(`
+  INSERT INTO gatepass (
+    date,
+    time_in,
+    time_out,
+    name,
+    sr_code,
+    course,
+    sex,
+    reason,
+    signature
+  ) VALUES (
+    @date,
+    @time_in,
+    @time_out,
+    @name,
+    @sr_code,
+    @course,
+    @sex,
+    @reason,
+    @signature
+  )
+`);
+
+const countMinorStmt = db.prepare(`SELECT COUNT(*) as count FROM minor_offenses`);
+const countUniformStmt = db.prepare(`SELECT COUNT(*) as count FROM non_wearing_uniform`);
+const countGatepassStmt = db.prepare(`SELECT COUNT(*) as count FROM gatepass`);
+const pendingSanctionsStmt = db.prepare(`
+  SELECT COUNT(*) as count
+  FROM minor_offenses
+  WHERE signature IS NULL OR TRIM(signature) = ''
+`);
+const resolvedWeekStmt = db.prepare(`
+  SELECT COUNT(*) as count
+  FROM minor_offenses
+  WHERE date(date_of_sanction) >= date('now','-6 day')
+    AND date(date_of_sanction) <= date('now')
+`);
+const followUpsStmt = db.prepare(`
+  SELECT COUNT(*) as count
+  FROM non_wearing_uniform
+  WHERE signature IS NULL OR TRIM(signature) = ''
+`);
+
+const gatepassFollowUpsStmt = db.prepare(`
+  SELECT COUNT(*) as count
+  FROM gatepass
+  WHERE signature IS NULL OR TRIM(signature) = ''
+`);
+
 app.use(express.json());
 app.use(express.static(__dirname));
 
 app.get("/api/minor-offenses", (_req, res) => {
   const rows = listStmt.all();
   res.json(rows);
+});
+
+app.get("/api/non-wearing-uniform", (_req, res) => {
+  const rows = listUniformStmt.all();
+  res.json(rows);
+});
+
+app.get("/api/gatepass", (_req, res) => {
+  const rows = listGatepassStmt.all();
+  res.json(rows);
+});
+
+app.get("/api/dashboard", (_req, res) => {
+  const minorCount = countMinorStmt.get().count || 0;
+  const uniformCount = countUniformStmt.get().count || 0;
+  const gatepassCount = countGatepassStmt.get().count || 0;
+  const pendingSanctions = pendingSanctionsStmt.get().count || 0;
+  const resolvedThisWeek = resolvedWeekStmt.get().count || 0;
+  const followUpsDue =
+    (followUpsStmt.get().count || 0) + (gatepassFollowUpsStmt.get().count || 0);
+
+  res.json({
+    activeCases: minorCount + uniformCount + gatepassCount,
+    pendingSanctions,
+    resolvedThisWeek,
+    followUpsDue,
+  });
 });
 
 app.post("/api/minor-offenses", (req, res) => {
@@ -98,6 +237,60 @@ app.post("/api/minor-offenses", (req, res) => {
   };
 
   const info = insertStmt.run(record);
+  res.status(201).json({ id: info.lastInsertRowid });
+});
+
+app.post("/api/non-wearing-uniform", (req, res) => {
+  const payload = req.body || {};
+  const requiredFields = [
+    "date",
+    "time_in",
+    "time_out",
+    "name",
+    "sr_code",
+    "course",
+    "sex",
+    "reason",
+  ];
+
+  const missing = requiredFields.filter((field) => !payload[field]);
+  if (missing.length) {
+    return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
+  }
+
+  const record = {
+    ...payload,
+    signature: payload.signature || "",
+  };
+
+  const info = insertUniformStmt.run(record);
+  res.status(201).json({ id: info.lastInsertRowid });
+});
+
+app.post("/api/gatepass", (req, res) => {
+  const payload = req.body || {};
+  const requiredFields = [
+    "date",
+    "time_in",
+    "time_out",
+    "name",
+    "sr_code",
+    "course",
+    "sex",
+    "reason",
+  ];
+
+  const missing = requiredFields.filter((field) => !payload[field]);
+  if (missing.length) {
+    return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
+  }
+
+  const record = {
+    ...payload,
+    signature: payload.signature || "",
+  };
+
+  const info = insertGatepassStmt.run(record);
   res.status(201).json({ id: info.lastInsertRowid });
 });
 
