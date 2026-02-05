@@ -26,6 +26,8 @@
       <nav class="nav">
         <button class="nav-btn active" data-tab="landing">Landing</button>
         <button class="nav-btn" data-tab="minor">Minor Offense</button>
+        <button class="nav-btn" data-tab="uniform">Non-Wearing Uniform</button>
+        <button class="nav-btn" id="logout-btn">Logout</button>
       </nav>
     </header>
 
@@ -106,7 +108,7 @@
       <section id="minor" class="tab">
         <div class="sheet">
           <div class="sheet-header">
-            <div class="seal">BATSU</div>
+            <div class="seal">BATSTATEU</div>
             <div class="sheet-title">
               <p class="line small">Republic of the Philippines</p>
               <p class="line accent">Batangas State University</p>
@@ -209,8 +211,103 @@
           </form>
         </div>
       </section>
+
+      <section id="uniform" class="tab">
+        <div class="sheet">
+          <div class="sheet-header">
+            <div class="seal">BATSU</div>
+            <div class="sheet-title">
+              <p class="line small">Republic of the Philippines</p>
+              <p class="line accent">Batangas State University</p>
+              <p class="line">The National Engineering University</p>
+              <p class="line">Alangilan Campus</p>
+              <p class="line strong">OFFICE OF STUDENT DISCIPLINE</p>
+              <p class="line">Second Semester AY 2025-2026</p>
+            </div>
+          </div>
+
+          <div class="log-title">
+            <h2>LOGSHEET</h2>
+            <h3>REQUEST FOR NON-WEARING OF UNIFORM</h3>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th rowspan="2">No.</th>
+                  <th rowspan="2">Date</th>
+                  <th colspan="2">Time</th>
+                  <th rowspan="2">Name</th>
+                  <th rowspan="2">SR Code</th>
+                  <th rowspan="2">Course</th>
+                  <th colspan="2">Sex</th>
+                  <th rowspan="2">Reason</th>
+                  <th rowspan="2">Signature</th>
+                </tr>
+                <tr>
+                  <th>In</th>
+                  <th>Out</th>
+                  <th>M</th>
+                  <th>F</th>
+                </tr>
+              </thead>
+              <tbody id="uniform-table-body"></tbody>
+            </table>
+          </div>
+
+          <form id="uniform-form" class="record-form">
+            <div class="form-header">
+              <img src="assets/logo.png" alt="Batangas State University logo" />
+              <h3>Create Record</h3>
+            </div>
+            <div class="form-grid">
+              <label>
+                Date
+                <input type="date" name="date" required />
+              </label>
+              <label>
+                Time In
+                <input type="time" name="time_in" required />
+              </label>
+              <label>
+                Time Out
+                <input type="time" name="time_out" required />
+              </label>
+              <label>
+                Name
+                <input type="text" name="name" placeholder="Full name" required />
+              </label>
+              <label>
+                SR Code
+                <input type="text" name="sr_code" placeholder="2024-0000" required />
+              </label>
+              <label>
+                Course
+                <input type="text" name="course" placeholder="BSIT / BSME" required />
+              </label>
+              <fieldset class="sex-field">
+                <legend>Sex</legend>
+                <label><input type="radio" name="sex" value="M" required /> M</label>
+                <label><input type="radio" name="sex" value="F" /> F</label>
+              </fieldset>
+              <label>
+                Reason
+                <input type="text" name="reason" required />
+              </label>
+              <label>
+                Signature
+                <input type="text" name="signature" placeholder="Optional" />
+              </label>
+            </div>
+            <button class="primary" type="submit">Save Record</button>
+            <p class="form-status" id="uniform-status" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
     </main>
 
     <script src="app.js"></script>
+    <script type="module" src="auth-guard.js"></script>
   </body>
 </html>

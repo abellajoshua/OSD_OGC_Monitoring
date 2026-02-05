@@ -5,6 +5,9 @@ const tableBody = document.querySelector("#minor-table-body");
 const recordForm = document.querySelector("#record-form");
 const formStatus = document.querySelector("#form-status");
 const exportButton = document.querySelector("#export-pdf");
+const uniformTableBody = document.querySelector("#uniform-table-body");
+const uniformForm = document.querySelector("#uniform-form");
+const uniformStatus = document.querySelector("#uniform-status");
 
 function switchTab(targetId) {
   tabs.forEach((tab) => {
@@ -55,6 +58,34 @@ function renderRows(records) {
   });
 }
 
+function renderUniformRows(records) {
+  uniformTableBody.innerHTML = "";
+  if (!records.length) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td colspan="11">No records yet. Create the first entry below.</td>`;
+    uniformTableBody.appendChild(row);
+    return;
+  }
+
+  records.forEach((record, index) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${index + 1}</td>
+      <td>${formatDate(record.date)}</td>
+      <td>${record.time_in || ""}</td>
+      <td>${record.time_out || ""}</td>
+      <td>${record.name || ""}</td>
+      <td>${record.sr_code || ""}</td>
+      <td>${record.course || ""}</td>
+      <td>${record.sex === "M" ? "✔" : ""}</td>
+      <td>${record.sex === "F" ? "✔" : ""}</td>
+      <td>${record.reason || ""}</td>
+      <td>${record.signature || ""}</td>
+    `;
+    uniformTableBody.appendChild(row);
+  });
+}
+
 async function loadRecords() {
   try {
     const response = await fetch("/api/minor-offenses");
@@ -62,6 +93,16 @@ async function loadRecords() {
     renderRows(records);
   } catch (error) {
     renderRows([]);
+  }
+}
+
+async function loadUniformRecords() {
+  try {
+    const response = await fetch("/api/non-wearing-uniform");
+    const records = await response.json();
+    renderUniformRows(records);
+  } catch (error) {
+    renderUniformRows([]);
   }
 }
 
@@ -109,6 +150,33 @@ if (recordForm) {
   });
 }
 
+if (uniformForm) {
+  uniformForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    uniformStatus.textContent = "Saving record...";
+    const formData = new FormData(uniformForm);
+    const payload = Object.fromEntries(formData.entries());
+
+    try {
+      const response = await fetch("/api/non-wearing-uniform", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to save record.");
+      }
+
+      uniformForm.reset();
+      uniformStatus.textContent = "Record saved.";
+      await loadUniformRecords();
+    } catch (error) {
+      uniformStatus.textContent = "Something went wrong. Please try again.";
+    }
+  });
+}
+
 if (exportButton) {
   exportButton.addEventListener("click", () => {
     window.location.href = "/api/minor-offenses/pdf";
@@ -116,3 +184,4 @@ if (exportButton) {
 }
 
 loadRecords();
+loadUniformRecords();

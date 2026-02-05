@@ -32,8 +32,27 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS non_wearing_uniform (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    time_in TEXT NOT NULL,
+    time_out TEXT NOT NULL,
+    name TEXT NOT NULL,
+    sr_code TEXT NOT NULL,
+    course TEXT NOT NULL,
+    sex TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    signature TEXT
+  );
+`);
+
 const listStmt = db.prepare(
   `SELECT * FROM minor_offenses ORDER BY date(date_of_complaint) DESC, id DESC`
+);
+
+const listUniformStmt = db.prepare(
+  `SELECT * FROM non_wearing_uniform ORDER BY date(date) DESC, id DESC`
 );
 
 const insertStmt = db.prepare(`
@@ -64,11 +83,40 @@ const insertStmt = db.prepare(`
   )
 `);
 
+const insertUniformStmt = db.prepare(`
+  INSERT INTO non_wearing_uniform (
+    date,
+    time_in,
+    time_out,
+    name,
+    sr_code,
+    course,
+    sex,
+    reason,
+    signature
+  ) VALUES (
+    @date,
+    @time_in,
+    @time_out,
+    @name,
+    @sr_code,
+    @course,
+    @sex,
+    @reason,
+    @signature
+  )
+`);
+
 app.use(express.json());
 app.use(express.static(__dirname));
 
 app.get("/api/minor-offenses", (_req, res) => {
   const rows = listStmt.all();
+  res.json(rows);
+});
+
+app.get("/api/non-wearing-uniform", (_req, res) => {
+  const rows = listUniformStmt.all();
   res.json(rows);
 });
 
@@ -98,6 +146,33 @@ app.post("/api/minor-offenses", (req, res) => {
   };
 
   const info = insertStmt.run(record);
+  res.status(201).json({ id: info.lastInsertRowid });
+});
+
+app.post("/api/non-wearing-uniform", (req, res) => {
+  const payload = req.body || {};
+  const requiredFields = [
+    "date",
+    "time_in",
+    "time_out",
+    "name",
+    "sr_code",
+    "course",
+    "sex",
+    "reason",
+  ];
+
+  const missing = requiredFields.filter((field) => !payload[field]);
+  if (missing.length) {
+    return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
+  }
+
+  const record = {
+    ...payload,
+    signature: payload.signature || "",
+  };
+
+  const info = insertUniformStmt.run(record);
   res.status(201).json({ id: info.lastInsertRowid });
 });
 

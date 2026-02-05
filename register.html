@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OSD & OGC Monitoring | Register</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="ambient">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+
+    <main class="auth">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <img src="assets/logo.png" alt="Batangas State University logo" />
+          <div>
+            <p class="auth-title">OSD & OGC Monitoring</p>
+            <p class="auth-subtitle">Create staff credentials</p>
+          </div>
+        </div>
+
+        <h1>Register</h1>
+        <p class="auth-lead">Set up your staff account to manage logs and reports.</p>
+
+        <form class="auth-form" id="register-form">
+          <label>
+            Full Name
+            <input type="text" name="name" placeholder="Juan Dela Cruz" required />
+          </label>
+          <label>
+            Email
+            <input type="email" name="email" placeholder="name@batsu.edu.ph" required />
+          </label>
+          <label>
+            Role
+            <input type="text" name="role" placeholder="OSD Staff" required />
+          </label>
+          <label>
+            Password
+            <input type="password" name="password" placeholder="••••••••" required />
+          </label>
+          <label>
+            Confirm Password
+            <input type="password" name="confirm_password" placeholder="••••••••" required />
+          </label>
+          <button class="primary" type="submit">Create Account</button>
+        </form>
+
+        <p class="form-status" id="register-status" aria-live="polite"></p>
+
+        <div class="auth-links">
+          <a href="login.html">Already have an account? Login</a>
+          <a href="index.html">Back to home</a>
+        </div>
+      </div>
+    </main>
+
+    <script type="module" src="register.js"></script>
+  </body>
+</html>
