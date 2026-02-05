@@ -28,6 +28,7 @@
         <button class="nav-btn" data-tab="minor">Minor Offense</button>
         <button class="nav-btn" data-tab="uniform">Non-Wearing Uniform</button>
         <button class="nav-btn" data-tab="gatepass">Gatepass</button>
+        <button class="nav-btn" data-tab="goodmoral">Good Moral</button>
         <button class="nav-btn" id="logout-btn">Logout</button>
       </nav>
     </header>
@@ -42,10 +43,7 @@
               A disciplined, modern workspace for tracking complaints, sanctions, and program coordination. Built
               to keep records clean, searchable, and ready for reporting.
             </p>
-            <div class="hero-actions">
-              <button class="primary" data-tab="minor">Open Minor Offense Log</button>
-              <button class="ghost" data-tab="minor" data-scroll="record-form">Create New Record</button>
-            </div>
+            <div class="hero-actions"></div>
           </div>
           <div class="hero-card">
             <h3>Today at a Glance</h3>
@@ -91,12 +89,12 @@
           <article>
             <h3>Program Monitoring</h3>
             <p>Track compliance, program participation, and document updates in one view.</p>
-            <button class="link">View Programs</button>
+            <a class="link" href="programs.html">View Programs</a>
           </article>
           <article>
             <h3>Document Control</h3>
             <p>Archive incident reports, sanctions, and hearing outcomes with audit-ready records.</p>
-            <button class="link">Open Archive</button>
+            <a class="link" href="archive.html">Open Archive</a>
           </article>
           <article>
             <h3>Analytics & Reports</h3>
@@ -109,51 +107,13 @@
       <section id="minor" class="tab">
         <div class="sheet">
           <div class="sheet-header">
-            <div class="seal">BATSTATEU</div>
-            <div class="sheet-title">
-              <p class="line small">Republic of the Philippines</p>
-              <p class="line accent">Batangas State University</p>
-              <p class="line">The National Engineering University</p>
-              <p class="line">Alangilan Campus</p>
-              <p class="line strong">OFFICE OF STUDENT DISCIPLINE</p>
-              <p class="line">First Semester AY 2025-2026</p>
-            </div>
+            <div class="sheet-title"></div>
           </div>
 
           <div class="log-title">
             <h2>LOGSHEET</h2>
             <h3>MINOR OFFENSES</h3>
           </div>
-
-          <div class="sheet-actions">
-            <button class="primary" id="export-pdf">Export Logsheet PDF</button>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th rowspan="2">Date of Complaint</th>
-                  <th rowspan="2">Name of Student</th>
-                  <th rowspan="2">SR Code</th>
-                  <th rowspan="2">Year / Program</th>
-                  <th rowspan="2">Contact Number</th>
-                  <th rowspan="2">Reported By</th>
-                  <th colspan="2">Sex</th>
-                  <th rowspan="2">Offense</th>
-                  <th rowspan="2">Sanction</th>
-                  <th rowspan="2">Date of Sanction</th>
-                  <th rowspan="2">Signature</th>
-                </tr>
-                <tr>
-                  <th>M</th>
-                  <th>F</th>
-                </tr>
-              </thead>
-              <tbody id="minor-table-body"></tbody>
-            </table>
-          </div>
-          <p class="footnote">Prepared by OSD staff for monitoring and compliance tracking.</p>
 
           <form id="record-form" class="record-form">
             <div class="form-header">
@@ -202,59 +162,69 @@
                 Date of Sanction
                 <input type="date" name="date_of_sanction" required />
               </label>
-              <label>
-                Signature
-                <input type="text" name="signature" placeholder="Optional" />
-              </label>
             </div>
-            <button class="primary" type="submit">Save Record</button>
+            <div class="form-actions">
+              <button class="primary" type="submit" data-submit-label="Save Record">Save Record</button>
+              <button class="ghost is-hidden" type="button" data-edit-cancel>Cancel Edit</button>
+            </div>
             <p class="form-status" id="form-status" aria-live="polite"></p>
           </form>
-        </div>
-      </section>
 
-      <section id="uniform" class="tab">
-        <div class="sheet">
-          <div class="sheet-header">
-            <div class="seal">BATSU</div>
-            <div class="sheet-title">
-              <p class="line small">Republic of the Philippines</p>
-              <p class="line accent">Batangas State University</p>
-              <p class="line">The National Engineering University</p>
-              <p class="line">Alangilan Campus</p>
-              <p class="line strong">OFFICE OF STUDENT DISCIPLINE</p>
-              <p class="line">Second Semester AY 2025-2026</p>
-            </div>
+          <div class="filter-bar" data-filter-scope="minor">
+            <input type="search" placeholder="Search name, SR code, offense, reported by..." data-filter="query" />
+            <label>
+              From
+              <input type="date" data-filter="from" />
+            </label>
+            <label>
+              To
+              <input type="date" data-filter="to" />
+            </label>
+            <button class="primary" type="button" data-filter="apply">Filter</button>
+            <button class="ghost" type="button" data-filter="clear">Clear</button>
           </div>
 
-          <div class="log-title">
-            <h2>LOGSHEET</h2>
-            <h3>REQUEST FOR NON-WEARING OF UNIFORM</h3>
+          <div class="sheet-actions">
+            <button class="primary" id="export-pdf">Print / Save PDF</button>
           </div>
 
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th rowspan="2">No.</th>
-                  <th rowspan="2">Date</th>
-                  <th colspan="2">Time</th>
-                  <th rowspan="2">Name</th>
+                  <th rowspan="2">Date of Complaint</th>
+                  <th rowspan="2">Name of Student</th>
                   <th rowspan="2">SR Code</th>
-                  <th rowspan="2">Course</th>
+                  <th rowspan="2">Year / Program</th>
+                  <th rowspan="2">Contact Number</th>
+                  <th rowspan="2">Reported By</th>
                   <th colspan="2">Sex</th>
-                  <th rowspan="2">Reason</th>
-                  <th rowspan="2">Signature</th>
+                  <th rowspan="2">Offense</th>
+                  <th rowspan="2">Sanction</th>
+                  <th rowspan="2">Date of Sanction</th>
+                  <th rowspan="2">Action</th>
                 </tr>
                 <tr>
-                  <th>In</th>
-                  <th>Out</th>
                   <th>M</th>
                   <th>F</th>
                 </tr>
               </thead>
-              <tbody id="uniform-table-body"></tbody>
+              <tbody id="minor-table-body"></tbody>
             </table>
+          </div>
+          <p class="footnote">Prepared by OSD staff for monitoring and compliance tracking.</p>
+        </div>
+      </section>
+
+      <section id="uniform" class="tab">
+        <div class="sheet">
+          <div class="sheet-header">
+            <div class="sheet-title"></div>
+          </div>
+
+          <div class="log-title">
+            <h2>LOGSHEET</h2>
+            <h3>REQUEST FOR NON-WEARING OF UNIFORM</h3>
           </div>
 
           <form id="uniform-form" class="record-form">
@@ -296,34 +266,26 @@
                 Reason
                 <input type="text" name="reason" required />
               </label>
-              <label>
-                Signature
-                <input type="text" name="signature" placeholder="Optional" />
-              </label>
             </div>
-            <button class="primary" type="submit">Save Record</button>
+            <div class="form-actions">
+              <button class="primary" type="submit" data-submit-label="Save Record">Save Record</button>
+              <button class="ghost is-hidden" type="button" data-edit-cancel>Cancel Edit</button>
+            </div>
             <p class="form-status" id="uniform-status" aria-live="polite"></p>
           </form>
-        </div>
-      </section>
 
-      <section id="gatepass" class="tab">
-        <div class="sheet">
-          <div class="sheet-header">
-            <div class="seal">BATSU</div>
-            <div class="sheet-title">
-              <p class="line small">Republic of the Philippines</p>
-              <p class="line accent">Batangas State University</p>
-              <p class="line">The National Engineering University</p>
-              <p class="line">Alangilan Campus</p>
-              <p class="line strong">OFFICE OF STUDENT DISCIPLINE</p>
-              <p class="line">First Semester AY 2024-2025</p>
-            </div>
-          </div>
-
-          <div class="log-title">
-            <h2>LOGSHEET</h2>
-            <h3>REQUEST FOR GATEPASS</h3>
+          <div class="filter-bar" data-filter-scope="uniform">
+            <input type="search" placeholder="Search name, SR code, course, reason..." data-filter="query" />
+            <label>
+              From
+              <input type="date" data-filter="from" />
+            </label>
+            <label>
+              To
+              <input type="date" data-filter="to" />
+            </label>
+            <button class="primary" type="button" data-filter="apply">Filter</button>
+            <button class="ghost" type="button" data-filter="clear">Clear</button>
           </div>
 
           <div class="table-wrap">
@@ -338,7 +300,7 @@
                   <th rowspan="2">Course</th>
                   <th colspan="2">Sex</th>
                   <th rowspan="2">Reason</th>
-                  <th rowspan="2">Signature</th>
+                  <th rowspan="2">Action</th>
                 </tr>
                 <tr>
                   <th>In</th>
@@ -347,8 +309,21 @@
                   <th>F</th>
                 </tr>
               </thead>
-              <tbody id="gatepass-table-body"></tbody>
+              <tbody id="uniform-table-body"></tbody>
             </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="gatepass" class="tab">
+        <div class="sheet">
+          <div class="sheet-header">
+            <div class="sheet-title"></div>
+          </div>
+
+          <div class="log-title">
+            <h2>LOGSHEET</h2>
+            <h3>REQUEST FOR GATEPASS</h3>
           </div>
 
           <form id="gatepass-form" class="record-form">
@@ -390,14 +365,151 @@
                 Reason
                 <input type="text" name="reason" required />
               </label>
-              <label>
-                Signature
-                <input type="text" name="signature" placeholder="Optional" />
-              </label>
             </div>
-            <button class="primary" type="submit">Save Record</button>
+            <div class="form-actions">
+              <button class="primary" type="submit" data-submit-label="Save Record">Save Record</button>
+              <button class="ghost is-hidden" type="button" data-edit-cancel>Cancel Edit</button>
+            </div>
             <p class="form-status" id="gatepass-status" aria-live="polite"></p>
           </form>
+
+          <div class="filter-bar" data-filter-scope="gatepass">
+            <input type="search" placeholder="Search name, SR code, course, reason..." data-filter="query" />
+            <label>
+              From
+              <input type="date" data-filter="from" />
+            </label>
+            <label>
+              To
+              <input type="date" data-filter="to" />
+            </label>
+            <button class="primary" type="button" data-filter="apply">Filter</button>
+            <button class="ghost" type="button" data-filter="clear">Clear</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th rowspan="2">No.</th>
+                  <th rowspan="2">Date</th>
+                  <th colspan="2">Time</th>
+                  <th rowspan="2">Name</th>
+                  <th rowspan="2">SR Code</th>
+                  <th rowspan="2">Course</th>
+                  <th colspan="2">Sex</th>
+                  <th rowspan="2">Reason</th>
+                  <th rowspan="2">Action</th>
+                </tr>
+                <tr>
+                  <th>In</th>
+                  <th>Out</th>
+                  <th>M</th>
+                  <th>F</th>
+                </tr>
+              </thead>
+              <tbody id="gatepass-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="goodmoral" class="tab">
+        <div class="sheet">
+          <div class="sheet-header">
+            <div class="sheet-title"></div>
+          </div>
+
+          <div class="log-title">
+            <h2>LOGSHEET</h2>
+            <h3>VERIFICATION OF RECORDS ON OFFENSES FOR THE REQUEST ON GOOD MORAL CERTIFICATE</h3>
+          </div>
+
+          <form id="goodmoral-form" class="record-form">
+            <div class="form-header">
+              <img src="assets/logo.png" alt="Batangas State University logo" />
+              <h3>Create Record</h3>
+            </div>
+            <div class="form-grid">
+              <label>
+                Date
+                <input type="date" name="date" required />
+              </label>
+              <label>
+                Time In
+                <input type="time" name="time_in" required />
+              </label>
+              <label>
+                Time Out
+                <input type="time" name="time_out" required />
+              </label>
+              <label>
+                Name
+                <input type="text" name="name" placeholder="Full name" required />
+              </label>
+              <label>
+                SR Code
+                <input type="text" name="sr_code" placeholder="2024-0000" required />
+              </label>
+              <label>
+                Course
+                <input type="text" name="course" placeholder="BSIT / BSME" required />
+              </label>
+              <fieldset class="sex-field">
+                <legend>Sex</legend>
+                <label><input type="radio" name="sex" value="M" required /> M</label>
+                <label><input type="radio" name="sex" value="F" /> F</label>
+              </fieldset>
+              <label>
+                Purpose
+                <input type="text" name="purpose" required />
+              </label>
+            </div>
+            <div class="form-actions">
+              <button class="primary" type="submit" data-submit-label="Save Record">Save Record</button>
+              <button class="ghost is-hidden" type="button" data-edit-cancel>Cancel Edit</button>
+            </div>
+            <p class="form-status" id="goodmoral-status" aria-live="polite"></p>
+          </form>
+
+          <div class="filter-bar" data-filter-scope="goodmoral">
+            <input type="search" placeholder="Search name, SR code, course, purpose..." data-filter="query" />
+            <label>
+              From
+              <input type="date" data-filter="from" />
+            </label>
+            <label>
+              To
+              <input type="date" data-filter="to" />
+            </label>
+            <button class="primary" type="button" data-filter="apply">Filter</button>
+            <button class="ghost" type="button" data-filter="clear">Clear</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th rowspan="2">No.</th>
+                  <th rowspan="2">Date</th>
+                  <th colspan="2">Time</th>
+                  <th rowspan="2">Name</th>
+                  <th rowspan="2">SR Code</th>
+                  <th rowspan="2">Course</th>
+                  <th colspan="2">Sex</th>
+                  <th rowspan="2">Purpose</th>
+                  <th rowspan="2">Action</th>
+                </tr>
+                <tr>
+                  <th>In</th>
+                  <th>Out</th>
+                  <th>M</th>
+                  <th>F</th>
+                </tr>
+              </thead>
+              <tbody id="goodmoral-table-body"></tbody>
+            </table>
+          </div>
         </div>
       </section>
     </main>

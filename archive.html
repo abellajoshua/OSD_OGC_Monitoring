@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OSD & OGC Monitoring | Archive</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="ambient">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">
+          <img src="assets/logo.png" alt="Batangas State University logo" />
+        </div>
+        <div>
+          <p class="brand-title">Archive Center</p>
+          <p class="brand-subtitle">Download CSV logs for record-keeping</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <a class="nav-btn" href="index.html">Back to Dashboard</a>
+      </nav>
+    </header>
+
+    <main class="container">
+      <section class="sheet">
+        <div class="log-title">
+          <h2>Archive Downloads</h2>
+          <h3>CSV Exports</h3>
+        </div>
+        <div class="archive-links">
+          <a class="primary" href="/api/minor-offenses/archive">Minor Offenses CSV</a>
+          <a class="ghost" href="/api/non-wearing-uniform/archive">Non-Wearing Uniform CSV</a>
+          <a class="ghost" href="/api/gatepass/archive">Gatepass CSV</a>
+          <a class="ghost" href="/api/good-moral/archive">Good Moral CSV</a>
+        </div>
+        <p class="archive-note">Use the browser print dialog in the Minor Offense tab to save PDFs.</p>
+      </section>
+    </main>
+
+    <script type="module" src="auth-guard.js"></script>
+  </body>
+</html>
