@@ -27,8 +27,7 @@ db.exec(`
     sex TEXT NOT NULL,
     offense TEXT NOT NULL,
     sanction TEXT NOT NULL,
-    date_of_sanction TEXT NOT NULL,
-    signature TEXT
+    date_of_sanction TEXT NOT NULL
   );
 `);
 
@@ -42,8 +41,7 @@ db.exec(`
     sr_code TEXT NOT NULL,
     course TEXT NOT NULL,
     sex TEXT NOT NULL,
-    reason TEXT NOT NULL,
-    signature TEXT
+    reason TEXT NOT NULL
   );
 `);
 
@@ -57,8 +55,21 @@ db.exec(`
     sr_code TEXT NOT NULL,
     course TEXT NOT NULL,
     sex TEXT NOT NULL,
-    reason TEXT NOT NULL,
-    signature TEXT
+    reason TEXT NOT NULL
+  );
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS good_moral (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    time_in TEXT NOT NULL,
+    time_out TEXT NOT NULL,
+    name TEXT NOT NULL,
+    sr_code TEXT NOT NULL,
+    course TEXT NOT NULL,
+    sex TEXT NOT NULL,
+    purpose TEXT NOT NULL
   );
 `);
 
@@ -74,6 +85,21 @@ const listGatepassStmt = db.prepare(
   `SELECT * FROM gatepass ORDER BY date(date) DESC, id DESC`
 );
 
+const listGoodMoralStmt = db.prepare(`
+  SELECT
+    gm.*,
+    CASE
+      WHEN EXISTS (
+        SELECT 1
+        FROM minor_offenses mo
+        WHERE TRIM(mo.sr_code) = TRIM(gm.sr_code)
+      ) THEN 1
+      ELSE 0
+    END AS has_minor_offense
+  FROM good_moral gm
+  ORDER BY date(gm.date) DESC, gm.id DESC
+`);
+
 const insertStmt = db.prepare(`
   INSERT INTO minor_offenses (
     date_of_complaint,
@@ -85,8 +111,7 @@ const insertStmt = db.prepare(`
     sex,
     offense,
     sanction,
-    date_of_sanction,
-    signature
+    date_of_sanction
   ) VALUES (
     @date_of_complaint,
     @name_of_student,
@@ -97,8 +122,7 @@ const insertStmt = db.prepare(`
     @sex,
     @offense,
     @sanction,
-    @date_of_sanction,
-    @signature
+    @date_of_sanction
   )
 `);
 
@@ -111,8 +135,7 @@ const insertUniformStmt = db.prepare(`
     sr_code,
     course,
     sex,
-    reason,
-    signature
+    reason
   ) VALUES (
     @date,
     @time_in,
@@ -121,8 +144,7 @@ const insertUniformStmt = db.prepare(`
     @sr_code,
     @course,
     @sex,
-    @reason,
-    @signature
+    @reason
   )
 `);
 
@@ -135,8 +157,7 @@ const insertGatepassStmt = db.prepare(`
     sr_code,
     course,
     sex,
-    reason,
-    signature
+    reason
   ) VALUES (
     @date,
     @time_in,
@@ -145,18 +166,41 @@ const insertGatepassStmt = db.prepare(`
     @sr_code,
     @course,
     @sex,
-    @reason,
-    @signature
+    @reason
+  )
+`);
+
+const insertGoodMoralStmt = db.prepare(`
+  INSERT INTO good_moral (
+    date,
+    time_in,
+    time_out,
+    name,
+    sr_code,
+    course,
+    sex,
+    purpose
+  ) VALUES (
+    @date,
+    @time_in,
+    @time_out,
+    @name,
+    @sr_code,
+    @course,
+    @sex,
+    @purpose
   )
 `);
 
 const countMinorStmt = db.prepare(`SELECT COUNT(*) as count FROM minor_offenses`);
 const countUniformStmt = db.prepare(`SELECT COUNT(*) as count FROM non_wearing_uniform`);
 const countGatepassStmt = db.prepare(`SELECT COUNT(*) as count FROM gatepass`);
+const countGoodMoralStmt = db.prepare(`SELECT COUNT(*) as count FROM good_moral`);
 const pendingSanctionsStmt = db.prepare(`
   SELECT COUNT(*) as count
   FROM minor_offenses
-  WHERE signature IS NULL OR TRIM(signature) = ''
+  WHERE sanction IS NULL OR TRIM(sanction) = ''
+     OR date_of_sanction IS NULL OR TRIM(date_of_sanction) = ''
 `);
 const resolvedWeekStmt = db.prepare(`
   SELECT COUNT(*) as count
@@ -167,13 +211,19 @@ const resolvedWeekStmt = db.prepare(`
 const followUpsStmt = db.prepare(`
   SELECT COUNT(*) as count
   FROM non_wearing_uniform
-  WHERE signature IS NULL OR TRIM(signature) = ''
+  WHERE time_out IS NULL OR TRIM(time_out) = ''
 `);
 
 const gatepassFollowUpsStmt = db.prepare(`
   SELECT COUNT(*) as count
   FROM gatepass
-  WHERE signature IS NULL OR TRIM(signature) = ''
+  WHERE time_out IS NULL OR TRIM(time_out) = ''
+`);
+
+const goodMoralFollowUpsStmt = db.prepare(`
+  SELECT COUNT(*) as count
+  FROM good_moral
+  WHERE time_out IS NULL OR TRIM(time_out) = ''
 `);
 
 app.use(express.json());
@@ -184,9 +234,47 @@ app.get("/api/minor-offenses", (_req, res) => {
   res.json(rows);
 });
 
+app.get("/api/minor-offenses/archive", (_req, res) => {
+  const rows = listStmt.all();
+  const headers = [
+    "date_of_complaint",
+    "name_of_student",
+    "sr_code",
+    "year_program",
+    "contact_number",
+    "reported_by",
+    "sex",
+    "offense",
+    "sanction",
+    "date_of_sanction",
+  ];
+  const csv = buildCsv(headers, rows);
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", "attachment; filename=minor-offenses.csv");
+  res.send(csv);
+});
+
 app.get("/api/non-wearing-uniform", (_req, res) => {
   const rows = listUniformStmt.all();
   res.json(rows);
+});
+
+app.get("/api/non-wearing-uniform/archive", (_req, res) => {
+  const rows = listUniformStmt.all();
+  const headers = [
+    "date",
+    "time_in",
+    "time_out",
+    "name",
+    "sr_code",
+    "course",
+    "sex",
+    "reason",
+  ];
+  const csv = buildCsv(headers, rows);
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", "attachment; filename=non-wearing-uniform.csv");
+  res.send(csv);
 });
 
 app.get("/api/gatepass", (_req, res) => {
@@ -194,17 +282,61 @@ app.get("/api/gatepass", (_req, res) => {
   res.json(rows);
 });
 
+app.get("/api/gatepass/archive", (_req, res) => {
+  const rows = listGatepassStmt.all();
+  const headers = [
+    "date",
+    "time_in",
+    "time_out",
+    "name",
+    "sr_code",
+    "course",
+    "sex",
+    "reason",
+  ];
+  const csv = buildCsv(headers, rows);
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", "attachment; filename=gatepass.csv");
+  res.send(csv);
+});
+
+app.get("/api/good-moral", (_req, res) => {
+  const rows = listGoodMoralStmt.all();
+  res.json(rows);
+});
+
+app.get("/api/good-moral/archive", (_req, res) => {
+  const rows = listGoodMoralStmt.all();
+  const headers = [
+    "date",
+    "time_in",
+    "time_out",
+    "name",
+    "sr_code",
+    "course",
+    "sex",
+    "purpose",
+  ];
+  const csv = buildCsv(headers, rows);
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", "attachment; filename=good-moral.csv");
+  res.send(csv);
+});
+
 app.get("/api/dashboard", (_req, res) => {
   const minorCount = countMinorStmt.get().count || 0;
   const uniformCount = countUniformStmt.get().count || 0;
   const gatepassCount = countGatepassStmt.get().count || 0;
+  const goodMoralCount = countGoodMoralStmt.get().count || 0;
   const pendingSanctions = pendingSanctionsStmt.get().count || 0;
   const resolvedThisWeek = resolvedWeekStmt.get().count || 0;
   const followUpsDue =
-    (followUpsStmt.get().count || 0) + (gatepassFollowUpsStmt.get().count || 0);
+    (followUpsStmt.get().count || 0) +
+    (gatepassFollowUpsStmt.get().count || 0) +
+    (goodMoralFollowUpsStmt.get().count || 0);
 
   res.json({
-    activeCases: minorCount + uniformCount + gatepassCount,
+    activeCases: minorCount + uniformCount + gatepassCount + goodMoralCount,
     pendingSanctions,
     resolvedThisWeek,
     followUpsDue,
@@ -231,12 +363,7 @@ app.post("/api/minor-offenses", (req, res) => {
     return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
   }
 
-  const record = {
-    ...payload,
-    signature: payload.signature || "",
-  };
-
-  const info = insertStmt.run(record);
+  const info = insertStmt.run(payload);
   res.status(201).json({ id: info.lastInsertRowid });
 });
 
@@ -258,12 +385,7 @@ app.post("/api/non-wearing-uniform", (req, res) => {
     return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
   }
 
-  const record = {
-    ...payload,
-    signature: payload.signature || "",
-  };
-
-  const info = insertUniformStmt.run(record);
+  const info = insertUniformStmt.run(payload);
   res.status(201).json({ id: info.lastInsertRowid });
 });
 
@@ -285,12 +407,29 @@ app.post("/api/gatepass", (req, res) => {
     return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
   }
 
-  const record = {
-    ...payload,
-    signature: payload.signature || "",
-  };
+  const info = insertGatepassStmt.run(payload);
+  res.status(201).json({ id: info.lastInsertRowid });
+});
 
-  const info = insertGatepassStmt.run(record);
+app.post("/api/good-moral", (req, res) => {
+  const payload = req.body || {};
+  const requiredFields = [
+    "date",
+    "time_in",
+    "time_out",
+    "name",
+    "sr_code",
+    "course",
+    "sex",
+    "purpose",
+  ];
+
+  const missing = requiredFields.filter((field) => !payload[field]);
+  if (missing.length) {
+    return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
+  }
+
+  const info = insertGoodMoralStmt.run(payload);
   res.status(201).json({ id: info.lastInsertRowid });
 });
 
@@ -348,6 +487,20 @@ function formatDate(value) {
   });
 }
 
+function toCsvValue(value) {
+  const text = String(value ?? "");
+  if (/[",\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function buildCsv(headers, rows) {
+  const headerLine = headers.join(",");
+  const lines = rows.map((row) => headers.map((key) => toCsvValue(row[key])).join(","));
+  return [headerLine, ...lines].join("\n");
+}
+
 function renderMinorOffensesHTML(records) {
   const rows = records
     .map((record) => {
@@ -364,7 +517,6 @@ function renderMinorOffensesHTML(records) {
           <td>${escapeHtml(record.offense)}</td>
           <td>${escapeHtml(record.sanction)}</td>
           <td>${escapeHtml(formatDate(record.date_of_sanction))}</td>
-          <td>${escapeHtml(record.signature || "")}</td>
         </tr>
       `;
     })
@@ -421,7 +573,6 @@ function renderMinorOffensesHTML(records) {
                 <th rowspan="2">Offense</th>
                 <th rowspan="2">Sanction</th>
                 <th rowspan="2">Date of Sanction</th>
-                <th rowspan="2">Signature</th>
               </tr>
               <tr>
                 <th>M</th>
@@ -429,7 +580,7 @@ function renderMinorOffensesHTML(records) {
               </tr>
             </thead>
             <tbody>
-              ${rows || "<tr><td colspan='12'>No records</td></tr>"}
+              ${rows || "<tr><td colspan='11'>No records</td></tr>"}
             </tbody>
           </table>
         </div>

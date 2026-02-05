@@ -11,10 +11,24 @@ const uniformStatus = document.querySelector("#uniform-status");
 const gatepassTableBody = document.querySelector("#gatepass-table-body");
 const gatepassForm = document.querySelector("#gatepass-form");
 const gatepassStatus = document.querySelector("#gatepass-status");
+const goodmoralTableBody = document.querySelector("#goodmoral-table-body");
+const goodmoralForm = document.querySelector("#goodmoral-form");
+const goodmoralStatus = document.querySelector("#goodmoral-status");
 const statActive = document.querySelector("[data-stat='active']");
 const statPending = document.querySelector("[data-stat='pending']");
 const statResolved = document.querySelector("[data-stat='resolved']");
 const statFollowups = document.querySelector("[data-stat='followups']");
+const archiveButtons = document.querySelectorAll("[data-archive]");
+
+const minorFilter = document.querySelector("[data-filter-scope='minor']");
+const uniformFilter = document.querySelector("[data-filter-scope='uniform']");
+const gatepassFilter = document.querySelector("[data-filter-scope='gatepass']");
+const goodmoralFilter = document.querySelector("[data-filter-scope='goodmoral']");
+
+let minorRecords = [];
+let uniformRecords = [];
+let gatepassRecords = [];
+let goodmoralRecords = [];
 
 function switchTab(targetId) {
   tabs.forEach((tab) => {
@@ -40,7 +54,7 @@ function renderRows(records) {
   tableBody.innerHTML = "";
   if (!records.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="12">No records yet. Create the first entry below.</td>`;
+    row.innerHTML = `<td colspan="11">No records yet. Create the first entry below.</td>`;
     tableBody.appendChild(row);
     return;
   }
@@ -59,7 +73,6 @@ function renderRows(records) {
       <td>${record.offense || ""}</td>
       <td>${record.sanction || ""}</td>
       <td>${formatDate(record.date_of_sanction)}</td>
-      <td>${record.signature || ""}</td>
     `;
     tableBody.appendChild(row);
   });
@@ -69,7 +82,7 @@ function renderUniformRows(records) {
   uniformTableBody.innerHTML = "";
   if (!records.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="11">No records yet. Create the first entry below.</td>`;
+    row.innerHTML = `<td colspan="10">No records yet. Create the first entry below.</td>`;
     uniformTableBody.appendChild(row);
     return;
   }
@@ -87,7 +100,6 @@ function renderUniformRows(records) {
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.reason || ""}</td>
-      <td>${record.signature || ""}</td>
     `;
     uniformTableBody.appendChild(row);
   });
@@ -97,7 +109,7 @@ function renderGatepassRows(records) {
   gatepassTableBody.innerHTML = "";
   if (!records.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="11">No records yet. Create the first entry below.</td>`;
+    row.innerHTML = `<td colspan="10">No records yet. Create the first entry below.</td>`;
     gatepassTableBody.appendChild(row);
     return;
   }
@@ -115,9 +127,139 @@ function renderGatepassRows(records) {
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.reason || ""}</td>
-      <td>${record.signature || ""}</td>
     `;
     gatepassTableBody.appendChild(row);
+  });
+}
+
+function renderGoodmoralRows(records) {
+  goodmoralTableBody.innerHTML = "";
+  if (!records.length) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td colspan="10">No records yet. Create the first entry below.</td>`;
+    goodmoralTableBody.appendChild(row);
+    return;
+  }
+
+  records.forEach((record, index) => {
+    const tag = record.has_minor_offense
+      ? `<span class="tag tag-alert">Minor Offense</span>`
+      : "";
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${index + 1}</td>
+      <td>${formatDate(record.date)}</td>
+      <td>${record.time_in || ""}</td>
+      <td>${record.time_out || ""}</td>
+      <td>${record.name || ""} ${tag}</td>
+      <td>${record.sr_code || ""}</td>
+      <td>${record.course || ""}</td>
+      <td>${record.sex === "M" ? "✔" : ""}</td>
+      <td>${record.sex === "F" ? "✔" : ""}</td>
+      <td>${record.purpose || ""}</td>
+    `;
+    goodmoralTableBody.appendChild(row);
+  });
+}
+
+function matchesQuery(record, fields, query) {
+  if (!query) return true;
+  const haystack = fields.map((field) => String(record[field] || "")).join(" ").toLowerCase();
+  return haystack.includes(query.toLowerCase());
+}
+
+function withinDateRange(recordDate, from, to) {
+  if (!recordDate) return false;
+  const dateValue = new Date(recordDate);
+  if (Number.isNaN(dateValue.getTime())) return false;
+  if (from) {
+    const fromDate = new Date(from);
+    if (dateValue < fromDate) return false;
+  }
+  if (to) {
+    const toDate = new Date(to);
+    if (dateValue > toDate) return false;
+  }
+  return true;
+}
+
+function applyMinorFilters() {
+  if (!minorFilter) return;
+  const query = minorFilter.querySelector("[data-filter='query']").value.trim();
+  const from = minorFilter.querySelector("[data-filter='from']").value;
+  const to = minorFilter.querySelector("[data-filter='to']").value;
+
+  const filtered = minorRecords.filter((record) => {
+    const inRange = withinDateRange(record.date_of_complaint, from, to);
+    const matches = matchesQuery(record, ["name_of_student", "sr_code", "offense", "reported_by", "year_program"], query);
+    return inRange && matches;
+  });
+  renderRows(filtered);
+}
+
+function applyUniformFilters() {
+  if (!uniformFilter) return;
+  const query = uniformFilter.querySelector("[data-filter='query']").value.trim();
+  const from = uniformFilter.querySelector("[data-filter='from']").value;
+  const to = uniformFilter.querySelector("[data-filter='to']").value;
+
+  const filtered = uniformRecords.filter((record) => {
+    const inRange = withinDateRange(record.date, from, to);
+    const matches = matchesQuery(record, ["name", "sr_code", "course", "reason"], query);
+    return inRange && matches;
+  });
+  renderUniformRows(filtered);
+}
+
+function applyGatepassFilters() {
+  if (!gatepassFilter) return;
+  const query = gatepassFilter.querySelector("[data-filter='query']").value.trim();
+  const from = gatepassFilter.querySelector("[data-filter='from']").value;
+  const to = gatepassFilter.querySelector("[data-filter='to']").value;
+
+  const filtered = gatepassRecords.filter((record) => {
+    const inRange = withinDateRange(record.date, from, to);
+    const matches = matchesQuery(record, ["name", "sr_code", "course", "reason"], query);
+    return inRange && matches;
+  });
+  renderGatepassRows(filtered);
+}
+
+function applyGoodmoralFilters() {
+  if (!goodmoralFilter) return;
+  const query = goodmoralFilter.querySelector("[data-filter='query']").value.trim();
+  const from = goodmoralFilter.querySelector("[data-filter='from']").value;
+  const to = goodmoralFilter.querySelector("[data-filter='to']").value;
+
+  const filtered = goodmoralRecords.filter((record) => {
+    const inRange = withinDateRange(record.date, from, to);
+    const matches = matchesQuery(record, ["name", "sr_code", "course", "purpose"], query);
+    return inRange && matches;
+  });
+  renderGoodmoralRows(filtered);
+}
+
+function setupFilters(scopeElement, applyFn) {
+  if (!scopeElement) return;
+  const queryInput = scopeElement.querySelector("[data-filter='query']");
+  const fromInput = scopeElement.querySelector("[data-filter='from']");
+  const toInput = scopeElement.querySelector("[data-filter='to']");
+  const applyButton = scopeElement.querySelector("[data-filter='apply']");
+  const clearButton = scopeElement.querySelector("[data-filter='clear']");
+
+  [queryInput, fromInput, toInput].forEach((input) => {
+    input.addEventListener("input", applyFn);
+  });
+
+  if (applyButton) {
+    applyButton.addEventListener("click", applyFn);
+  }
+
+  clearButton.addEventListener("click", () => {
+    queryInput.value = "";
+    fromInput.value = "";
+    toInput.value = "";
+    applyFn();
   });
 }
 
@@ -125,7 +267,8 @@ async function loadRecords() {
   try {
     const response = await fetch("/api/minor-offenses");
     const records = await response.json();
-    renderRows(records);
+    minorRecords = records;
+    applyMinorFilters();
   } catch (error) {
     renderRows([]);
   }
@@ -151,7 +294,8 @@ async function loadUniformRecords() {
   try {
     const response = await fetch("/api/non-wearing-uniform");
     const records = await response.json();
-    renderUniformRows(records);
+    uniformRecords = records;
+    applyUniformFilters();
   } catch (error) {
     renderUniformRows([]);
   }
@@ -161,9 +305,21 @@ async function loadGatepassRecords() {
   try {
     const response = await fetch("/api/gatepass");
     const records = await response.json();
-    renderGatepassRows(records);
+    gatepassRecords = records;
+    applyGatepassFilters();
   } catch (error) {
     renderGatepassRows([]);
+  }
+}
+
+async function loadGoodmoralRecords() {
+  try {
+    const response = await fetch("/api/good-moral");
+    const records = await response.json();
+    goodmoralRecords = records;
+    applyGoodmoralFilters();
+  } catch (error) {
+    renderGoodmoralRows([]);
   }
 }
 
@@ -184,6 +340,7 @@ heroButtons.forEach((button) => {
   });
 });
 
+
 if (recordForm) {
   recordForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -199,7 +356,8 @@ if (recordForm) {
       });
 
       if (!response.ok) {
-        throw new Error("Unable to save record.");
+        const details = await response.json().catch(() => null);
+        throw new Error(details?.error || "Unable to save record.");
       }
 
       recordForm.reset();
@@ -207,7 +365,10 @@ if (recordForm) {
       await loadRecords();
       await loadDashboard();
     } catch (error) {
-      formStatus.textContent = "Something went wrong. Please try again.";
+      formStatus.textContent =
+        error?.message?.includes("Failed to fetch")
+          ? "Server not reachable. Please start the server."
+          : error.message || "Something went wrong. Please try again.";
     }
   });
 }
@@ -227,7 +388,8 @@ if (uniformForm) {
       });
 
       if (!response.ok) {
-        throw new Error("Unable to save record.");
+        const details = await response.json().catch(() => null);
+        throw new Error(details?.error || "Unable to save record.");
       }
 
       uniformForm.reset();
@@ -235,7 +397,10 @@ if (uniformForm) {
       await loadUniformRecords();
       await loadDashboard();
     } catch (error) {
-      uniformStatus.textContent = "Something went wrong. Please try again.";
+      uniformStatus.textContent =
+        error?.message?.includes("Failed to fetch")
+          ? "Server not reachable. Please start the server."
+          : error.message || "Something went wrong. Please try again.";
     }
   });
 }
@@ -255,7 +420,8 @@ if (gatepassForm) {
       });
 
       if (!response.ok) {
-        throw new Error("Unable to save record.");
+        const details = await response.json().catch(() => null);
+        throw new Error(details?.error || "Unable to save record.");
       }
 
       gatepassForm.reset();
@@ -263,7 +429,42 @@ if (gatepassForm) {
       await loadGatepassRecords();
       await loadDashboard();
     } catch (error) {
-      gatepassStatus.textContent = "Something went wrong. Please try again.";
+      gatepassStatus.textContent =
+        error?.message?.includes("Failed to fetch")
+          ? "Server not reachable. Please start the server."
+          : error.message || "Something went wrong. Please try again.";
+    }
+  });
+}
+
+if (goodmoralForm) {
+  goodmoralForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    goodmoralStatus.textContent = "Saving record...";
+    const formData = new FormData(goodmoralForm);
+    const payload = Object.fromEntries(formData.entries());
+
+    try {
+      const response = await fetch("/api/good-moral", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const details = await response.json().catch(() => null);
+        throw new Error(details?.error || "Unable to save record.");
+      }
+
+      goodmoralForm.reset();
+      goodmoralStatus.textContent = "Record saved.";
+      await loadGoodmoralRecords();
+      await loadDashboard();
+    } catch (error) {
+      goodmoralStatus.textContent =
+        error?.message?.includes("Failed to fetch")
+          ? "Server not reachable. Please start the server."
+          : error.message || "Something went wrong. Please try again.";
     }
   });
 }
@@ -277,4 +478,19 @@ if (exportButton) {
 loadRecords();
 loadUniformRecords();
 loadGatepassRecords();
+loadGoodmoralRecords();
 loadDashboard();
+
+setupFilters(minorFilter, applyMinorFilters);
+setupFilters(uniformFilter, applyUniformFilters);
+setupFilters(gatepassFilter, applyGatepassFilters);
+setupFilters(goodmoralFilter, applyGoodmoralFilters);
+
+archiveButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const endpoint = button.dataset.archive;
+    if (endpoint) {
+      window.location.href = `/api/${endpoint}/archive`;
+    }
+  });
+});
