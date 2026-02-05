@@ -318,9 +318,10 @@ h1 {
 
 .sheet-header {
   display: grid;
-  grid-template-columns: 80px 1fr;
-  gap: 16px;
+  grid-template-columns: 1fr;
+  gap: 12px;
   align-items: center;
+  justify-items: center;
   margin-bottom: 20px;
 }
 

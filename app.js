@@ -341,17 +341,22 @@ function attachRowActions({ tableElement, endpoint, getRecords, form, fields, re
       const confirmed = window.confirm("Delete this record?");
       if (!confirmed) return;
 
-      try {
-        const response = await fetch(`/api/${endpoint}/${id}`, { method: "DELETE" });
-        if (!response.ok) {
-          const details = await response.json().catch(() => null);
-          throw new Error(details?.error || "Delete failed.");
-        }
-        await reloadFn();
-        await loadDashboard();
-      } catch (error) {
-        alert(error.message || "Unable to delete record.");
+    try {
+      const response = await fetch(`/api/${endpoint}/${id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const details = await response.json().catch(() => null);
+        const message =
+          details?.error ||
+          (response.status === 404
+            ? "Delete endpoint not found or record missing. Restart the server."
+            : "Delete failed.");
+        throw new Error(message);
       }
+      await reloadFn();
+      await loadDashboard();
+    } catch (error) {
+      alert(error.message || "Unable to delete record.");
+    }
     }
   });
 }

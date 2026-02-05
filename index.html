@@ -89,7 +89,7 @@
           <article>
             <h3>Program Monitoring</h3>
             <p>Track compliance, program participation, and document updates in one view.</p>
-            <button class="link">View Programs</button>
+            <a class="link" href="programs.html">View Programs</a>
           </article>
           <article>
             <h3>Document Control</h3>
@@ -107,65 +107,13 @@
       <section id="minor" class="tab">
         <div class="sheet">
           <div class="sheet-header">
-            <div class="seal">BATSTATEU</div>
-            <div class="sheet-title">
-              <p class="line small">Republic of the Philippines</p>
-              <p class="line accent">Batangas State University</p>
-              <p class="line">The National Engineering University</p>
-              <p class="line">Alangilan Campus</p>
-              <p class="line strong">OFFICE OF STUDENT DISCIPLINE</p>
-              <p class="line">First Semester AY 2025-2026</p>
-            </div>
+            <div class="sheet-title"></div>
           </div>
 
           <div class="log-title">
             <h2>LOGSHEET</h2>
             <h3>MINOR OFFENSES</h3>
           </div>
-
-          <div class="filter-bar" data-filter-scope="minor">
-            <input type="search" placeholder="Search name, SR code, offense, reported by..." data-filter="query" />
-            <label>
-              From
-              <input type="date" data-filter="from" />
-            </label>
-            <label>
-              To
-              <input type="date" data-filter="to" />
-            </label>
-            <button class="primary" type="button" data-filter="apply">Filter</button>
-            <button class="ghost" type="button" data-filter="clear">Clear</button>
-          </div>
-
-          <div class="sheet-actions">
-            <button class="primary" id="export-pdf">Export Logsheet PDF</button>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th rowspan="2">Date of Complaint</th>
-                  <th rowspan="2">Name of Student</th>
-                  <th rowspan="2">SR Code</th>
-                  <th rowspan="2">Year / Program</th>
-                  <th rowspan="2">Contact Number</th>
-                  <th rowspan="2">Reported By</th>
-                  <th colspan="2">Sex</th>
-                  <th rowspan="2">Offense</th>
-                  <th rowspan="2">Sanction</th>
-                  <th rowspan="2">Date of Sanction</th>
-                  <th rowspan="2">Action</th>
-                </tr>
-                <tr>
-                  <th>M</th>
-                  <th>F</th>
-                </tr>
-              </thead>
-              <tbody id="minor-table-body"></tbody>
-            </table>
-          </div>
-          <p class="footnote">Prepared by OSD staff for monitoring and compliance tracking.</p>
 
           <form id="record-form" class="record-form">
             <div class="form-header">
@@ -221,30 +169,9 @@
             </div>
             <p class="form-status" id="form-status" aria-live="polite"></p>
           </form>
-        </div>
-      </section>
 
-      <section id="uniform" class="tab">
-        <div class="sheet">
-          <div class="sheet-header">
-            <div class="seal">BATSU</div>
-            <div class="sheet-title">
-              <p class="line small">Republic of the Philippines</p>
-              <p class="line accent">Batangas State University</p>
-              <p class="line">The National Engineering University</p>
-              <p class="line">Alangilan Campus</p>
-              <p class="line strong">OFFICE OF STUDENT DISCIPLINE</p>
-              <p class="line">Second Semester AY 2025-2026</p>
-            </div>
-          </div>
-
-          <div class="log-title">
-            <h2>LOGSHEET</h2>
-            <h3>REQUEST FOR NON-WEARING OF UNIFORM</h3>
-          </div>
-
-          <div class="filter-bar" data-filter-scope="uniform">
-            <input type="search" placeholder="Search name, SR code, course, reason..." data-filter="query" />
+          <div class="filter-bar" data-filter-scope="minor">
+            <input type="search" placeholder="Search name, SR code, offense, reported by..." data-filter="query" />
             <label>
               From
               <input type="date" data-filter="from" />
@@ -257,29 +184,47 @@
             <button class="ghost" type="button" data-filter="clear">Clear</button>
           </div>
 
+          <div class="sheet-actions">
+            <button class="primary" id="export-pdf">Export Logsheet PDF</button>
+          </div>
+
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th rowspan="2">No.</th>
-                  <th rowspan="2">Date</th>
-                  <th colspan="2">Time</th>
-                  <th rowspan="2">Name</th>
+                  <th rowspan="2">Date of Complaint</th>
+                  <th rowspan="2">Name of Student</th>
                   <th rowspan="2">SR Code</th>
-                  <th rowspan="2">Course</th>
+                  <th rowspan="2">Year / Program</th>
+                  <th rowspan="2">Contact Number</th>
+                  <th rowspan="2">Reported By</th>
                   <th colspan="2">Sex</th>
-                  <th rowspan="2">Reason</th>
+                  <th rowspan="2">Offense</th>
+                  <th rowspan="2">Sanction</th>
+                  <th rowspan="2">Date of Sanction</th>
                   <th rowspan="2">Action</th>
                 </tr>
                 <tr>
-                  <th>In</th>
-                  <th>Out</th>
                   <th>M</th>
                   <th>F</th>
                 </tr>
               </thead>
-              <tbody id="uniform-table-body"></tbody>
+              <tbody id="minor-table-body"></tbody>
             </table>
+          </div>
+          <p class="footnote">Prepared by OSD staff for monitoring and compliance tracking.</p>
+        </div>
+      </section>
+
+      <section id="uniform" class="tab">
+        <div class="sheet">
+          <div class="sheet-header">
+            <div class="sheet-title"></div>
+          </div>
+
+          <div class="log-title">
+            <h2>LOGSHEET</h2>
+            <h3>REQUEST FOR NON-WEARING OF UNIFORM</h3>
           </div>
 
           <form id="uniform-form" class="record-form">
@@ -328,29 +273,8 @@
             </div>
             <p class="form-status" id="uniform-status" aria-live="polite"></p>
           </form>
-        </div>
-      </section>
 
-      <section id="gatepass" class="tab">
-        <div class="sheet">
-          <div class="sheet-header">
-            <div class="seal">BATSU</div>
-            <div class="sheet-title">
-              <p class="line small">Republic of the Philippines</p>
-              <p class="line accent">Batangas State University</p>
-              <p class="line">The National Engineering University</p>
-              <p class="line">Alangilan Campus</p>
-              <p class="line strong">OFFICE OF STUDENT DISCIPLINE</p>
-              <p class="line">First Semester AY 2024-2025</p>
-            </div>
-          </div>
-
-          <div class="log-title">
-            <h2>LOGSHEET</h2>
-            <h3>REQUEST FOR GATEPASS</h3>
-          </div>
-
-          <div class="filter-bar" data-filter-scope="gatepass">
+          <div class="filter-bar" data-filter-scope="uniform">
             <input type="search" placeholder="Search name, SR code, course, reason..." data-filter="query" />
             <label>
               From
@@ -385,8 +309,21 @@
                   <th>F</th>
                 </tr>
               </thead>
-              <tbody id="gatepass-table-body"></tbody>
+              <tbody id="uniform-table-body"></tbody>
             </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="gatepass" class="tab">
+        <div class="sheet">
+          <div class="sheet-header">
+            <div class="sheet-title"></div>
+          </div>
+
+          <div class="log-title">
+            <h2>LOGSHEET</h2>
+            <h3>REQUEST FOR GATEPASS</h3>
           </div>
 
           <form id="gatepass-form" class="record-form">
@@ -435,30 +372,9 @@
             </div>
             <p class="form-status" id="gatepass-status" aria-live="polite"></p>
           </form>
-        </div>
-      </section>
 
-      <section id="goodmoral" class="tab">
-        <div class="sheet">
-          <div class="sheet-header">
-            <div class="seal">BATSU</div>
-            <div class="sheet-title">
-              <p class="line small">Republic of the Philippines</p>
-              <p class="line accent">Batangas State University</p>
-              <p class="line">The National Engineering University</p>
-              <p class="line">Alangilan Campus</p>
-              <p class="line strong">OFFICE OF STUDENT DISCIPLINE</p>
-              <p class="line">First Semester AY 2024-2025</p>
-            </div>
-          </div>
-
-          <div class="log-title">
-            <h2>LOGSHEET</h2>
-            <h3>VERIFICATION OF RECORDS ON OFFENSES FOR THE REQUEST ON GOOD MORAL CERTIFICATE</h3>
-          </div>
-
-          <div class="filter-bar" data-filter-scope="goodmoral">
-            <input type="search" placeholder="Search name, SR code, course, purpose..." data-filter="query" />
+          <div class="filter-bar" data-filter-scope="gatepass">
+            <input type="search" placeholder="Search name, SR code, course, reason..." data-filter="query" />
             <label>
               From
               <input type="date" data-filter="from" />
@@ -482,7 +398,7 @@
                   <th rowspan="2">SR Code</th>
                   <th rowspan="2">Course</th>
                   <th colspan="2">Sex</th>
-                  <th rowspan="2">Purpose</th>
+                  <th rowspan="2">Reason</th>
                   <th rowspan="2">Action</th>
                 </tr>
                 <tr>
@@ -492,8 +408,21 @@
                   <th>F</th>
                 </tr>
               </thead>
-              <tbody id="goodmoral-table-body"></tbody>
+              <tbody id="gatepass-table-body"></tbody>
             </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="goodmoral" class="tab">
+        <div class="sheet">
+          <div class="sheet-header">
+            <div class="sheet-title"></div>
+          </div>
+
+          <div class="log-title">
+            <h2>LOGSHEET</h2>
+            <h3>VERIFICATION OF RECORDS ON OFFENSES FOR THE REQUEST ON GOOD MORAL CERTIFICATE</h3>
           </div>
 
           <form id="goodmoral-form" class="record-form">
@@ -542,6 +471,45 @@
             </div>
             <p class="form-status" id="goodmoral-status" aria-live="polite"></p>
           </form>
+
+          <div class="filter-bar" data-filter-scope="goodmoral">
+            <input type="search" placeholder="Search name, SR code, course, purpose..." data-filter="query" />
+            <label>
+              From
+              <input type="date" data-filter="from" />
+            </label>
+            <label>
+              To
+              <input type="date" data-filter="to" />
+            </label>
+            <button class="primary" type="button" data-filter="apply">Filter</button>
+            <button class="ghost" type="button" data-filter="clear">Clear</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th rowspan="2">No.</th>
+                  <th rowspan="2">Date</th>
+                  <th colspan="2">Time</th>
+                  <th rowspan="2">Name</th>
+                  <th rowspan="2">SR Code</th>
+                  <th rowspan="2">Course</th>
+                  <th colspan="2">Sex</th>
+                  <th rowspan="2">Purpose</th>
+                  <th rowspan="2">Action</th>
+                </tr>
+                <tr>
+                  <th>In</th>
+                  <th>Out</th>
+                  <th>M</th>
+                  <th>F</th>
+                </tr>
+              </thead>
+              <tbody id="goodmoral-table-body"></tbody>
+            </table>
+          </div>
         </div>
       </section>
     </main>

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OSD & OGC Monitoring | Programs</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="ambient">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">
+          <img src="assets/logo.png" alt="Batangas State University logo" />
+        </div>
+        <div>
+          <p class="brand-title">Program Monitoring</p>
+          <p class="brand-subtitle">Compliance, participation, and document tracking</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <a class="nav-btn" href="index.html">Back to Dashboard</a>
+      </nav>
+    </header>
+
+    <main class="container">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Programs Overview</p>
+          <h1>Program Monitoring Center</h1>
+          <p class="lead">
+            Use this workspace to track ongoing programs, compliance checkpoints, and participation status across
+            campus initiatives.
+          </p>
+        </div>
+        <div class="hero-card">
+          <h3>Highlights</h3>
+          <div class="stat-grid">
+            <div class="stat">
+              <span>Active Programs</span>
+              <strong>6</strong>
+            </div>
+            <div class="stat">
+              <span>Pending Reviews</span>
+              <strong>3</strong>
+            </div>
+            <div class="stat">
+              <span>Compliance Due</span>
+              <strong>5</strong>
+            </div>
+            <div class="stat">
+              <span>Reports Submitted</span>
+              <strong>12</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="cards">
+        <article>
+          <h3>Program Logbook</h3>
+          <p>Capture program milestones, attendance, and completion status.</p>
+          <button class="link">Open Logbook</button>
+        </article>
+        <article>
+          <h3>Compliance Tracker</h3>
+          <p>Monitor policy adherence, documentation status, and audit checkpoints.</p>
+          <button class="link">View Compliance</button>
+        </article>
+        <article>
+          <h3>Participation Metrics</h3>
+          <p>Review participation trends and generate summary reports.</p>
+          <button class="link">Generate Report</button>
+        </article>
+      </section>
+
+      <section class="sheet" style="margin-top: 28px;">
+        <div class="log-title">
+          <h2>Program Snapshot</h2>
+          <h3>Active Initiatives</h3>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Program</th>
+                <th>Owner</th>
+                <th>Status</th>
+                <th>Next Review</th>
+                <th>Compliance</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>OSD Orientation</td>
+                <td>Student Affairs</td>
+                <td>In Progress</td>
+                <td>Mar 05, 2026</td>
+                <td>On Track</td>
+              </tr>
+              <tr>
+                <td>Campus Safety Workshops</td>
+                <td>OSD Team</td>
+                <td>Planning</td>
+                <td>Mar 12, 2026</td>
+                <td>Needs Docs</td>
+              </tr>
+              <tr>
+                <td>Peer Mentoring</td>
+                <td>Guidance Office</td>
+                <td>Active</td>
+                <td>Feb 20, 2026</td>
+                <td>On Track</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="auth-guard.js"></script>
+  </body>
+</html>
