@@ -49,6 +49,43 @@ function formatDate(value) {
   });
 }
 
+function openPrintView() {
+  const table = document.querySelector("#minor .table-wrap table");
+  const title = document.querySelector("#minor .log-title");
+
+  if (!table || !title) return;
+
+  const printWindow = window.open("", "_blank", "width=980,height=720");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Minor Offense Logsheet</title>
+        <style>
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; }
+          .log-title { text-align: center; margin-bottom: 18px; }
+          .log-title h2 { margin: 0; font-size: 24px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; letter-spacing: 1px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #111; padding: 6px; text-align: center; }
+          th { background: #f5f5f5; text-transform: uppercase; }
+          th:last-child, td:last-child { display: none; }
+        </style>
+      </head>
+      <body>
+        ${title.outerHTML}
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
 function renderRows(records) {
   tableBody.innerHTML = "";
   if (!records.length) {
@@ -590,7 +627,7 @@ if (goodmoralForm) {
 
 if (exportButton) {
   exportButton.addEventListener("click", () => {
-    window.location.href = "/api/minor-offenses/pdf";
+    openPrintView();
   });
 }
 
