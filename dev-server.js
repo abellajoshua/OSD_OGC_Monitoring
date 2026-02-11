@@ -4,6 +4,7 @@ const express = require("express");
 const path = require("path");
 
 const dashboardHandler = require("./api/dashboard");
+const configHandler = require("./api/config");
 const minorHandler = require("./api/minor-offenses/index");
 const minorByIdHandler = require("./api/minor-offenses/[id]");
 const minorArchiveHandler = require("./api/minor-offenses/archive");
@@ -21,8 +22,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, "public")));
 
+app.all("/api/config", (req, res) => configHandler(req, res));
 app.all("/api/dashboard", (req, res) => dashboardHandler(req, res));
 
 app.all("/api/minor-offenses", (req, res) => minorHandler(req, res));

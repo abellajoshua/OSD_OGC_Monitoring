@@ -15,6 +15,7 @@ OSD_OGC_Monitoring is a web-based system designed to centralize and monitor OSD 
 3. Add environment variables:
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
+   - `SUPABASE_ANON_KEY`
    - For local dev, you can place them in `.env` (see `.env.example`).
 
 ## Deploy to Vercel
@@ -27,3 +28,4 @@ OSD_OGC_Monitoring is a web-based system designed to centralize and monitor OSD 
 
 ## Notes
 - The “Print / Save PDF” button uses the browser print dialog.
+- Static files are served from `public/`.
