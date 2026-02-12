@@ -1,6 +1,7 @@
 {
   "version": 2,
   "routes": [
+    { "src": "/", "dest": "/login.html" },
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/login", "dest": "/login.html" },
     { "src": "/register", "dest": "/register.html" },
