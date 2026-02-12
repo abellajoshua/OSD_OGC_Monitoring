@@ -1,9 +1,10 @@
-import { supabase } from "./supabaseClient.js";
+import { getSupabase } from "./supabaseClient.js";
 
 const registerForm = document.querySelector("#register-form");
 const statusEl = document.querySelector("#register-status");
 
 async function redirectIfLoggedIn() {
+  const supabase = await getSupabase();
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -28,6 +29,7 @@ if (registerForm) {
       return;
     }
 
+    const supabase = await getSupabase();
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -49,4 +51,6 @@ if (registerForm) {
   });
 }
 
-redirectIfLoggedIn();
+redirectIfLoggedIn().catch((error) => {
+  statusEl.textContent = error.message || "Unable to connect to Supabase.";
+});
