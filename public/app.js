@@ -14,10 +14,16 @@ const gatepassStatus = document.querySelector("#gatepass-status");
 const goodmoralTableBody = document.querySelector("#goodmoral-table-body");
 const goodmoralForm = document.querySelector("#goodmoral-form");
 const goodmoralStatus = document.querySelector("#goodmoral-status");
+const dashboardActivityBody = document.querySelector("#dashboard-activity-body");
 const statActive = document.querySelector("[data-stat='active']");
 const statPending = document.querySelector("[data-stat='pending']");
 const statResolved = document.querySelector("[data-stat='resolved']");
 const statFollowups = document.querySelector("[data-stat='followups']");
+const kpiMinor = document.querySelector("[data-kpi='minor']");
+const kpiUniform = document.querySelector("[data-kpi='uniform']");
+const kpiGatepass = document.querySelector("[data-kpi='gatepass']");
+const kpiGoodmoral = document.querySelector("[data-kpi='goodmoral']");
+const kpiGoodmoralFlagged = document.querySelector("[data-kpi='goodmoral-flagged']");
 
 const minorFilter = document.querySelector("[data-filter-scope='minor']");
 const uniformFilter = document.querySelector("[data-filter-scope='uniform']");
@@ -28,6 +34,14 @@ let minorRecords = [];
 let uniformRecords = [];
 let gatepassRecords = [];
 let goodmoralRecords = [];
+
+function normalizeDateValue(record) {
+  return (
+    record.date_of_complaint ||
+    record.date ||
+    (record.created_at ? String(record.created_at).slice(0, 10) : "")
+  );
+}
 
 function switchTab(targetId) {
   tabs.forEach((tab) => {
@@ -47,6 +61,86 @@ function formatDate(value) {
     day: "2-digit",
     year: "numeric",
   });
+}
+
+function formatDashboardDetail(item) {
+  if (item.type === "Minor Offense") return item.record.offense || "";
+  if (item.type === "Good Moral") {
+    const purpose = item.record.purpose || "";
+    return item.record.has_minor_offense ? `${purpose} (Minor offense tagged)` : purpose;
+  }
+  return item.record.reason || "";
+}
+
+function buildRecentDashboardItems() {
+  const mappedMinor = minorRecords.map((record) => ({
+    type: "Minor Offense",
+    date: normalizeDateValue(record),
+    name: record.name_of_student || "",
+    srCode: record.sr_code || "",
+    record,
+  }));
+  const mappedUniform = uniformRecords.map((record) => ({
+    type: "Non-Wearing Uniform",
+    date: normalizeDateValue(record),
+    name: record.name || "",
+    srCode: record.sr_code || "",
+    record,
+  }));
+  const mappedGatepass = gatepassRecords.map((record) => ({
+    type: "Gatepass",
+    date: normalizeDateValue(record),
+    name: record.name || "",
+    srCode: record.sr_code || "",
+    record,
+  }));
+  const mappedGoodmoral = goodmoralRecords.map((record) => ({
+    type: "Good Moral",
+    date: normalizeDateValue(record),
+    name: record.name || "",
+    srCode: record.sr_code || "",
+    record,
+  }));
+
+  return [...mappedMinor, ...mappedUniform, ...mappedGatepass, ...mappedGoodmoral]
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .slice(0, 10);
+}
+
+function renderDashboardActivity() {
+  if (!dashboardActivityBody) return;
+  const items = buildRecentDashboardItems();
+  dashboardActivityBody.innerHTML = "";
+
+  if (!items.length) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td colspan="5">No entries yet.</td>`;
+    dashboardActivityBody.appendChild(row);
+    return;
+  }
+
+  items.forEach((item) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${formatDate(item.date)}</td>
+      <td>${item.type}</td>
+      <td>${item.name}</td>
+      <td>${item.srCode}</td>
+      <td>${formatDashboardDetail(item)}</td>
+    `;
+    dashboardActivityBody.appendChild(row);
+  });
+}
+
+function updateDashboardCounters() {
+  if (kpiMinor) kpiMinor.textContent = minorRecords.length;
+  if (kpiUniform) kpiUniform.textContent = uniformRecords.length;
+  if (kpiGatepass) kpiGatepass.textContent = gatepassRecords.length;
+  if (kpiGoodmoral) kpiGoodmoral.textContent = goodmoralRecords.length;
+  if (kpiGoodmoralFlagged) {
+    kpiGoodmoralFlagged.textContent = goodmoralRecords.filter((row) => row.has_minor_offense).length;
+  }
+  renderDashboardActivity();
 }
 
 function openPrintView() {
@@ -411,8 +505,11 @@ async function loadRecords() {
     const records = await response.json();
     minorRecords = records;
     applyMinorFilters();
+    updateDashboardCounters();
   } catch (error) {
+    minorRecords = [];
     renderRows([]);
+    updateDashboardCounters();
   }
 }
 
@@ -438,8 +535,11 @@ async function loadUniformRecords() {
     const records = await response.json();
     uniformRecords = records;
     applyUniformFilters();
+    updateDashboardCounters();
   } catch (error) {
+    uniformRecords = [];
     renderUniformRows([]);
+    updateDashboardCounters();
   }
 }
 
@@ -449,8 +549,11 @@ async function loadGatepassRecords() {
     const records = await response.json();
     gatepassRecords = records;
     applyGatepassFilters();
+    updateDashboardCounters();
   } catch (error) {
+    gatepassRecords = [];
     renderGatepassRows([]);
+    updateDashboardCounters();
   }
 }
 
@@ -460,13 +563,24 @@ async function loadGoodmoralRecords() {
     const records = await response.json();
     goodmoralRecords = records;
     applyGoodmoralFilters();
+    updateDashboardCounters();
   } catch (error) {
+    goodmoralRecords = [];
     renderGoodmoralRows([]);
+    updateDashboardCounters();
   }
 }
 
 navButtons.forEach((button) => {
-  button.addEventListener("click", () => switchTab(button.dataset.tab));
+  button.addEventListener("click", () => {
+    const targetTab = button.dataset.tab;
+    if (!targetTab) return;
+    switchTab(targetTab);
+    const openMenu = document.getElementById("mainNav");
+    if (openMenu && openMenu.classList.contains("show") && window.bootstrap) {
+      window.bootstrap.Collapse.getOrCreateInstance(openMenu).hide();
+    }
+  });
 });
 
 heroButtons.forEach((button) => {
@@ -481,6 +595,29 @@ heroButtons.forEach((button) => {
     }
   });
 });
+
+const programButton = document.querySelector(".cards article:nth-child(1) .link");
+const archiveButton = document.querySelector(".cards article:nth-child(2) .link");
+const reportButton = document.querySelector(".cards article:nth-child(3) .link");
+
+if (programButton) {
+  programButton.addEventListener("click", () => {
+    window.location.href = "/programs.html";
+  });
+}
+
+if (archiveButton) {
+  archiveButton.addEventListener("click", () => {
+    window.location.href = "/archive.html";
+  });
+}
+
+if (reportButton) {
+  reportButton.addEventListener("click", () => {
+    switchTab("minor");
+    openPrintView();
+  });
+}
 
 
 if (recordForm) {
@@ -636,6 +773,7 @@ loadUniformRecords();
 loadGatepassRecords();
 loadGoodmoralRecords();
 loadDashboard();
+updateDashboardCounters();
 
 setupFilters(minorFilter, applyMinorFilters);
 setupFilters(uniformFilter, applyUniformFilters);
