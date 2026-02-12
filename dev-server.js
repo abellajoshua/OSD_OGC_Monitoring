@@ -24,6 +24,10 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
+app.get("/", (_req, res) => {
+  res.redirect("/login.html");
+});
+
 app.all("/api/config", (req, res) => configHandler(req, res));
 app.all("/api/dashboard", (req, res) => dashboardHandler(req, res));
 
