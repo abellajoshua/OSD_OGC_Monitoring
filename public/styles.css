@@ -79,12 +79,18 @@ body {
   padding: 24px 6vw;
 }
 
-.navbar-toggler {
+.navbar-toggler,
+.sidebar-toggle {
   border: 1px solid rgba(164, 19, 33, 0.25);
   background: #fff;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 700;
+  color: var(--ink);
 }
 
-.navbar-toggler:focus {
+.navbar-toggler:focus,
+.sidebar-toggle:focus {
   box-shadow: 0 0 0 0.2rem rgba(164, 19, 33, 0.18);
 }
 
@@ -127,6 +133,21 @@ body {
 .nav {
   display: flex;
   gap: 12px;
+}
+
+.sidebar-modal {
+  max-width: 320px;
+  background: linear-gradient(180deg, #fff7f7 0%, #ffffff 100%);
+}
+
+.nav-sidebar {
+  width: 100%;
+  flex-direction: column;
+}
+
+.nav-sidebar .nav-btn {
+  width: 100%;
+  text-align: left;
 }
 
 .nav-btn {
@@ -625,24 +646,11 @@ tbody td {
 
 @media (max-width: 768px) {
   .topbar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 18px;
+    gap: 12px;
   }
 
-  .topbar .container-fluid {
-    padding-left: 0;
-    padding-right: 0;
-  }
-
-  .nav {
-    width: 100%;
-    flex-direction: column;
-  }
-
-  .nav-btn {
-    width: 100%;
-    text-align: left;
+  .brand {
+    max-width: 74%;
   }
 
   .hero-actions {

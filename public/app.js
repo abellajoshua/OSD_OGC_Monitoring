@@ -721,9 +721,9 @@ navButtons.forEach((button) => {
     const targetTab = button.dataset.tab;
     if (!targetTab) return;
     switchTab(targetTab);
-    const openMenu = document.getElementById("mainNav");
-    if (openMenu && openMenu.classList.contains("show") && window.bootstrap) {
-      window.bootstrap.Collapse.getOrCreateInstance(openMenu).hide();
+    const sidebar = document.getElementById("sidebarNav");
+    if (sidebar && window.bootstrap && sidebar.classList.contains("show")) {
+      window.bootstrap.Offcanvas.getOrCreateInstance(sidebar).hide();
     }
   });
 });

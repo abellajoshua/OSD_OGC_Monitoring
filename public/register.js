@@ -29,28 +29,38 @@ if (registerForm) {
       return;
     }
 
-    const supabase = await getSupabase();
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: name,
-          role,
+    try {
+      const supabase = await getSupabase();
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+            role,
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
-      statusEl.textContent = error.message || "Registration failed.";
-      return;
+      if (error) {
+        statusEl.textContent = error.message || "Registration failed.";
+        return;
+      }
+
+      statusEl.textContent =
+        "Account created. Check your email to confirm, then login.";
+    } catch (error) {
+      statusEl.textContent =
+        error?.message?.includes("Failed to fetch")
+          ? "Unable to reach Supabase. Check internet and SUPABASE_URL."
+          : error.message || "Registration failed.";
     }
-
-    statusEl.textContent =
-      "Account created. Check your email to confirm, then login.";
   });
 }
 
 redirectIfLoggedIn().catch((error) => {
-  statusEl.textContent = error.message || "Unable to connect to Supabase.";
+  statusEl.textContent =
+    error?.message?.includes("Failed to fetch")
+      ? "Unable to reach Supabase. Check internet and firewall/VPN."
+      : error.message || "Unable to connect to Supabase.";
 });
