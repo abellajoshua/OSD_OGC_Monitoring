@@ -588,17 +588,35 @@ tbody td {
 }
 
 .sex-field {
-  border: 1px dashed var(--soft-line);
-  border-radius: 12px;
-  padding: 12px;
-  min-height: 86px;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.sex-field legend {
+  float: none;
+  padding: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sex-field > div {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  margin-top: 18px;
 }
 
 .sex-field label {
   flex-direction: row;
   align-items: center;
-  gap: 8px;
-  font-weight: 600;
+  gap: 6px;
+  font-weight: 400;
+  margin: 0;
 }
 
 .form-status {
