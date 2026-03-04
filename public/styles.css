@@ -586,6 +586,22 @@ tbody td {
   color: var(--muted);
 }
 
+.archive-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.archive-links button {
+  width: 100%;
+}
+
+.archive-note {
+  margin-top: 12px;
+  color: var(--muted);
+}
+
 .form-actions {
   display: flex;
   gap: 10px;

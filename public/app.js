@@ -201,6 +201,7 @@ function updateDashboardCounters() {
     kpiGoodmoralFlagged.textContent = goodmoralRecords.filter((row) => row.has_minor_offense).length;
   }
   renderDashboardActivity();
+  loadDashboard();
 }
 
 function flagGoodMoralFromMinor() {
@@ -249,6 +250,83 @@ function openPrintView() {
   printWindow.document.close();
   printWindow.focus();
   printWindow.print();
+}
+
+const archiveConfig = {
+  "minor-offenses": {
+    headers: [
+      "id",
+      "date_of_complaint",
+      "name_of_student",
+      "sr_code",
+      "year_program",
+      "contact_number",
+      "reported_by",
+      "sex",
+      "offense",
+      "sanction",
+      "date_of_sanction",
+      "created_at",
+    ],
+    getRows: () => minorRecords,
+    fileName: "minor-offenses-archive.csv",
+  },
+  "non-wearing-uniform": {
+    headers: [
+      "id",
+      "date",
+      "time_in",
+      "time_out",
+      "name",
+      "sr_code",
+      "course",
+      "sex",
+      "reason",
+      "created_at",
+    ],
+    getRows: () => uniformRecords,
+    fileName: "non-wearing-uniform-archive.csv",
+  },
+  gatepass: {
+    headers: [
+      "id",
+      "date",
+      "time_in",
+      "time_out",
+      "name",
+      "sr_code",
+      "course",
+      "sex",
+      "reason",
+      "created_at",
+    ],
+    getRows: () => gatepassRecords,
+    fileName: "gatepass-archive.csv",
+  },
+  "good-moral": {
+    headers: [
+      "id",
+      "date",
+      "time_in",
+      "time_out",
+      "name",
+      "sr_code",
+      "course",
+      "sex",
+      "purpose",
+      "created_at",
+    ],
+    getRows: () => goodmoralRecords,
+    fileName: "good-moral-archive.csv",
+  },
+};
+
+function exportArchiveCsv(type) {
+  const config = archiveConfig[type];
+  if (!config) return;
+  const rows = config.getRows() || [];
+  const csv = buildCsv(config.headers, rows);
+  downloadCsv(config.fileName, csv);
 }
 
 function renderRows(records) {
@@ -694,30 +772,17 @@ if (recordForm) {
     const formData = new FormData(recordForm);
     const payload = Object.fromEntries(formData.entries());
     const editId = recordForm.dataset.editId;
-    const method = editId ? "PUT" : "POST";
-    const url = editId ? `/api/minor-offenses/${editId}` : "/api/minor-offenses";
 
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const details = await response.json().catch(() => null);
-        throw new Error(details?.error || "Unable to save record.");
-      }
+      if (editId) await updateRow(TABLES.minor, editId, payload);
+      else await createRow(TABLES.minor, payload);
 
       setFormEditState(recordForm, false);
       formStatus.textContent = editId ? "Record updated." : "Record saved.";
       await loadRecords();
       await loadDashboard();
     } catch (error) {
-      formStatus.textContent =
-        error?.message?.includes("Failed to fetch")
-          ? "Server not reachable. Please start the server."
-          : error.message || "Something went wrong. Please try again.";
+      formStatus.textContent = error.message || "Something went wrong. Please try again.";
     }
   });
 }
@@ -729,32 +794,17 @@ if (uniformForm) {
     const formData = new FormData(uniformForm);
     const payload = Object.fromEntries(formData.entries());
     const editId = uniformForm.dataset.editId;
-    const method = editId ? "PUT" : "POST";
-    const url = editId
-      ? `/api/non-wearing-uniform/${editId}`
-      : "/api/non-wearing-uniform";
 
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const details = await response.json().catch(() => null);
-        throw new Error(details?.error || "Unable to save record.");
-      }
+      if (editId) await updateRow(TABLES.uniform, editId, payload);
+      else await createRow(TABLES.uniform, payload);
 
       setFormEditState(uniformForm, false);
       uniformStatus.textContent = editId ? "Record updated." : "Record saved.";
       await loadUniformRecords();
       await loadDashboard();
     } catch (error) {
-      uniformStatus.textContent =
-        error?.message?.includes("Failed to fetch")
-          ? "Server not reachable. Please start the server."
-          : error.message || "Something went wrong. Please try again.";
+      uniformStatus.textContent = error.message || "Something went wrong. Please try again.";
     }
   });
 }
@@ -766,30 +816,17 @@ if (gatepassForm) {
     const formData = new FormData(gatepassForm);
     const payload = Object.fromEntries(formData.entries());
     const editId = gatepassForm.dataset.editId;
-    const method = editId ? "PUT" : "POST";
-    const url = editId ? `/api/gatepass/${editId}` : "/api/gatepass";
 
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const details = await response.json().catch(() => null);
-        throw new Error(details?.error || "Unable to save record.");
-      }
+      if (editId) await updateRow(TABLES.gatepass, editId, payload);
+      else await createRow(TABLES.gatepass, payload);
 
       setFormEditState(gatepassForm, false);
       gatepassStatus.textContent = editId ? "Record updated." : "Record saved.";
       await loadGatepassRecords();
       await loadDashboard();
     } catch (error) {
-      gatepassStatus.textContent =
-        error?.message?.includes("Failed to fetch")
-          ? "Server not reachable. Please start the server."
-          : error.message || "Something went wrong. Please try again.";
+      gatepassStatus.textContent = error.message || "Something went wrong. Please try again.";
     }
   });
 }
@@ -801,30 +838,17 @@ if (goodmoralForm) {
     const formData = new FormData(goodmoralForm);
     const payload = Object.fromEntries(formData.entries());
     const editId = goodmoralForm.dataset.editId;
-    const method = editId ? "PUT" : "POST";
-    const url = editId ? `/api/good-moral/${editId}` : "/api/good-moral";
 
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const details = await response.json().catch(() => null);
-        throw new Error(details?.error || "Unable to save record.");
-      }
+      if (editId) await updateRow(TABLES.goodmoral, editId, payload);
+      else await createRow(TABLES.goodmoral, payload);
 
       setFormEditState(goodmoralForm, false);
       goodmoralStatus.textContent = editId ? "Record updated." : "Record saved.";
       await loadGoodmoralRecords();
       await loadDashboard();
     } catch (error) {
-      goodmoralStatus.textContent =
-        error?.message?.includes("Failed to fetch")
-          ? "Server not reachable. Please start the server."
-          : error.message || "Something went wrong. Please try again.";
+      goodmoralStatus.textContent = error.message || "Something went wrong. Please try again.";
     }
   });
 }
@@ -834,6 +858,12 @@ if (exportButton) {
     openPrintView();
   });
 }
+
+document.querySelectorAll("[data-archive]").forEach((button) => {
+  button.addEventListener("click", () => {
+    exportArchiveCsv(button.dataset.archive);
+  });
+});
 
 loadRecords();
 loadUniformRecords();
@@ -849,7 +879,7 @@ setupFilters(goodmoralFilter, applyGoodmoralFilters);
 
 attachRowActions({
   tableElement: tableBody,
-  endpoint: "minor-offenses",
+  tableName: TABLES.minor,
   getRecords: () => minorRecords,
   form: recordForm,
   fields: [
@@ -869,7 +899,7 @@ attachRowActions({
 
 attachRowActions({
   tableElement: uniformTableBody,
-  endpoint: "non-wearing-uniform",
+  tableName: TABLES.uniform,
   getRecords: () => uniformRecords,
   form: uniformForm,
   fields: ["date", "time_in", "time_out", "name", "sr_code", "course", "sex", "reason"],
@@ -878,7 +908,7 @@ attachRowActions({
 
 attachRowActions({
   tableElement: gatepassTableBody,
-  endpoint: "gatepass",
+  tableName: TABLES.gatepass,
   getRecords: () => gatepassRecords,
   form: gatepassForm,
   fields: ["date", "time_in", "time_out", "name", "sr_code", "course", "sex", "reason"],
@@ -887,7 +917,7 @@ attachRowActions({
 
 attachRowActions({
   tableElement: goodmoralTableBody,
-  endpoint: "good-moral",
+  tableName: TABLES.goodmoral,
   getRecords: () => goodmoralRecords,
   form: goodmoralForm,
   fields: ["date", "time_in", "time_out", "name", "sr_code", "course", "sex", "purpose"],
