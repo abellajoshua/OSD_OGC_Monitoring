@@ -1,3 +1,12 @@
+import { getSupabase } from "./supabaseClient.js";
+
+const TABLES = {
+  minor: "minor_offenses",
+  uniform: "non_wearing_uniform",
+  gatepass: "gatepass",
+  goodmoral: "good_moral",
+};
+
 const navButtons = document.querySelectorAll(".nav-btn");
 const tabs = document.querySelectorAll(".tab");
 const heroButtons = document.querySelectorAll("[data-tab]");
@@ -34,6 +43,57 @@ let minorRecords = [];
 let uniformRecords = [];
 let gatepassRecords = [];
 let goodmoralRecords = [];
+
+function buildCsv(headers, rows) {
+  const escape = (value) => {
+    const text = String(value ?? "");
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  const headerRow = headers.join(",");
+  const dataRows = rows.map((row) => headers.map((key) => escape(row[key])).join(","));
+  return [headerRow, ...dataRows].join("\n");
+}
+
+function downloadCsv(fileName, csvContent) {
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+async function fetchTableRows(table, dateColumn) {
+  const supabase = await getSupabase();
+  const query = supabase.from(table).select("*");
+  const primaryOrderColumn = dateColumn || "id";
+  const { data, error } = await query
+    .order(primaryOrderColumn, { ascending: false })
+    .order("id", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function createRow(table, payload) {
+  const supabase = await getSupabase();
+  const { error } = await supabase.from(table).insert(payload);
+  if (error) throw error;
+}
+
+async function updateRow(table, id, payload) {
+  const supabase = await getSupabase();
+  const { error } = await supabase.from(table).update(payload).eq("id", id);
+  if (error) throw error;
+}
+
+async function deleteRow(table, id) {
+  const supabase = await getSupabase();
+  const { error } = await supabase.from(table).delete().eq("id", id);
+  if (error) throw error;
+}
 
 function normalizeDateValue(record) {
   return (
@@ -141,6 +201,17 @@ function updateDashboardCounters() {
     kpiGoodmoralFlagged.textContent = goodmoralRecords.filter((row) => row.has_minor_offense).length;
   }
   renderDashboardActivity();
+}
+
+function flagGoodMoralFromMinor() {
+  if (!goodmoralRecords.length) return;
+  const codeSet = new Set(
+    minorRecords.map((row) => String(row.sr_code || "").trim().toLowerCase())
+  );
+  goodmoralRecords = goodmoralRecords.map((row) => ({
+    ...row,
+    has_minor_offense: codeSet.has(String(row.sr_code || "").trim().toLowerCase()) ? 1 : 0,
+  }));
 }
 
 function openPrintView() {
@@ -448,7 +519,7 @@ function fillForm(form, record, fields) {
   });
 }
 
-function attachRowActions({ tableElement, endpoint, getRecords, form, fields, reloadFn }) {
+function attachRowActions({ tableElement, tableName, getRecords, form, fields, reloadFn }) {
   if (!tableElement) return;
   tableElement.addEventListener("click", async (event) => {
     const editButton = event.target.closest("[data-action='edit']");
@@ -473,16 +544,7 @@ function attachRowActions({ tableElement, endpoint, getRecords, form, fields, re
       if (!confirmed) return;
 
     try {
-      const response = await fetch(`/api/${endpoint}/${id}`, { method: "DELETE" });
-      if (!response.ok) {
-        const details = await response.json().catch(() => null);
-        const message =
-          details?.error ||
-          (response.status === 404
-            ? "Delete endpoint not found or record missing. Restart the server."
-            : "Delete failed.");
-        throw new Error(message);
-      }
+      await deleteRow(tableName, id);
       await reloadFn();
       await loadDashboard();
     } catch (error) {
@@ -501,9 +563,8 @@ function attachCancelEdit(form) {
 
 async function loadRecords() {
   try {
-    const response = await fetch("/api/minor-offenses");
-    const records = await response.json();
-    minorRecords = records;
+    minorRecords = await fetchTableRows(TABLES.minor, "date_of_complaint");
+    flagGoodMoralFromMinor();
     applyMinorFilters();
     updateDashboardCounters();
   } catch (error) {
@@ -514,26 +575,35 @@ async function loadRecords() {
 }
 
 async function loadDashboard() {
-  try {
-    const response = await fetch("/api/dashboard");
-    const stats = await response.json();
-    if (statActive) statActive.textContent = stats.activeCases ?? 0;
-    if (statPending) statPending.textContent = stats.pendingSanctions ?? 0;
-    if (statResolved) statResolved.textContent = stats.resolvedThisWeek ?? 0;
-    if (statFollowups) statFollowups.textContent = stats.followUpsDue ?? 0;
-  } catch (error) {
-    if (statActive) statActive.textContent = "--";
-    if (statPending) statPending.textContent = "--";
-    if (statResolved) statResolved.textContent = "--";
-    if (statFollowups) statFollowups.textContent = "--";
-  }
+  const activeCases =
+    minorRecords.length + uniformRecords.length + gatepassRecords.length + goodmoralRecords.length;
+  const pendingSanctions = minorRecords.filter(
+    (item) => !String(item.sanction || "").trim() || !item.date_of_sanction
+  ).length;
+
+  const start = new Date();
+  start.setDate(start.getDate() - 6);
+  const startMs = start.setHours(0, 0, 0, 0);
+  const nowMs = new Date().setHours(23, 59, 59, 999);
+  const resolvedThisWeek = minorRecords.filter((item) => {
+    if (!item.date_of_sanction) return false;
+    const value = new Date(item.date_of_sanction).getTime();
+    return !Number.isNaN(value) && value >= startMs && value <= nowMs;
+  }).length;
+
+  const followUpsDue = [...uniformRecords, ...gatepassRecords, ...goodmoralRecords].filter(
+    (item) => !String(item.time_out || "").trim()
+  ).length;
+
+  if (statActive) statActive.textContent = activeCases;
+  if (statPending) statPending.textContent = pendingSanctions;
+  if (statResolved) statResolved.textContent = resolvedThisWeek;
+  if (statFollowups) statFollowups.textContent = followUpsDue;
 }
 
 async function loadUniformRecords() {
   try {
-    const response = await fetch("/api/non-wearing-uniform");
-    const records = await response.json();
-    uniformRecords = records;
+    uniformRecords = await fetchTableRows(TABLES.uniform, "date");
     applyUniformFilters();
     updateDashboardCounters();
   } catch (error) {
@@ -545,9 +615,7 @@ async function loadUniformRecords() {
 
 async function loadGatepassRecords() {
   try {
-    const response = await fetch("/api/gatepass");
-    const records = await response.json();
-    gatepassRecords = records;
+    gatepassRecords = await fetchTableRows(TABLES.gatepass, "date");
     applyGatepassFilters();
     updateDashboardCounters();
   } catch (error) {
@@ -559,9 +627,8 @@ async function loadGatepassRecords() {
 
 async function loadGoodmoralRecords() {
   try {
-    const response = await fetch("/api/good-moral");
-    const records = await response.json();
-    goodmoralRecords = records;
+    goodmoralRecords = await fetchTableRows(TABLES.goodmoral, "date");
+    flagGoodMoralFromMinor();
     applyGoodmoralFilters();
     updateDashboardCounters();
   } catch (error) {
@@ -602,13 +669,13 @@ const reportButton = document.querySelector(".cards article:nth-child(3) .link")
 
 if (programButton) {
   programButton.addEventListener("click", () => {
-    window.location.href = "/programs.html";
+    window.location.href = "programs.html";
   });
 }
 
 if (archiveButton) {
   archiveButton.addEventListener("click", () => {
-    window.location.href = "/archive.html";
+    window.location.href = "archive.html";
   });
 }
 
