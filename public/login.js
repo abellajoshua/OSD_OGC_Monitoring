@@ -21,22 +21,32 @@ if (loginForm) {
     const email = formData.get("email");
     const password = formData.get("password");
 
-    const supabase = await getSupabase();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const supabase = await getSupabase();
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      statusEl.textContent = error.message || "Login failed.";
-      return;
+      if (error) {
+        statusEl.textContent = error.message || "Login failed.";
+        return;
+      }
+
+      statusEl.textContent = "Success! Redirecting...";
+      window.location.href = "index.html";
+    } catch (error) {
+      statusEl.textContent =
+        error?.message?.includes("Failed to fetch")
+          ? "Unable to reach Supabase. Check internet and SUPABASE_URL."
+          : error.message || "Login failed.";
     }
-
-    statusEl.textContent = "Success! Redirecting...";
-    window.location.href = "index.html";
   });
 }
 
 redirectIfLoggedIn().catch((error) => {
-  statusEl.textContent = error.message || "Unable to connect to Supabase.";
+  statusEl.textContent =
+    error?.message?.includes("Failed to fetch")
+      ? "Unable to reach Supabase. Check internet and firewall/VPN."
+      : error.message || "Unable to connect to Supabase.";
 });

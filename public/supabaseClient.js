@@ -2,24 +2,18 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 let supabaseClient;
 
+const FALLBACK_CONFIG = {
+  SUPABASE_URL: "https://axmuxanqmhuvxefhazot.supabase.co",
+  SUPABASE_ANON_KEY:
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bXV4YW5xbWh1dnhlZmhhem90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMjc5NjgsImV4cCI6MjA4NTgwMzk2OH0.u4O0TXfrpAL9Tt7b-Yv5KEU9OFV5fhtRMf74KFohKJw",
+};
+
 async function loadConfig() {
   if (window.APP_CONFIG) {
     return window.APP_CONFIG;
   }
 
-  try {
-    const response = await fetch("/api/config");
-    if (response.ok) {
-      return await response.json();
-    }
-  } catch (error) {
-    // ignore and fall through
-  }
-
-  return {
-    SUPABASE_URL: "",
-    SUPABASE_ANON_KEY: "",
-  };
+  return FALLBACK_CONFIG;
 }
 
 export async function getSupabase() {
