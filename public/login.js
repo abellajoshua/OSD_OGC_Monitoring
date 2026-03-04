@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabaseClient.js";
+import { getSupabase } from "./supabaseClient.js?v=3";
 
 const loginForm = document.querySelector("#login-form");
 const statusEl = document.querySelector("#login-status");

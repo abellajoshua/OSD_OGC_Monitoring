@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabaseClient.js";
+import { getSupabase } from "./supabaseClient.js?v=3";
 
 const TABLES = {
   minor: "minor_offenses",
