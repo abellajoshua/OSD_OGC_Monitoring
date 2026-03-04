@@ -8,18 +8,27 @@ grant select, insert, update, delete on table public.major_offenses to authentic
 grant select, insert, update, delete on table public.non_wearing_uniform to authenticated;
 grant select, insert, update, delete on table public.gatepass to authenticated;
 grant select, insert, update, delete on table public.good_moral to authenticated;
+grant select, insert, update, delete on table public.id_replacement to authenticated;
+grant select, insert, update, delete on table public.leave_of_absence to authenticated;
+grant select, insert, update, delete on table public.user_accounts to authenticated;
 
 grant usage, select on sequence public.minor_offenses_id_seq to authenticated;
 grant usage, select on sequence public.major_offenses_id_seq to authenticated;
 grant usage, select on sequence public.non_wearing_uniform_id_seq to authenticated;
 grant usage, select on sequence public.gatepass_id_seq to authenticated;
 grant usage, select on sequence public.good_moral_id_seq to authenticated;
+grant usage, select on sequence public.id_replacement_id_seq to authenticated;
+grant usage, select on sequence public.leave_of_absence_id_seq to authenticated;
+grant usage, select on sequence public.user_accounts_id_seq to authenticated;
 
 alter table public.minor_offenses enable row level security;
 alter table public.major_offenses enable row level security;
 alter table public.non_wearing_uniform enable row level security;
 alter table public.gatepass enable row level security;
 alter table public.good_moral enable row level security;
+alter table public.id_replacement enable row level security;
+alter table public.leave_of_absence enable row level security;
+alter table public.user_accounts enable row level security;
 
 drop policy if exists "authenticated_minor_offenses_all" on public.minor_offenses;
 create policy "authenticated_minor_offenses_all"
@@ -56,6 +65,30 @@ with check (true);
 drop policy if exists "authenticated_good_moral_all" on public.good_moral;
 create policy "authenticated_good_moral_all"
 on public.good_moral
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "authenticated_id_replacement_all" on public.id_replacement;
+create policy "authenticated_id_replacement_all"
+on public.id_replacement
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "authenticated_leave_of_absence_all" on public.leave_of_absence;
+create policy "authenticated_leave_of_absence_all"
+on public.leave_of_absence
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "authenticated_user_accounts_all" on public.user_accounts;
+create policy "authenticated_user_accounts_all"
+on public.user_accounts
 for all
 to authenticated
 using (true)

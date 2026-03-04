@@ -25,7 +25,7 @@
           <img src="assets/logo.png" alt="Batangas State University logo" />
         </div>
         <div>
-          <p class="brand-title">OSD & OGC Monitoring</p>
+          <p class="brand-title">OSD & OGC Monitoring - Coordinator</p>
           <p class="brand-subtitle">Centralized discipline records, status tracking, and reporting</p>
         </div>
       </div>
@@ -53,6 +53,9 @@
           <button class="nav-btn" data-tab="uniform">Non-Wearing Uniform</button>
           <button class="nav-btn" data-tab="gatepass">Gatepass</button>
           <button class="nav-btn" data-tab="goodmoral">Good Moral</button>
+          <button class="nav-btn" data-tab="idreplacement">ID Replacement</button>
+          <button class="nav-btn" data-tab="leaveofabsence">Leave of Absence</button>
+          <a href="admin.html" class="nav-btn" id="admin-link" style="display: none;">Admin Panel</a>
           <button class="nav-btn" id="logout-btn">Logout</button>
         </nav>
       </div>
@@ -671,6 +674,196 @@
             </div>
             <button class="primary" type="submit">Save Record</button>
             <p class="form-status" id="goodmoral-status" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
+
+      <section id="idreplacement" class="tab">
+        <div class="sheet">
+          <div class="log-title">
+            <h2>LOGSHEET</h2>
+            <h3>REQUEST FOR ID REPLACEMENT</h3>
+          </div>
+
+          <div class="filter-bar" data-filter-scope="idreplacement">
+            <input type="search" placeholder="Search name, SR code, course, reason..." data-filter="query" />
+            <label>
+              From
+              <input type="date" data-filter="from" />
+            </label>
+            <label>
+              To
+              <input type="date" data-filter="to" />
+            </label>
+            <button class="primary" type="button" data-filter="apply">Filter</button>
+            <button class="ghost" type="button" data-filter="clear">Clear</button>
+          </div>
+
+          <div class="sheet-actions">
+            <button class="ghost" type="button" data-archive="id-replacement">Archive CSV</button>
+          </div>
+
+          <div class="table-wrap table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th rowspan="2">No.</th>
+                  <th rowspan="2">Date</th>
+                  <th colspan="2">Time</th>
+                  <th rowspan="2">Name</th>
+                  <th rowspan="2">SR Code</th>
+                  <th rowspan="2">Course</th>
+                  <th colspan="2">Sex</th>
+                  <th rowspan="2">Reason</th>
+                </tr>
+                <tr>
+                  <th>In</th>
+                  <th>Out</th>
+                  <th>M</th>
+                  <th>F</th>
+                </tr>
+              </thead>
+              <tbody id="idreplacement-table-body"></tbody>
+            </table>
+          </div>
+
+          <form id="idreplacement-form" class="record-form">
+            <div class="form-header">
+              <img src="assets/logo.png" alt="Batangas State University logo" />
+              <h3>Create Record</h3>
+            </div>
+            <div class="form-grid">
+              <label>
+                Date
+                <input type="date" name="date" required />
+              </label>
+              <label>
+                Time In
+                <input type="time" name="time_in" required />
+              </label>
+              <label>
+                Time Out
+                <input type="time" name="time_out" required />
+              </label>
+              <label>
+                Name
+                <input type="text" name="name" placeholder="Full name" required />
+              </label>
+              <label>
+                SR Code
+                <input type="text" name="sr_code" placeholder="2024-0000" required />
+              </label>
+              <label>
+                Course
+                <input type="text" name="course" placeholder="BSIT / BSME" required />
+              </label>
+              <fieldset class="sex-field">
+                <legend>Sex</legend>
+                <label><input type="radio" name="sex" value="M" required /> M</label>
+                <label><input type="radio" name="sex" value="F" /> F</label>
+              </fieldset>
+              <label>
+                Reason
+                <input type="text" name="reason" required />
+              </label>
+            </div>
+            <button class="primary" type="submit">Save Record</button>
+            <p class="form-status" id="idreplacement-status" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
+
+      <section id="leaveofabsence" class="tab">
+        <div class="sheet">
+          <div class="log-title">
+            <h2>LOGSHEET</h2>
+            <h3>REQUEST FOR LEAVE OF ABSENCE</h3>
+          </div>
+
+          <div class="filter-bar" data-filter-scope="leaveofabsence">
+            <input type="search" placeholder="Search name, SR code, course, reason..." data-filter="query" />
+            <label>
+              From
+              <input type="date" data-filter="from" />
+            </label>
+            <label>
+              To
+              <input type="date" data-filter="to" />
+            </label>
+            <button class="primary" type="button" data-filter="apply">Filter</button>
+            <button class="ghost" type="button" data-filter="clear">Clear</button>
+          </div>
+
+          <div class="sheet-actions">
+            <button class="ghost" type="button" data-archive="leave-of-absence">Archive CSV</button>
+          </div>
+
+          <div class="table-wrap table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th rowspan="2">No.</th>
+                  <th rowspan="2">Date</th>
+                  <th colspan="2">Time</th>
+                  <th rowspan="2">Name</th>
+                  <th rowspan="2">SR Code</th>
+                  <th rowspan="2">Course</th>
+                  <th colspan="2">Sex</th>
+                  <th rowspan="2">Reason</th>
+                </tr>
+                <tr>
+                  <th>In</th>
+                  <th>Out</th>
+                  <th>M</th>
+                  <th>F</th>
+                </tr>
+              </thead>
+              <tbody id="leaveofabsence-table-body"></tbody>
+            </table>
+          </div>
+
+          <form id="leaveofabsence-form" class="record-form">
+            <div class="form-header">
+              <img src="assets/logo.png" alt="Batangas State University logo" />
+              <h3>Create Record</h3>
+            </div>
+            <div class="form-grid">
+              <label>
+                Date
+                <input type="date" name="date" required />
+              </label>
+              <label>
+                Time In
+                <input type="time" name="time_in" required />
+              </label>
+              <label>
+                Time Out
+                <input type="time" name="time_out" required />
+              </label>
+              <label>
+                Name
+                <input type="text" name="name" placeholder="Full name" required />
+              </label>
+              <label>
+                SR Code
+                <input type="text" name="sr_code" placeholder="2024-0000" required />
+              </label>
+              <label>
+                Course
+                <input type="text" name="course" placeholder="BSIT / BSME" required />
+              </label>
+              <fieldset class="sex-field">
+                <legend>Sex</legend>
+                <label><input type="radio" name="sex" value="M" required /> M</label>
+                <label><input type="radio" name="sex" value="F" /> F</label>
+              </fieldset>
+              <label>
+                Reason
+                <input type="text" name="reason" required />
+              </label>
+            </div>
+            <button class="primary" type="submit">Save Record</button>
+            <p class="form-status" id="leaveofabsence-status" aria-live="polite"></p>
           </form>
         </div>
       </section>

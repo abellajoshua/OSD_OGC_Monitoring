@@ -6,6 +6,8 @@ const TABLES = {
   uniform: "non_wearing_uniform",
   gatepass: "gatepass",
   goodmoral: "good_moral",
+  idreplacement: "id_replacement",
+  leaveofabsence: "leave_of_absence",
 };
 
 const navButtons = document.querySelectorAll(".nav-btn");
@@ -28,6 +30,12 @@ const gatepassStatus = document.querySelector("#gatepass-status");
 const goodmoralTableBody = document.querySelector("#goodmoral-table-body");
 const goodmoralForm = document.querySelector("#goodmoral-form");
 const goodmoralStatus = document.querySelector("#goodmoral-status");
+const idreplacementTableBody = document.querySelector("#idreplacement-table-body");
+const idreplacementForm = document.querySelector("#idreplacement-form");
+const idreplacementStatus = document.querySelector("#idreplacement-status");
+const leaveofabsenceTableBody = document.querySelector("#leaveofabsence-table-body");
+const leaveofabsenceForm = document.querySelector("#leaveofabsence-form");
+const leaveofabsenceStatus = document.querySelector("#leaveofabsence-status");
 const dashboardActivityBody = document.querySelector("#dashboard-activity-body");
 const statActive = document.querySelector("[data-stat='active']");
 const statPending = document.querySelector("[data-stat='pending']");
@@ -45,12 +53,16 @@ const majorFilter = document.querySelector("[data-filter-scope='major']");
 const uniformFilter = document.querySelector("[data-filter-scope='uniform']");
 const gatepassFilter = document.querySelector("[data-filter-scope='gatepass']");
 const goodmoralFilter = document.querySelector("[data-filter-scope='goodmoral']");
+const idreplacementFilter = document.querySelector("[data-filter-scope='idreplacement']");
+const leaveofabsenceFilter = document.querySelector("[data-filter-scope='leaveofabsence']");
 
 let minorRecords = [];
 let majorRecords = [];
 let uniformRecords = [];
 let gatepassRecords = [];
 let goodmoralRecords = [];
+let idreplacementRecords = [];
+let leaveofabsenceRecords = [];
 
 function buildCsv(headers, rows) {
   const escape = (value) => {
@@ -652,6 +664,96 @@ function applyGoodmoralFilters() {
   renderGoodmoralRows(filtered);
 }
 
+function renderIdreplacementRows(records) {
+  idreplacementTableBody.innerHTML = "";
+  if (!records.length) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td colspan="11">No records yet. Create the first entry below.</td>`;
+    idreplacementTableBody.appendChild(row);
+    return;
+  }
+
+  records.forEach((record, index) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${index + 1}</td>
+      <td>${formatDate(record.date)}</td>
+      <td>${record.time_in || ""}</td>
+      <td>${record.time_out || ""}</td>
+      <td>${record.name || ""}</td>
+      <td>${record.sr_code || ""}</td>
+      <td>${record.course || ""}</td>
+      <td>${record.sex === "M" ? "✔" : ""}</td>
+      <td>${record.sex === "F" ? "✔" : ""}</td>
+      <td>${record.reason || ""}</td>
+      <td>
+        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
+        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+      </td>
+    `;
+    idreplacementTableBody.appendChild(row);
+  });
+}
+
+function applyIdreplacementFilters() {
+  if (!idreplacementFilter) return;
+  const query = idreplacementFilter.querySelector("[data-filter='query']").value.trim();
+  const from = idreplacementFilter.querySelector("[data-filter='from']").value;
+  const to = idreplacementFilter.querySelector("[data-filter='to']").value;
+
+  const filtered = idreplacementRecords.filter((record) => {
+    const inRange = withinDateRange(record.date, from, to);
+    const matches = matchesQuery(record, ["name", "sr_code", "course", "reason"], query);
+    return inRange && matches;
+  });
+  renderIdreplacementRows(filtered);
+}
+
+function renderLeaveofabsenceRows(records) {
+  leaveofabsenceTableBody.innerHTML = "";
+  if (!records.length) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td colspan="11">No records yet. Create the first entry below.</td>`;
+    leaveofabsenceTableBody.appendChild(row);
+    return;
+  }
+
+  records.forEach((record, index) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${index + 1}</td>
+      <td>${formatDate(record.date)}</td>
+      <td>${record.time_in || ""}</td>
+      <td>${record.time_out || ""}</td>
+      <td>${record.name || ""}</td>
+      <td>${record.sr_code || ""}</td>
+      <td>${record.course || ""}</td>
+      <td>${record.sex === "M" ? "✔" : ""}</td>
+      <td>${record.sex === "F" ? "✔" : ""}</td>
+      <td>${record.reason || ""}</td>
+      <td>
+        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
+        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+      </td>
+    `;
+    leaveofabsenceTableBody.appendChild(row);
+  });
+}
+
+function applyLeaveofabsenceFilters() {
+  if (!leaveofabsenceFilter) return;
+  const query = leaveofabsenceFilter.querySelector("[data-filter='query']").value.trim();
+  const from = leaveofabsenceFilter.querySelector("[data-filter='from']").value;
+  const to = leaveofabsenceFilter.querySelector("[data-filter='to']").value;
+
+  const filtered = leaveofabsenceRecords.filter((record) => {
+    const inRange = withinDateRange(record.date, from, to);
+    const matches = matchesQuery(record, ["name", "sr_code", "course", "reason"], query);
+    return inRange && matches;
+  });
+  renderLeaveofabsenceRows(filtered);
+}
+
 function setupFilters(scopeElement, applyFn) {
   if (!scopeElement) return;
   const queryInput = scopeElement.querySelector("[data-filter='query']");
@@ -847,6 +949,30 @@ async function loadGoodmoralRecords() {
   }
 }
 
+async function loadIdreplacementRecords() {
+  try {
+    idreplacementRecords = await fetchTableRows(TABLES.idreplacement, "date");
+    applyIdreplacementFilters();
+    updateDashboardCounters();
+  } catch (error) {
+    idreplacementRecords = [];
+    renderIdreplacementRows([]);
+    updateDashboardCounters();
+  }
+}
+
+async function loadLeaveofabsenceRecords() {
+  try {
+    leaveofabsenceRecords = await fetchTableRows(TABLES.leaveofabsence, "date");
+    applyLeaveofabsenceFilters();
+    updateDashboardCounters();
+  } catch (error) {
+    leaveofabsenceRecords = [];
+    renderLeaveofabsenceRows([]);
+    updateDashboardCounters();
+  }
+}
+
 navButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const targetTab = button.dataset.tab;
@@ -1006,6 +1132,50 @@ if (goodmoralForm) {
   });
 }
 
+if (idreplacementForm) {
+  idreplacementForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    idreplacementStatus.textContent = "Saving record...";
+    const formData = new FormData(idreplacementForm);
+    const payload = Object.fromEntries(formData.entries());
+    const editId = idreplacementForm.dataset.editId;
+
+    try {
+      if (editId) await updateRow(TABLES.idreplacement, editId, payload);
+      else await createRow(TABLES.idreplacement, payload);
+
+      setFormEditState(idreplacementForm, false);
+      idreplacementStatus.textContent = editId ? "Record updated." : "Record saved.";
+      await loadIdreplacementRecords();
+      await loadDashboard();
+    } catch (error) {
+      idreplacementStatus.textContent = error.message || "Something went wrong. Please try again.";
+    }
+  });
+}
+
+if (leaveofabsenceForm) {
+  leaveofabsenceForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    leaveofabsenceStatus.textContent = "Saving record...";
+    const formData = new FormData(leaveofabsenceForm);
+    const payload = Object.fromEntries(formData.entries());
+    const editId = leaveofabsenceForm.dataset.editId;
+
+    try {
+      if (editId) await updateRow(TABLES.leaveofabsence, editId, payload);
+      else await createRow(TABLES.leaveofabsence, payload);
+
+      setFormEditState(leaveofabsenceForm, false);
+      leaveofabsenceStatus.textContent = editId ? "Record updated." : "Record saved.";
+      await loadLeaveofabsenceRecords();
+      await loadDashboard();
+    } catch (error) {
+      leaveofabsenceStatus.textContent = error.message || "Something went wrong. Please try again.";
+    }
+  });
+}
+
 if (exportButton) {
   exportButton.addEventListener("click", () => {
     openPrintView();
@@ -1029,6 +1199,8 @@ loadMajorRecords();
 loadUniformRecords();
 loadGatepassRecords();
 loadGoodmoralRecords();
+loadIdreplacementRecords();
+loadLeaveofabsenceRecords();
 loadDashboard();
 updateDashboardCounters();
 
@@ -1037,6 +1209,8 @@ setupFilters(majorFilter, applyMajorFilters);
 setupFilters(uniformFilter, applyUniformFilters);
 setupFilters(gatepassFilter, applyGatepassFilters);
 setupFilters(goodmoralFilter, applyGoodmoralFilters);
+setupFilters(idreplacementFilter, applyIdreplacementFilters);
+setupFilters(leaveofabsenceFilter, applyLeaveofabsenceFilters);
 
 attachRowActions({
   tableElement: tableBody,
@@ -1105,8 +1279,64 @@ attachRowActions({
   reloadFn: loadGoodmoralRecords,
 });
 
+attachRowActions({
+  tableElement: idreplacementTableBody,
+  tableName: TABLES.idreplacement,
+  getRecords: () => idreplacementRecords,
+  form: idreplacementForm,
+  fields: ["date", "time_in", "time_out", "name", "sr_code", "course", "sex", "reason"],
+  reloadFn: loadIdreplacementRecords,
+});
+
+attachRowActions({
+  tableElement: leaveofabsenceTableBody,
+  tableName: TABLES.leaveofabsence,
+  getRecords: () => leaveofabsenceRecords,
+  form: leaveofabsenceForm,
+  fields: ["date", "time_in", "time_out", "name", "sr_code", "course", "sex", "reason"],
+  reloadFn: loadLeaveofabsenceRecords,
+});
+
 attachCancelEdit(recordForm);
 attachCancelEdit(majorForm);
 attachCancelEdit(uniformForm);
 attachCancelEdit(gatepassForm);
 attachCancelEdit(goodmoralForm);
+attachCancelEdit(idreplacementForm);
+attachCancelEdit(leaveofabsenceForm);
+
+// Check if user is admin and show admin link
+(async function checkAdminUser() {
+  const ADMIN_EMAIL = "mcdoelfamini10@gmail.com";
+  const supabase = await getSupabase();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  
+  if (!session) {
+    window.location.href = "login.html";
+    return;
+  }
+  
+  // Check if user is admin
+  if (session.user.email === ADMIN_EMAIL) {
+    const adminLink = document.querySelector("#admin-link");
+    if (adminLink) {
+      adminLink.style.display = "block";
+    }
+    return;
+  }
+  
+  // Check if user is head (should not access this page)
+  const { data: userAccount } = await supabase
+    .from("user_accounts")
+    .select("role")
+    .eq("email", session.user.email)
+    .single();
+  
+  if (userAccount && userAccount.role === "head") {
+    alert("This page is for Coordinators only. Redirecting to Reports Dashboard...");
+    window.location.href = "reports.html";
+    return;
+  }
+})();
