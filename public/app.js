@@ -88,7 +88,7 @@ function downloadCsv(fileName, csvContent) {
 
 async function fetchTableRows(table, dateColumn) {
   const supabase = await getSupabase();
-  const query = supabase.from(table).select("*");
+  const query = supabase.from(table).select("*").eq("archived", false);
   const primaryOrderColumn = dateColumn || "id";
   const { data, error } = await query
     .order(primaryOrderColumn, { ascending: false })
@@ -106,6 +106,12 @@ async function createRow(table, payload) {
 async function updateRow(table, id, payload) {
   const supabase = await getSupabase();
   const { error } = await supabase.from(table).update(payload).eq("id", id);
+  if (error) throw error;
+}
+
+async function archiveRow(table, id) {
+  const supabase = await getSupabase();
+  const { error } = await supabase.from(table).update({ archived: true }).eq("id", id);
   if (error) throw error;
 }
 
@@ -438,7 +444,7 @@ function renderRows(records) {
       <td>${formatDate(record.date_of_sanction)}</td>
       <td>
         <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
       </td>
     `;
     tableBody.appendChild(row);
@@ -470,7 +476,7 @@ function renderMajorRows(records) {
       <td>${formatDate(record.date_of_sanction)}</td>
       <td>
         <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
       </td>
     `;
     majorTableBody.appendChild(row);
@@ -501,7 +507,7 @@ function renderUniformRows(records) {
       <td>${record.reason || ""}</td>
       <td>
         <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
       </td>
     `;
     uniformTableBody.appendChild(row);
@@ -532,7 +538,7 @@ function renderGatepassRows(records) {
       <td>${record.reason || ""}</td>
       <td>
         <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
       </td>
     `;
     gatepassTableBody.appendChild(row);
@@ -566,7 +572,7 @@ function renderGoodmoralRows(records) {
       <td>${record.purpose || ""}</td>
       <td>
         <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
       </td>
     `;
     goodmoralTableBody.appendChild(row);
@@ -688,7 +694,7 @@ function renderIdreplacementRows(records) {
       <td>${record.reason || ""}</td>
       <td>
         <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
       </td>
     `;
     idreplacementTableBody.appendChild(row);
@@ -733,7 +739,7 @@ function renderLeaveofabsenceRows(records) {
       <td>${record.reason || ""}</td>
       <td>
         <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
       </td>
     `;
     leaveofabsenceTableBody.appendChild(row);
@@ -821,7 +827,7 @@ function attachRowActions({ tableElement, tableName, getRecords, form, fields, r
   if (!tableElement) return;
   tableElement.addEventListener("click", async (event) => {
     const editButton = event.target.closest("[data-action='edit']");
-    const deleteButton = event.target.closest("[data-action='delete']");
+    const archiveButton = event.target.closest("[data-action='archive']");
 
     if (editButton) {
       const id = editButton.dataset.id;
@@ -835,18 +841,19 @@ function attachRowActions({ tableElement, tableName, getRecords, form, fields, r
       return;
     }
 
-    if (deleteButton) {
-      const id = deleteButton.dataset.id;
+    if (archiveButton) {
+      const id = archiveButton.dataset.id;
       if (!id) return;
-      const confirmed = window.confirm("Delete this record?");
+      const confirmed = window.confirm("Archive this record? You can view and restore it later from the Archive page.");
       if (!confirmed) return;
 
     try {
-      await deleteRow(tableName, id);
+      await archiveRow(tableName, id);
       await reloadFn();
       await loadDashboard();
+      alert("Record archived successfully!");
     } catch (error) {
-      alert(error.message || "Unable to delete record.");
+      alert(error.message || "Unable to archive record.");
     }
     }
   });

@@ -1,0 +1,355 @@
+import { getSupabase } from "./supabaseClient.js?v=3";
+
+// Tab navigation
+const navBtns = document.querySelectorAll(".nav-btn");
+const tabs = document.querySelectorAll(".tab");
+
+navBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const tabName = btn.getAttribute("data-tab");
+    if (!tabName) return;
+
+    navBtns.forEach((b) => b.classList.remove("active"));
+    tabs.forEach((t) => t.classList.remove("active"));
+
+    btn.classList.add("active");
+    document.getElementById(tabName)?.classList.add("active");
+
+    loadArchivedRecords(tabName);
+  });
+});
+
+// Logout
+document.getElementById("logout-btn")?.addEventListener("click", async () => {
+  try {
+    const supabase = await getSupabase();
+    await supabase.auth.signOut();
+    window.location.href = "login.html";
+  } catch (err) {
+    console.error("Error signing out:", err);
+  }
+});
+
+// Load archived records on page load
+document.addEventListener("DOMContentLoaded", () => {
+  loadArchivedRecords("minor");
+});
+
+// Fetch archived rows from a table
+async function fetchArchivedRows(table) {
+  try {
+    const supabase = await getSupabase();
+    const { data, error } = await supabase
+      .from(table)
+      .select("*")
+      .eq("archived", true)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.error(`Error fetching archived records from ${table}:`, err);
+    return [];
+  }
+}
+
+// Restore a record (set archived = false)
+async function restoreRow(table, id) {
+  if (!confirm("Restore this record to active records?")) return;
+
+  try {
+    const supabase = await getSupabase();
+    const { error } = await supabase
+      .from(table)
+      .update({ archived: false })
+      .eq("id", id);
+
+    if (error) throw error;
+
+    alert("Record restored successfully!");
+    
+    // Reload current tab
+    const activeTab = document.querySelector(".nav-btn.active")?.getAttribute("data-tab");
+    if (activeTab) {
+      loadArchivedRecords(activeTab);
+    }
+  } catch (err) {
+    console.error("Error restoring record:", err);
+    alert("Failed to restore record: " + err.message);
+  }
+}
+
+// Permanently delete a record
+async function permanentlyDeleteRow(table, id) {
+  if (!confirm("⚠️ PERMANENTLY DELETE this record?\n\nThis action CANNOT be undone!")) {
+    return;
+  }
+
+  try {
+    const supabase = await getSupabase();
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
+
+    alert("Record permanently deleted.");
+    
+    // Reload current tab
+    const activeTab = document.querySelector(".nav-btn.active")?.getAttribute("data-tab");
+    if (activeTab) {
+      loadArchivedRecords(activeTab);
+    }
+  } catch (err) {
+    console.error("Error deleting record:", err);
+    alert("Failed to delete record: " + err.message);
+  }
+}
+
+// Attach restore and delete actions to row
+function attachRowActions(row, table, id) {
+  const restoreBtn = row.querySelector(".restore-btn");
+  const deleteBtn = row.querySelector(".delete-btn");
+
+  restoreBtn?.addEventListener("click", () => restoreRow(table, id));
+  deleteBtn?.addEventListener("click", () => permanentlyDeleteRow(table, id));
+}
+
+// Load archived records for specific table
+async function loadArchivedRecords(tabName) {
+  let table = "";
+  let tbodyId = "";
+
+  switch (tabName) {
+    case "minor":
+      table = "minor_offenses";
+      tbodyId = "minor-table-body";
+      break;
+    case "major":
+      table = "major_offenses";
+      tbodyId = "major-table-body";
+      break;
+    case "uniform":
+      table = "non_wearing_uniform";
+      tbodyId = "uniform-table-body";
+      break;
+    case "gatepass":
+      table = "gatepass";
+      tbodyId = "gatepass-table-body";
+      break;
+    case "goodmoral":
+      table = "good_moral";
+      tbodyId = "goodmoral-table-body";
+      break;
+    case "idreplacement":
+      table = "id_replacement";
+      tbodyId = "idreplacement-table-body";
+      break;
+    case "leaveofabsence":
+      table = "leave_of_absence";
+      tbodyId = "leaveofabsence-table-body";
+      break;
+    default:
+      return;
+  }
+
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+
+  // Show loading state
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">Loading...</td></tr>';
+
+  const rows = await fetchArchivedRows(table);
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No archived records found.</td></tr>';
+    return;
+  }
+
+  // Render rows based on table type
+  if (tabName === "minor") {
+    renderMinorRows(rows, tbody);
+  } else if (tabName === "major") {
+    renderMajorRows(rows, tbody);
+  } else if (tabName === "uniform") {
+    renderUniformRows(rows, tbody);
+  } else if (tabName === "gatepass") {
+    renderGatepassRows(rows, tbody);
+  } else if (tabName === "goodmoral") {
+    renderGoodmoralRows(rows, tbody);
+  } else if (tabName === "idreplacement") {
+    renderIdReplacementRows(rows, tbody);
+  } else if (tabName === "leaveofabsence") {
+    renderLeaveOfAbsenceRows(rows, tbody);
+  }
+}
+
+// Render functions for each table type
+function renderMinorRows(rows, tbody) {
+  tbody.innerHTML = rows
+    .map(
+      (r) => `
+    <tr>
+      <td>${r.date_of_complaint || ""}</td>
+      <td>${r.name_of_student || ""}</td>
+      <td>${r.sr_code || ""}</td>
+      <td>${r.offense || ""}</td>
+      <td>${r.sanction || ""}</td>
+      <td>
+        <button class="btn btn-sm btn-success restore-btn">Restore</button>
+        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+      </td>
+    </tr>
+  `
+    )
+    .join("");
+
+  tbody.querySelectorAll("tr").forEach((row, idx) => {
+    attachRowActions(row, "minor_offenses", rows[idx].id);
+  });
+}
+
+function renderMajorRows(rows, tbody) {
+  tbody.innerHTML = rows
+    .map(
+      (r) => `
+    <tr>
+      <td>${r.date_of_complaint || ""}</td>
+      <td>${r.name_of_student || ""}</td>
+      <td>${r.sr_code || ""}</td>
+      <td>${r.offense || ""}</td>
+      <td>${r.sanction || ""}</td>
+      <td>
+        <button class="btn btn-sm btn-success restore-btn">Restore</button>
+        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+      </td>
+    </tr>
+  `
+    )
+    .join("");
+
+  tbody.querySelectorAll("tr").forEach((row, idx) => {
+    attachRowActions(row, "major_offenses", rows[idx].id);
+  });
+}
+
+function renderUniformRows(rows, tbody) {
+  tbody.innerHTML = rows
+    .map(
+      (r) => `
+    <tr>
+      <td>${r.date || ""}</td>
+      <td>${r.name || ""}</td>
+      <td>${r.sr_code || ""}</td>
+      <td>${r.course || ""}</td>
+      <td>${r.reason || ""}</td>
+      <td>
+        <button class="btn btn-sm btn-success restore-btn">Restore</button>
+        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+      </td>
+    </tr>
+  `
+    )
+    .join("");
+
+  tbody.querySelectorAll("tr").forEach((row, idx) => {
+    attachRowActions(row, "non_wearing_uniform", rows[idx].id);
+  });
+}
+
+function renderGatepassRows(rows, tbody) {
+  tbody.innerHTML = rows
+    .map(
+      (r) => `
+    <tr>
+      <td>${r.date || ""}</td>
+      <td>${r.name || ""}</td>
+      <td>${r.sr_code || ""}</td>
+      <td>${r.course || ""}</td>
+      <td>${r.reason || ""}</td>
+      <td>
+        <button class="btn btn-sm btn-success restore-btn">Restore</button>
+        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+      </td>
+    </tr>
+  `
+    )
+    .join("");
+
+  tbody.querySelectorAll("tr").forEach((row, idx) => {
+    attachRowActions(row, "gatepass", rows[idx].id);
+  });
+}
+
+function renderGoodmoralRows(rows, tbody) {
+  tbody.innerHTML = rows
+    .map(
+      (r) => `
+    <tr>
+      <td>${r.date || ""}</td>
+      <td>${r.name || ""}</td>
+      <td>${r.sr_code || ""}</td>
+      <td>${r.course || ""}</td>
+      <td>${r.purpose || ""}</td>
+      <td>
+        <button class="btn btn-sm btn-success restore-btn">Restore</button>
+        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+      </td>
+    </tr>
+  `
+    )
+    .join("");
+
+  tbody.querySelectorAll("tr").forEach((row, idx) => {
+    attachRowActions(row, "good_moral", rows[idx].id);
+  });
+}
+
+function renderIdReplacementRows(rows, tbody) {
+  tbody.innerHTML = rows
+    .map(
+      (r) => `
+    <tr>
+      <td>${r.date || ""}</td>
+      <td>${r.name || ""}</td>
+      <td>${r.sr_code || ""}</td>
+      <td>${r.course || ""}</td>
+      <td>${r.reason || ""}</td>
+      <td>
+        <button class="btn btn-sm btn-success restore-btn">Restore</button>
+        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+      </td>
+    </tr>
+  `
+    )
+    .join("");
+
+  tbody.querySelectorAll("tr").forEach((row, idx) => {
+    attachRowActions(row, "id_replacement", rows[idx].id);
+  });
+}
+
+function renderLeaveOfAbsenceRows(rows, tbody) {
+  tbody.innerHTML = rows
+    .map(
+      (r) => `
+    <tr>
+      <td>${r.date || ""}</td>
+      <td>${r.name || ""}</td>
+      <td>${r.sr_code || ""}</td>
+      <td>${r.course || ""}</td>
+      <td>${r.reason || ""}</td>
+      <td>
+        <button class="btn btn-sm btn-success restore-btn">Restore</button>
+        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+      </td>
+    </tr>
+  `
+    )
+    .join("");
+
+  tbody.querySelectorAll("tr").forEach((row, idx) => {
+    attachRowActions(row, "leave_of_absence", rows[idx].id);
+  });
+}

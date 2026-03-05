@@ -112,6 +112,7 @@ async function loadMinorOffenses() {
     const { data, error } = await supabase
       .from("minor_offenses")
       .select("*")
+      .eq("archived", false)
       .order("date_of_complaint", { ascending: false });
 
     console.log("Minor offenses result:", { data, error });
@@ -160,6 +161,7 @@ async function loadUniformViolations() {
     const { data, error } = await supabase
       .from("non_wearing_uniform")
       .select("*")
+      .eq("archived", false)
       .order("date", { ascending: false });
 
     if (error) throw error;
@@ -202,6 +204,7 @@ async function loadGatepassRequests() {
     const { data, error } = await supabase
       .from("gatepass")
       .select("*")
+      .eq("archived", false)
       .order("date", { ascending: false });
 
     if (error) throw error;
@@ -245,6 +248,7 @@ async function loadGoodMoralRequests() {
     const { data, error } = await supabase
       .from("good_moral")
       .select("*")
+      .eq("archived", false)
       .order("date", { ascending: false });
 
     if (error) throw error;
@@ -287,6 +291,7 @@ async function loadIdReplacementRequests() {
     const { data, error } = await supabase
       .from("id_replacement")
       .select("*")
+      .eq("archived", false)
       .order("date", { ascending: false });
 
     if (error) throw error;
@@ -330,6 +335,7 @@ async function loadLeaveOfAbsenceRequests() {
     const { data, error } = await supabase
       .from("leave_of_absence")
       .select("*")
+      .eq("archived", false)
       .order("date", { ascending: false });
 
     if (error) throw error;

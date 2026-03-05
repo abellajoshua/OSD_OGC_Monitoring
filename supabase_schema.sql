@@ -10,6 +10,7 @@ create table if not exists public.minor_offenses (
   offense text not null,
   sanction text not null,
   date_of_sanction date not null,
+  archived boolean default false,
   created_at timestamptz default now()
 );
 
@@ -25,6 +26,7 @@ create table if not exists public.major_offenses (
   offense text not null,
   sanction text not null,
   date_of_sanction date not null,
+  archived boolean default false,
   created_at timestamptz default now()
 );
 
@@ -38,6 +40,7 @@ create table if not exists public.non_wearing_uniform (
   course text not null,
   sex text not null,
   reason text not null,
+  archived boolean default false,
   created_at timestamptz default now()
 );
 
@@ -51,6 +54,7 @@ create table if not exists public.gatepass (
   course text not null,
   sex text not null,
   reason text not null,
+  archived boolean default false,
   created_at timestamptz default now()
 );
 
@@ -64,6 +68,7 @@ create table if not exists public.good_moral (
   course text not null,
   sex text not null,
   purpose text not null,
+  archived boolean default false,
   created_at timestamptz default now()
 );
 
@@ -77,6 +82,7 @@ create table if not exists public.id_replacement (
   course text not null,
   sex text not null,
   reason text not null,
+  archived boolean default false,
   created_at timestamptz default now()
 );
 
@@ -90,6 +96,7 @@ create table if not exists public.leave_of_absence (
   course text not null,
   sex text not null,
   reason text not null,
+  archived boolean default false,
   created_at timestamptz default now()
 );
 
