@@ -56,6 +56,12 @@ document.querySelectorAll(".nav-btn[data-section]").forEach((btn) => {
     });
     document.getElementById(`${section}-section`).style.display = "block";
     
+    // Show/hide back button based on section
+    const backBtn = document.getElementById("back-to-overview-btn");
+    if (backBtn) {
+      backBtn.style.display = section === "overview" ? "none" : "flex";
+    }
+    
     // Close mobile sidebar
     const offcanvas = bootstrap.Offcanvas.getInstance(document.getElementById("sidebarNav"));
     if (offcanvas) {
@@ -63,6 +69,18 @@ document.querySelectorAll(".nav-btn[data-section]").forEach((btn) => {
     }
   });
 });
+
+// Back button handler
+const backToOverviewBtn = document.getElementById("back-to-overview-btn");
+if (backToOverviewBtn) {
+  backToOverviewBtn.addEventListener("click", () => {
+    // Trigger overview button click
+    const overviewBtn = document.querySelector('.nav-btn[data-section="overview"]');
+    if (overviewBtn) {
+      overviewBtn.click();
+    }
+  });
+}
 
 // Logout functionality
 document.getElementById("logout-btn")?.addEventListener("click", async () => {
@@ -149,6 +167,57 @@ async function loadMinorOffenses() {
   } catch (error) {
     console.error("Error loading minor offenses:", error);
     document.getElementById("minor-offenses-tbody").innerHTML = 
+      `<tr><td colspan="6" class="text-center py-4 text-danger">Error loading data: ${escapeHtml(error.message)}</td></tr>`;
+    return 0;
+  }
+}
+
+// Load Major Offenses
+async function loadMajorOffenses() {
+  try {
+    const supabase = await getSupabase();
+    console.log("Fetching major offenses...");
+    
+    const { data, error } = await supabase
+      .from("major_offenses")
+      .select("*")
+      .eq("archived", false)
+      .order("date_of_complaint", { ascending: false });
+
+    console.log("Major offenses result:", { data, error });
+
+    if (error) {
+      console.error("Major offenses error:", error);
+      throw error;
+    }
+
+    const tbody = document.getElementById("major-offenses-tbody");
+    
+    if (!data || data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No major offenses recorded</td></tr>`;
+      return 0;
+    }
+
+    tbody.innerHTML = data
+      .map(
+        (record) => `
+        <tr>
+          <td><strong>${escapeHtml(record.sr_code || "N/A")}</strong></td>
+          <td>${escapeHtml(record.name_of_student || "N/A")}</td>
+          <td>${escapeHtml(record.offense || "N/A")}</td>
+          <td>${formatDate(record.date_of_complaint)}</td>
+          <td>${escapeHtml(record.sanction || "N/A")}</td>
+          <td><span class="badge bg-danger">Major</span></td>
+        </tr>
+      `
+      )
+      .join("");
+
+    console.log(`Loaded ${data.length} major offenses`);
+    return data.length;
+  } catch (error) {
+    console.error("Error loading major offenses:", error);
+    document.getElementById("major-offenses-tbody").innerHTML = 
       `<tr><td colspan="6" class="text-center py-4 text-danger">Error loading data: ${escapeHtml(error.message)}</td></tr>`;
     return 0;
   }
@@ -376,8 +445,9 @@ async function loadLeaveOfAbsenceRequests() {
 async function loadAllData() {
   console.log("Starting to load all data...");
   
-  const [minorCount, uniformCount, gatepassCount, goodMoralCount, idReplacementCount, leaveOfAbsenceCount] = await Promise.all([
+  const [minorCount, majorCount, uniformCount, gatepassCount, goodMoralCount, idReplacementCount, leaveOfAbsenceCount] = await Promise.all([
     loadMinorOffenses(),
+    loadMajorOffenses(),
     loadUniformViolations(),
     loadGatepassRequests(),
     loadGoodMoralRequests(),
@@ -385,10 +455,11 @@ async function loadAllData() {
     loadLeaveOfAbsenceRequests(),
   ]);
 
-  console.log("Counts:", { minorCount, uniformCount, gatepassCount, goodMoralCount, idReplacementCount, leaveOfAbsenceCount });
+  console.log("Counts:", { minorCount, majorCount, uniformCount, gatepassCount, goodMoralCount, idReplacementCount, leaveOfAbsenceCount });
 
   // Update overview stats
   document.getElementById("total-minor").textContent = minorCount;
+  document.getElementById("total-major").textContent = majorCount;
   document.getElementById("total-uniform").textContent = uniformCount;
   document.getElementById("total-gatepass").textContent = gatepassCount;
   document.getElementById("total-goodmoral").textContent = goodMoralCount;

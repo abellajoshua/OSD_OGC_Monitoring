@@ -154,13 +154,13 @@
           </div>
         </div>
       </div>
-      <a href="index.html" class="back-btn" aria-label="Back to Dashboard">
+      <button class="back-btn" id="back-to-overview-btn" style="display: none;" aria-label="Back to Overview">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="19" y1="12" x2="5" y2="12"></line>
           <polyline points="12 19 5 12 12 5"></polyline>
         </svg>
         Back
-      </a>
+      </button>
     </header>
 
     <div class="offcanvas offcanvas-start sidebar-modal" tabindex="-1" id="sidebarNav" aria-labelledby="sidebarNavLabel">
@@ -172,6 +172,7 @@
         <nav class="nav nav-sidebar">
           <button class="nav-btn active" data-section="overview">Overview</button>
           <button class="nav-btn" data-section="minor-offenses">Minor Offenses</button>
+          <button class="nav-btn" data-section="major-offenses">Major Offenses</button>
           <button class="nav-btn" data-section="uniform-violations">Uniform Violations</button>
           <button class="nav-btn" data-section="gatepass-requests">Gatepass Requests</button>
           <button class="nav-btn" data-section="good-moral">Good Moral Requests</button>
@@ -200,6 +201,10 @@
           <div class="stat-card">
             <h4 id="total-minor">--</h4>
             <p>Minor Offenses</p>
+          </div>
+          <div class="stat-card">
+            <h4 id="total-major">--</h4>
+            <p>Major Offenses</p>
           </div>
           <div class="stat-card">
             <h4 id="total-uniform">--</h4>
@@ -266,6 +271,39 @@
                 </tr>
               </thead>
               <tbody id="minor-offenses-tbody">
+                <tr>
+                  <td colspan="6" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Major Offenses Section -->
+      <section id="major-offenses-section" class="report-section" style="display: none;">
+        <div class="report-header">
+          <h3>Major Offenses</h3>
+          <p>All recorded major offenses and disciplinary actions</p>
+        </div>
+        <div class="report-body">
+          <div class="table-container">
+            <table class="table report-table">
+              <thead>
+                <tr>
+                  <th>SR-Code</th>
+                  <th>Student Name</th>
+                  <th>Violation</th>
+                  <th>Date</th>
+                  <th>Sanction</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="major-offenses-tbody">
                 <tr>
                   <td colspan="6" class="text-center py-4">
                     <div class="spinner-border text-primary" role="status">
