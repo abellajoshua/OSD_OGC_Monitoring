@@ -186,50 +186,19 @@ async function loadUsers() {
 // Create new user account
 async function createUser(email, password, fullName, role) {
   try {
-    const supabase = await getSupabase();
-
-    // Create auth user using signUp (works with anon key)
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: email,
-      password: password,
-      options: {
-        data: {
-          full_name: fullName,
-          role: role
-        },
-        emailRedirectTo: window.location.origin + '/index.html'
-      }
+    // Call the API endpoint to create user without affecting admin session
+    const response = await fetch('/api/admin/create-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password, fullName, role }),
     });
 
-    if (authError) {
-      // Provide more detailed error message
-      if (authError.message.includes('invalid')) {
-        throw new Error(`Email validation failed. Please check Supabase settings: Authentication > Settings > Enable email confirmations should be disabled, or configure an email provider.`);
-      }
-      throw new Error(`Auth error: ${authError.message}`);
-    }
+    const result = await response.json();
 
-    if (!authData.user) {
-      throw new Error("User creation failed - no user data returned. Check if email confirmation is required in Supabase settings.");
-    }
-
-    // Save user account info to database
-    const { error: dbError } = await supabase.from("user_accounts").insert({
-      user_id: authData.user.id,
-      email: email,
-      full_name: fullName,
-      role: role,
-    });
-
-    if (dbError) {
-      // If database insert fails, user exists in Auth but not in database
-      console.error("Database insert error:", dbError);
-      
-      if (dbError.message.includes("violates check constraint") || dbError.message.includes("role_check")) {
-        throw new Error(`Database constraint error: The database is still configured for old roles (user/admin). You MUST run this SQL in Supabase:\n\nALTER TABLE public.user_accounts DROP CONSTRAINT IF EXISTS user_accounts_role_check;\nALTER TABLE public.user_accounts ADD CONSTRAINT user_accounts_role_check CHECK (role IN ('coordinator', 'head'));\n\nGo to: https://supabase.com/dashboard/project/plziabdipbwvatlbcbyp/sql`);
-      }
-      
-      throw new Error(`Database error: ${dbError.message}\n\nNote: User was created in Auth but NOT saved to database. You may need to delete it from Auth users.`);
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to create user');
     }
 
     // Show success message in users status area
@@ -267,16 +236,19 @@ async function createUser(email, password, fullName, role) {
 // Delete user
 async function deleteUser(email) {
   try {
-    const supabase = await getSupabase();
+    // Call the API endpoint to delete user from both Auth and database
+    const response = await fetch('/api/admin/delete-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    });
 
-    // Delete from user_accounts table
-    const { error: dbError } = await supabase
-      .from("user_accounts")
-      .delete()
-      .eq("email", email);
+    const result = await response.json();
 
-    if (dbError) {
-      throw dbError;
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to delete user');
     }
 
     usersStatus.innerHTML = `
@@ -284,7 +256,7 @@ async function deleteUser(email) {
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 0.5rem; vertical-align: middle;">
           <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
         </svg>
-        <strong>User deleted successfully</strong> - ${escapeHtml(email)} has been removed
+        <strong>User deleted permanently!</strong> - ${escapeHtml(email)} has been removed from database and authentication system
       </div>
     `;
     await loadUsers();
