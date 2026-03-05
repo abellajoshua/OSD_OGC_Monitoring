@@ -136,6 +136,12 @@ function switchTab(targetId) {
   navButtons.forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.tab === targetId);
   });
+  
+  // Show/hide back button based on active tab
+  const backBtn = document.getElementById("back-to-dashboard-btn");
+  if (backBtn) {
+    backBtn.style.display = targetId === "dashboard" ? "none" : "flex";
+  }
 }
 
 function formatDate(value) {
@@ -991,6 +997,14 @@ navButtons.forEach((button) => {
     }
   });
 });
+
+// Back to Dashboard button
+const backToDashboardBtn = document.getElementById("back-to-dashboard-btn");
+if (backToDashboardBtn) {
+  backToDashboardBtn.addEventListener("click", () => {
+    switchTab("dashboard");
+  });
+}
 
 heroButtons.forEach((button) => {
   button.addEventListener("click", () => {

@@ -16,6 +16,12 @@ navBtns.forEach((btn) => {
     document.getElementById(tabName)?.classList.add("active");
 
     loadArchivedRecords(tabName);
+
+    // Close sidebar menu after selecting a tab
+    const sidebar = document.getElementById("sidebarNav");
+    if (sidebar && window.bootstrap && sidebar.classList.contains("show")) {
+      window.bootstrap.Offcanvas.getOrCreateInstance(sidebar).hide();
+    }
   });
 });
 
