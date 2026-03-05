@@ -20,24 +20,31 @@
     </div>
 
     <header class="topbar">
-      <div class="brand">
-        <div class="logo">
-          <img src="assets/logo.png" alt="Batangas State University logo" />
-        </div>
-        <div>
-          <p class="brand-title">OSD & OGC Monitoring - Coordinator</p>
-          <p class="brand-subtitle">Centralized discipline records, status tracking, and reporting</p>
+      <div class="topbar-left">
+        <button
+          class="menu-icon-btn"
+          type="button"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#sidebarNav"
+          aria-controls="sidebarNav"
+          aria-label="Open Menu"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="brand">
+          <div class="logo">
+            <img src="assets/logo.png" alt="Batangas State University logo" />
+          </div>
+          <div>
+            <p class="brand-title">OSD & OGC Monitoring - Coordinator</p>
+            <p class="brand-subtitle">Centralized discipline records, status tracking, and reporting</p>
+          </div>
         </div>
       </div>
-      <button
-        class="sidebar-toggle"
-        type="button"
-        data-bs-toggle="offcanvas"
-        data-bs-target="#sidebarNav"
-        aria-controls="sidebarNav"
-      >
-        Open Menu
-      </button>
     </header>
 
     <div class="offcanvas offcanvas-start sidebar-modal" tabindex="-1" id="sidebarNav" aria-labelledby="sidebarNavLabel">
