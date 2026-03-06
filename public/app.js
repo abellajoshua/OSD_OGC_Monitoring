@@ -53,6 +53,10 @@ const kpiGatepass = document.querySelector("[data-kpi='gatepass']");
 const kpiGoodmoral = document.querySelector("[data-kpi='goodmoral']");
 const kpiGoodmoralFlagged = document.querySelector("[data-kpi='goodmoral-flagged']");
 
+const academicYearInput = document.querySelector("#academic-year-input");
+const semesterSelect = document.querySelector("#semester-select");
+const academicPeriodDisplay = document.querySelector("#academic-period-display");
+
 const minorFilter = document.querySelector("[data-filter-scope='minor']");
 const majorFilter = document.querySelector("[data-filter-scope='major']");
 const uniformFilter = document.querySelector("[data-filter-scope='uniform']");
@@ -278,6 +282,8 @@ function openPrintView() {
   const table = document.querySelector("#minor .table-wrap table");
 
   if (!table) return;
+  
+  const { year, semester } = getAcademicPeriod();
 
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
@@ -318,7 +324,7 @@ function openPrintView() {
             <h3>The National Engineering University</h3>
             <h4>Alangilan Campus</h4>
             <h3>OFFICE OF STUDENT DISCIPLINE</h3>
-            <h4>First Semester AY 2024-2025</h4>
+            <h4>${semester} AY ${year}</h4>
           </div>
         </div>
         <div class="log-title">
@@ -339,6 +345,8 @@ function openMajorPrintView() {
   const title = document.querySelector("#major .log-title");
 
   if (!table || !title) return;
+  
+  const { year, semester } = getAcademicPeriod();
 
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
@@ -379,7 +387,7 @@ function openMajorPrintView() {
             <h3>The National Engineering University</h3>
             <h4>Alangilan Campus</h4>
             <h3>OFFICE OF STUDENT DISCIPLINE</h3>
-            <h4>First Semester AY 2024-2025</h4>
+            <h4>${semester} AY ${year}</h4>
           </div>
         </div>
         ${title.outerHTML}
@@ -397,6 +405,8 @@ function openUniformPrintView() {
   const title = document.querySelector("#uniform .log-title");
 
   if (!table || !title) return;
+  
+  const { year, semester } = getAcademicPeriod();
 
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
@@ -437,7 +447,7 @@ function openUniformPrintView() {
             <h3>The National Engineering University</h3>
             <h4>Alangilan Campus</h4>
             <h3>OFFICE OF STUDENT DISCIPLINE</h3>
-            <h4>First Semester AY 2024-2025</h4>
+            <h4>${semester} AY ${year}</h4>
           </div>
         </div>
         ${title.outerHTML}
@@ -455,6 +465,8 @@ function openGatepassPrintView() {
   const title = document.querySelector("#gatepass .log-title");
 
   if (!table || !title) return;
+  
+  const { year, semester } = getAcademicPeriod();
 
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
@@ -495,7 +507,7 @@ function openGatepassPrintView() {
             <h3>The National Engineering University</h3>
             <h4>Alangilan Campus</h4>
             <h3>OFFICE OF STUDENT DISCIPLINE</h3>
-            <h4>First Semester AY 2024-2025</h4>
+            <h4>${semester} AY ${year}</h4>
           </div>
         </div>
         ${title.outerHTML}
@@ -513,6 +525,8 @@ function openGoodmoralPrintView() {
   const title = document.querySelector("#goodmoral .log-title");
 
   if (!table || !title) return;
+  
+  const { year, semester } = getAcademicPeriod();
 
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
@@ -553,7 +567,7 @@ function openGoodmoralPrintView() {
             <h3>The National Engineering University</h3>
             <h4>Alangilan Campus</h4>
             <h3>OFFICE OF STUDENT DISCIPLINE</h3>
-            <h4>First Semester AY 2024-2025</h4>
+            <h4>${semester} AY ${year}</h4>
           </div>
         </div>
         ${title.outerHTML}
@@ -571,6 +585,8 @@ function openIdreplacementPrintView() {
   const title = document.querySelector("#idreplacement .log-title");
 
   if (!table || !title) return;
+  
+  const { year, semester } = getAcademicPeriod();
 
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
@@ -611,7 +627,7 @@ function openIdreplacementPrintView() {
             <h3>The National Engineering University</h3>
             <h4>Alangilan Campus</h4>
             <h3>OFFICE OF STUDENT DISCIPLINE</h3>
-            <h4>First Semester AY 2024-2025</h4>
+            <h4>${semester} AY ${year}</h4>
           </div>
         </div>
         ${title.outerHTML}
@@ -629,6 +645,8 @@ function openLeaveofabsencePrintView() {
   const title = document.querySelector("#leaveofabsence .log-title");
 
   if (!table || !title) return;
+  
+  const { year, semester } = getAcademicPeriod();
 
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
@@ -669,7 +687,7 @@ function openLeaveofabsencePrintView() {
             <h3>The National Engineering University</h3>
             <h4>Alangilan Campus</h4>
             <h3>OFFICE OF STUDENT DISCIPLINE</h3>
-            <h4>First Semester AY 2024-2025</h4>
+            <h4>${semester} AY ${year}</h4>
           </div>
         </div>
         ${title.outerHTML}
@@ -1259,6 +1277,88 @@ async function loadMajorRecords() {
   }
 }
 
+// Academic Period Management
+function getAcademicPeriod() {
+  const year = localStorage.getItem("academicYear") || "2024-2025";
+  const semester = localStorage.getItem("semester") || "First Semester";
+  return { year, semester };
+}
+
+function setAcademicPeriod(year, semester) {
+  localStorage.setItem("academicYear", year);
+  localStorage.setItem("semester", semester);
+}
+
+function formatAcademicYear(input) {
+  // Remove all non-digit characters
+  let digits = input.replace(/\D/g, '');
+  
+  // Limit to 8 digits max
+  if (digits.length > 8) {
+    digits = digits.substring(0, 8);
+  }
+  
+  // Format as YYYY-YYYY
+  if (digits.length >= 4) {
+    const firstYear = digits.substring(0, 4);
+    const secondYear = digits.substring(4, 8);
+    return secondYear ? `${firstYear}-${secondYear}` : firstYear;
+  }
+  
+  return digits;
+}
+
+function updateAcademicPeriodDisplay() {
+  if (!academicPeriodDisplay) return;
+  const { year, semester } = getAcademicPeriod();
+  academicPeriodDisplay.textContent = `${semester} AY ${year}`;
+}
+
+function initializeAcademicPeriod() {
+  const { year, semester } = getAcademicPeriod();
+  
+  if (academicYearInput) {
+    academicYearInput.value = year;
+    
+    academicYearInput.addEventListener("input", (e) => {
+      const cursorPosition = e.target.selectionStart;
+      const oldValue = e.target.value;
+      const formatted = formatAcademicYear(e.target.value);
+      
+      e.target.value = formatted;
+      
+      // Adjust cursor position after formatting
+      let newCursorPosition = cursorPosition;
+      if (formatted.length > oldValue.length && cursorPosition === 5) {
+        newCursorPosition = 6; // Move cursor after the hyphen
+      }
+      e.target.setSelectionRange(newCursorPosition, newCursorPosition);
+      
+      setAcademicPeriod(formatted, getAcademicPeriod().semester);
+      updateAcademicPeriodDisplay();
+    });
+    
+    academicYearInput.addEventListener("blur", (e) => {
+      // Ensure proper format on blur
+      const formatted = formatAcademicYear(e.target.value);
+      e.target.value = formatted;
+      setAcademicPeriod(formatted, getAcademicPeriod().semester);
+      updateAcademicPeriodDisplay();
+    });
+  }
+  
+  if (semesterSelect) {
+    semesterSelect.value = semester;
+    semesterSelect.addEventListener("change", (e) => {
+      const newSemester = e.target.value;
+      setAcademicPeriod(getAcademicPeriod().year, newSemester);
+      updateAcademicPeriodDisplay();
+    });
+  }
+  
+  updateAcademicPeriodDisplay();
+}
+
 async function loadDashboard() {
   const activeCases =
     minorRecords.length + majorRecords.length + uniformRecords.length + gatepassRecords.length + goodmoralRecords.length;
@@ -1615,6 +1715,7 @@ loadIdreplacementRecords();
 loadLeaveofabsenceRecords();
 loadDashboard();
 updateDashboardCounters();
+initializeAcademicPeriod();
 
 setupFilters(minorFilter, applyMinorFilters);
 setupFilters(majorFilter, applyMajorFilters);
