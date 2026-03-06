@@ -5,12 +5,12 @@ const REQUIRED_FIELDS = [
   "name_of_student",
   "sr_code",
   "year_program",
-  "contact_number",
-  "reported_by",
   "sex",
+  "contact_number",
+  "complainant",
   "offense",
   "sanction",
-  "date_of_sanction",
+  "date_of_suspension",
 ];
 
 module.exports = async (req, res) => {

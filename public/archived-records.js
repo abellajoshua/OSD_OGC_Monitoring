@@ -345,7 +345,7 @@ function renderLeaveOfAbsenceRows(rows, tbody) {
       <td>${r.name || ""}</td>
       <td>${r.sr_code || ""}</td>
       <td>${r.course || ""}</td>
-      <td>${r.reason || ""}</td>
+      <td>${r.semester_period_covered || ""}</td>
       <td>
         <button class="btn btn-sm btn-success restore-btn">Restore</button>
         <button class="btn btn-sm btn-danger delete-btn">Delete</button>

@@ -27,6 +27,11 @@ async function checkHeadAccess() {
 
   if (error) {
     console.error("Error checking user role:", error);
+    // If user_accounts table doesn't exist (406 error), skip role check
+    if (error.code === "PGRST116" || error.message.includes("406")) {
+      console.log("user_accounts table not found, skipping role check");
+      return true;
+    }
     alert(`Error checking user role: ${error.message}`);
     return false;
   }
@@ -422,7 +427,7 @@ async function loadLeaveOfAbsenceRequests() {
         <tr>
           <td><strong>${escapeHtml(record.sr_code || "N/A")}</strong></td>
           <td>${escapeHtml(record.name || "N/A")}</td>
-          <td>${escapeHtml(record.reason || "N/A")}</td>
+          <td>${escapeHtml(record.semester_period_covered || "N/A")}</td>
           <td>${formatDate(record.date)}</td>
           <td>${escapeHtml(record.time_out || "N/A")}</td>
           <td>${escapeHtml(record.time_in || "N/A")}</td>

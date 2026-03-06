@@ -196,7 +196,7 @@
           </div>
 
           <div class="filter-bar" data-filter-scope="minor">
-            <input type="search" placeholder="Search name, SR code, offense, reported by..." data-filter="query" />
+            <input type="search" placeholder="Search name, SR code, offense, complainant..." data-filter="query" />
             <label>
               From
               <input type="date" data-filter="from" />
@@ -210,8 +210,8 @@
           </div>
 
           <div class="sheet-actions">
-            <button class="primary" id="export-pdf">Export Logsheet PDF</button>
-            <button class="ghost" type="button" data-archive="minor-offenses">Archive CSV</button>
+            <button class="primary" id="export-pdf">Print PDF</button>
+            <button class="ghost" type="button" data-archive="minor-offenses" style="margin-left: 10px;">Archive CSV</button>
           </div>
 
           <div class="table-wrap table-responsive">
@@ -228,6 +228,7 @@
                   <th rowspan="2">Offense</th>
                   <th rowspan="2">Sanction</th>
                   <th rowspan="2">Date of Sanction</th>
+                  <th rowspan="2">Actions</th>
                 </tr>
                 <tr>
                   <th>M</th>
@@ -267,7 +268,7 @@
               </label>
               <label>
                 Reported By
-                <input type="text" name="reported_by" placeholder="Staff / Faculty" required />
+                <input type="text" name="complainant" placeholder="Staff / Faculty" required />
               </label>
               <fieldset class="sex-field">
                 <legend>Sex</legend>
@@ -286,7 +287,7 @@
               </label>
               <label>
                 Date of Sanction
-                <input type="date" name="date_of_sanction" required />
+                <input type="date" name="date_of_suspension" required />
               </label>
             </div>
             <button class="primary" type="submit">Save Record</button>
@@ -303,7 +304,7 @@
           </div>
 
           <div class="filter-bar" data-filter-scope="major">
-            <input type="search" placeholder="Search name, SR code, offense, reported by..." data-filter="query" />
+            <input type="search" placeholder="Search name, SR code, offense, complainant..." data-filter="query" />
             <label>
               From
               <input type="date" data-filter="from" />
@@ -317,8 +318,8 @@
           </div>
 
           <div class="sheet-actions">
-            <button class="primary" id="export-major-pdf">Export Logsheet PDF</button>
-            <button class="ghost" type="button" data-archive="major-offenses">Archive CSV</button>
+            <button class="primary" id="export-major-pdf">Print PDF</button>
+            <button class="ghost" type="button" data-archive="major-offenses" style="margin-left: 10px;">Archive CSV</button>
           </div>
 
           <div class="table-wrap table-responsive">
@@ -329,12 +330,16 @@
                   <th rowspan="2">Name of Student</th>
                   <th rowspan="2">SR Code</th>
                   <th rowspan="2">Year / Program</th>
-                  <th rowspan="2">Contact Number</th>
-                  <th rowspan="2">Reported By</th>
                   <th colspan="2">Sex</th>
+                  <th rowspan="2">Contact Number</th>
+                  <th rowspan="2">Complainant</th>
+                  <th rowspan="2">Written Reply</th>
+                  <th rowspan="2">Date of Hearing</th>
                   <th rowspan="2">Offense</th>
                   <th rowspan="2">Sanction</th>
-                  <th rowspan="2">Date of Sanction</th>
+                  <th rowspan="2">Date of Suspension</th>
+                  <th rowspan="2">Date of Post Counseling</th>
+                  <th rowspan="2">Actions</th>
                 </tr>
                 <tr>
                   <th>M</th>
@@ -368,14 +373,6 @@
                 Year / Program
                 <input type="text" name="year_program" placeholder="2nd Year / BSIT" required />
               </label>
-              <label>
-                Contact Number
-                <input type="text" name="contact_number" placeholder="09xx-xxx-xxxx" required />
-              </label>
-              <label>
-                Reported By
-                <input type="text" name="reported_by" placeholder="Staff / Faculty" required />
-              </label>
               <fieldset class="sex-field">
                 <legend>Sex</legend>
                 <div>
@@ -383,6 +380,22 @@
                   <label><input type="radio" name="sex" value="F" /> F</label>
                 </div>
               </fieldset>
+              <label>
+                Contact Number
+                <input type="text" name="contact_number" placeholder="09xx-xxx-xxxx" required />
+              </label>
+              <label>
+                Complainant
+                <input type="text" name="complainant" placeholder="Staff / Faculty" required />
+              </label>
+              <label>
+                Written Reply
+                <input type="text" name="written_reply" placeholder="Student's written response (optional)" />
+              </label>
+              <label>
+                Date of Hearing
+                <input type="date" name="date_of_hearing" />
+              </label>
               <label>
                 Offense
                 <input type="text" name="offense" required />
@@ -392,8 +405,12 @@
                 <input type="text" name="sanction" required />
               </label>
               <label>
-                Date of Sanction
-                <input type="date" name="date_of_sanction" required />
+                Date of Suspension
+                <input type="date" name="date_of_suspension" required />
+              </label>
+              <label>
+                Date of Post Counseling
+                <input type="date" name="date_of_post_counseling" />
               </label>
             </div>
             <button class="primary" type="submit">Save Record</button>
@@ -424,7 +441,8 @@
           </div>
 
           <div class="sheet-actions">
-            <button class="ghost" type="button" data-archive="non-wearing-uniform">Archive CSV</button>
+            <button class="primary" id="export-uniform-pdf">Print PDF</button>
+            <button class="ghost" type="button" data-archive="non-wearing-uniform" style="margin-left: 10px;">Archive CSV</button>
           </div>
 
           <div class="table-wrap table-responsive">
@@ -439,6 +457,7 @@
                   <th rowspan="2">Course</th>
                   <th colspan="2">Sex</th>
                   <th rowspan="2">Reason</th>
+                  <th rowspan="2">Actions</th>
                 </tr>
                 <tr>
                   <th>In</th>
@@ -521,7 +540,8 @@
           </div>
 
           <div class="sheet-actions">
-            <button class="ghost" type="button" data-archive="gatepass">Archive CSV</button>
+            <button class="primary" id="export-gatepass-pdf">Print PDF</button>
+            <button class="ghost" type="button" data-archive="gatepass" style="margin-left: 10px;">Archive CSV</button>
           </div>
 
           <div class="table-wrap table-responsive">
@@ -536,6 +556,7 @@
                   <th rowspan="2">Course</th>
                   <th colspan="2">Sex</th>
                   <th rowspan="2">Reason</th>
+                  <th rowspan="2">Actions</th>
                 </tr>
                 <tr>
                   <th>In</th>
@@ -618,7 +639,8 @@
           </div>
 
           <div class="sheet-actions">
-            <button class="ghost" type="button" data-archive="good-moral">Archive CSV</button>
+            <button class="primary" id="export-goodmoral-pdf">Print PDF</button>
+            <button class="ghost" type="button" data-archive="good-moral" style="margin-left: 10px;">Archive CSV</button>
           </div>
 
           <div class="table-wrap table-responsive">
@@ -633,6 +655,7 @@
                   <th rowspan="2">Course</th>
                   <th colspan="2">Sex</th>
                   <th rowspan="2">Purpose</th>
+                  <th rowspan="2">Actions</th>
                 </tr>
                 <tr>
                   <th>In</th>
@@ -715,7 +738,8 @@
           </div>
 
           <div class="sheet-actions">
-            <button class="ghost" type="button" data-archive="id-replacement">Archive CSV</button>
+            <button class="primary" id="export-idreplacement-pdf">Print PDF</button>
+            <button class="ghost" type="button" data-archive="id-replacement" style="margin-left: 10px;">Archive CSV</button>
           </div>
 
           <div class="table-wrap table-responsive">
@@ -730,6 +754,7 @@
                   <th rowspan="2">Course</th>
                   <th colspan="2">Sex</th>
                   <th rowspan="2">Reason</th>
+                  <th rowspan="2">Actions</th>
                 </tr>
                 <tr>
                   <th>In</th>
@@ -798,7 +823,7 @@
           </div>
 
           <div class="filter-bar" data-filter-scope="leaveofabsence">
-            <input type="search" placeholder="Search name, SR code, course, reason..." data-filter="query" />
+            <input type="search" placeholder="Search name, SR code, course, semester/period covered..." data-filter="query" />
             <label>
               From
               <input type="date" data-filter="from" />
@@ -812,7 +837,8 @@
           </div>
 
           <div class="sheet-actions">
-            <button class="ghost" type="button" data-archive="leave-of-absence">Archive CSV</button>
+            <button class="primary" id="export-leaveofabsence-pdf">Print PDF</button>
+            <button class="ghost" type="button" data-archive="leave-of-absence" style="margin-left: 10px;">Archive CSV</button>
           </div>
 
           <div class="table-wrap table-responsive">
@@ -826,7 +852,8 @@
                   <th rowspan="2">SR Code</th>
                   <th rowspan="2">Course</th>
                   <th colspan="2">Sex</th>
-                  <th rowspan="2">Reason</th>
+                  <th rowspan="2">Semester/Period Covered</th>
+                  <th rowspan="2">Actions</th>
                 </tr>
                 <tr>
                   <th>In</th>
@@ -877,8 +904,8 @@
                 </div>
               </fieldset>
               <label>
-                Reason
-                <input type="text" name="reason" required />
+                Semester/Period Covered
+                <input type="text" name="semester_period_covered" required />
               </label>
             </div>
             <button class="primary" type="submit">Save Record</button>

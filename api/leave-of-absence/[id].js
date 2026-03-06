@@ -8,7 +8,7 @@ const REQUIRED_FIELDS = [
   "sr_code",
   "course",
   "sex",
-  "reason",
+  "semester_period_covered",
 ];
 
 module.exports = async (req, res) => {

@@ -24,18 +24,23 @@ const exportMajorButton = document.querySelector("#export-major-pdf");
 const uniformTableBody = document.querySelector("#uniform-table-body");
 const uniformForm = document.querySelector("#uniform-form");
 const uniformStatus = document.querySelector("#uniform-status");
+const exportUniformButton = document.querySelector("#export-uniform-pdf");
 const gatepassTableBody = document.querySelector("#gatepass-table-body");
 const gatepassForm = document.querySelector("#gatepass-form");
 const gatepassStatus = document.querySelector("#gatepass-status");
+const exportGatepassButton = document.querySelector("#export-gatepass-pdf");
 const goodmoralTableBody = document.querySelector("#goodmoral-table-body");
 const goodmoralForm = document.querySelector("#goodmoral-form");
 const goodmoralStatus = document.querySelector("#goodmoral-status");
+const exportGoodmoralButton = document.querySelector("#export-goodmoral-pdf");
 const idreplacementTableBody = document.querySelector("#idreplacement-table-body");
 const idreplacementForm = document.querySelector("#idreplacement-form");
 const idreplacementStatus = document.querySelector("#idreplacement-status");
+const exportIdreplacementButton = document.querySelector("#export-idreplacement-pdf");
 const leaveofabsenceTableBody = document.querySelector("#leaveofabsence-table-body");
 const leaveofabsenceForm = document.querySelector("#leaveofabsence-form");
 const leaveofabsenceStatus = document.querySelector("#leaveofabsence-status");
+const exportLeaveofabsenceButton = document.querySelector("#export-leaveofabsence-pdf");
 const dashboardActivityBody = document.querySelector("#dashboard-activity-body");
 const statActive = document.querySelector("[data-stat='active']");
 const statPending = document.querySelector("[data-stat='pending']");
@@ -88,11 +93,24 @@ function downloadCsv(fileName, csvContent) {
 
 async function fetchTableRows(table, dateColumn) {
   const supabase = await getSupabase();
-  const query = supabase.from(table).select("*").eq("archived", false);
   const primaryOrderColumn = dateColumn || "id";
-  const { data, error } = await query
+  
+  // Try with archived filter first
+  let query = supabase.from(table).select("*").eq("archived", false);
+  let { data, error } = await query
     .order(primaryOrderColumn, { ascending: false })
     .order("id", { ascending: false });
+  
+  // If archived column doesn't exist, try without it
+  if (error && error.message && error.message.includes("archived")) {
+    query = supabase.from(table).select("*");
+    const result = await query
+      .order(primaryOrderColumn, { ascending: false })
+      .order("id", { ascending: false });
+    data = result.data;
+    error = result.error;
+  }
+  
   if (error) throw error;
   return data || [];
 }
@@ -258,9 +276,8 @@ function flagGoodMoralFromMinor() {
 
 function openPrintView() {
   const table = document.querySelector("#minor .table-wrap table");
-  const title = document.querySelector("#minor .log-title");
 
-  if (!table || !title) return;
+  if (!table) return;
 
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
@@ -272,18 +289,42 @@ function openPrintView() {
         <meta charset="UTF-8" />
         <title>Minor Offense Logsheet</title>
         <style>
-          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; }
-          .log-title { text-align: center; margin-bottom: 18px; }
-          .log-title h2 { margin: 0; font-size: 24px; }
-          .log-title h3 { margin: 4px 0 0; font-size: 16px; letter-spacing: 1px; }
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
           table { width: 100%; border-collapse: collapse; font-size: 11px; }
           th, td { border: 1px solid #111; padding: 6px; text-align: center; }
-          th { background: #f5f5f5; text-transform: uppercase; }
-          th:last-child, td:last-child { display: none; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
         </style>
       </head>
       <body>
-        ${title.outerHTML}
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>First Semester AY 2024-2025</h4>
+          </div>
+        </div>
+        <div class="log-title">
+          <h2>LOGSHEET</h2>
+          <h3>MINOR OFFENSES</h3>
+        </div>
         ${table.outerHTML}
       </body>
     </html>
@@ -309,17 +350,328 @@ function openMajorPrintView() {
         <meta charset="UTF-8" />
         <title>Major Offense Logsheet</title>
         <style>
-          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; }
-          .log-title { text-align: center; margin-bottom: 18px; }
-          .log-title h2 { margin: 0; font-size: 24px; }
-          .log-title h3 { margin: 4px 0 0; font-size: 16px; letter-spacing: 1px; }
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
           table { width: 100%; border-collapse: collapse; font-size: 11px; }
           th, td { border: 1px solid #111; padding: 6px; text-align: center; }
-          th { background: #f5f5f5; text-transform: uppercase; }
-          th:last-child, td:last-child { display: none; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
         </style>
       </head>
       <body>
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>First Semester AY 2024-2025</h4>
+          </div>
+        </div>
+        ${title.outerHTML}
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function openUniformPrintView() {
+  const table = document.querySelector("#uniform .table-wrap table");
+  const title = document.querySelector("#uniform .log-title");
+
+  if (!table || !title) return;
+
+  const printWindow = window.open("", "_blank", "width=980,height=720");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Non-Wearing Uniform Logsheet</title>
+        <style>
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #111; padding: 6px; text-align: center; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
+        </style>
+      </head>
+      <body>
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>First Semester AY 2024-2025</h4>
+          </div>
+        </div>
+        ${title.outerHTML}
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function openGatepassPrintView() {
+  const table = document.querySelector("#gatepass .table-wrap table");
+  const title = document.querySelector("#gatepass .log-title");
+
+  if (!table || !title) return;
+
+  const printWindow = window.open("", "_blank", "width=980,height=720");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Gatepass Logsheet</title>
+        <style>
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #111; padding: 6px; text-align: center; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
+        </style>
+      </head>
+      <body>
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>First Semester AY 2024-2025</h4>
+          </div>
+        </div>
+        ${title.outerHTML}
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function openGoodmoralPrintView() {
+  const table = document.querySelector("#goodmoral .table-wrap table");
+  const title = document.querySelector("#goodmoral .log-title");
+
+  if (!table || !title) return;
+
+  const printWindow = window.open("", "_blank", "width=980,height=720");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Good Moral Verification Logsheet</title>
+        <style>
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #111; padding: 6px; text-align: center; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
+        </style>
+      </head>
+      <body>
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>First Semester AY 2024-2025</h4>
+          </div>
+        </div>
+        ${title.outerHTML}
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function openIdreplacementPrintView() {
+  const table = document.querySelector("#idreplacement .table-wrap table");
+  const title = document.querySelector("#idreplacement .log-title");
+
+  if (!table || !title) return;
+
+  const printWindow = window.open("", "_blank", "width=980,height=720");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>ID Replacement Logsheet</title>
+        <style>
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #111; padding: 6px; text-align: center; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
+        </style>
+      </head>
+      <body>
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>First Semester AY 2024-2025</h4>
+          </div>
+        </div>
+        ${title.outerHTML}
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function openLeaveofabsencePrintView() {
+  const table = document.querySelector("#leaveofabsence .table-wrap table");
+  const title = document.querySelector("#leaveofabsence .log-title");
+
+  if (!table || !title) return;
+
+  const printWindow = window.open("", "_blank", "width=980,height=720");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Leave of Absence Logsheet</title>
+        <style>
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #111; padding: 6px; text-align: center; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
+        </style>
+      </head>
+      <body>
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>First Semester AY 2024-2025</h4>
+          </div>
+        </div>
         ${title.outerHTML}
         ${table.outerHTML}
       </body>
@@ -338,12 +690,15 @@ const archiveConfig = {
       "name_of_student",
       "sr_code",
       "year_program",
-      "contact_number",
-      "reported_by",
       "sex",
+      "contact_number",
+      "complainant",
+      "written_reply",
+      "date_of_hearing",
       "offense",
       "sanction",
-      "date_of_sanction",
+      "date_of_suspension",
+      "date_of_post_counseling",
       "created_at",
     ],
     getRows: () => minorRecords,
@@ -356,12 +711,15 @@ const archiveConfig = {
       "name_of_student",
       "sr_code",
       "year_program",
-      "contact_number",
-      "reported_by",
       "sex",
+      "contact_number",
+      "complainant",
+      "written_reply",
+      "date_of_hearing",
       "offense",
       "sanction",
-      "date_of_sanction",
+      "date_of_suspension",
+      "date_of_post_counseling",
       "created_at",
     ],
     getRows: () => majorRecords,
@@ -442,12 +800,12 @@ function renderRows(records) {
       <td>${record.sr_code || ""}</td>
       <td>${record.year_program || ""}</td>
       <td>${record.contact_number || ""}</td>
-      <td>${record.reported_by || ""}</td>
+      <td>${record.complainant || ""}</td>
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.offense || ""}</td>
       <td>${record.sanction || ""}</td>
-      <td>${formatDate(record.date_of_sanction)}</td>
+      <td>${formatDate(record.date_of_suspension)}</td>
       <td>
         <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
         <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
@@ -461,7 +819,7 @@ function renderMajorRows(records) {
   majorTableBody.innerHTML = "";
   if (!records.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="12">No records yet. Create the first entry below.</td>`;
+    row.innerHTML = `<td colspan="15">No records yet. Create the first entry below.</td>`;
     majorTableBody.appendChild(row);
     return;
   }
@@ -473,13 +831,16 @@ function renderMajorRows(records) {
       <td>${record.name_of_student || ""}</td>
       <td>${record.sr_code || ""}</td>
       <td>${record.year_program || ""}</td>
-      <td>${record.contact_number || ""}</td>
-      <td>${record.reported_by || ""}</td>
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
+      <td>${record.contact_number || ""}</td>
+      <td>${record.complainant || ""}</td>
+      <td>${record.written_reply || ""}</td>
+      <td>${formatDate(record.date_of_hearing)}</td>
       <td>${record.offense || ""}</td>
       <td>${record.sanction || ""}</td>
-      <td>${formatDate(record.date_of_sanction)}</td>
+      <td>${formatDate(record.date_of_suspension)}</td>
+      <td>${formatDate(record.date_of_post_counseling)}</td>
       <td>
         <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
         <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
@@ -614,7 +975,7 @@ function applyMinorFilters() {
 
   const filtered = minorRecords.filter((record) => {
     const inRange = withinDateRange(record.date_of_complaint, from, to);
-    const matches = matchesQuery(record, ["name_of_student", "sr_code", "offense", "reported_by", "year_program"], query);
+    const matches = matchesQuery(record, ["name_of_student", "sr_code", "offense", "complainant", "year_program"], query);
     return inRange && matches;
   });
   renderRows(filtered);
@@ -742,7 +1103,7 @@ function renderLeaveofabsenceRows(records) {
       <td>${record.course || ""}</td>
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
-      <td>${record.reason || ""}</td>
+      <td>${record.semester_period_covered || ""}</td>
       <td>
         <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
         <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
@@ -760,7 +1121,7 @@ function applyLeaveofabsenceFilters() {
 
   const filtered = leaveofabsenceRecords.filter((record) => {
     const inRange = withinDateRange(record.date, from, to);
-    const matches = matchesQuery(record, ["name", "sr_code", "course", "reason"], query);
+    const matches = matchesQuery(record, ["name", "sr_code", "course", "semester_period_covered"], query);
     return inRange && matches;
   });
   renderLeaveofabsenceRows(filtered);
@@ -1209,6 +1570,36 @@ if (exportMajorButton) {
   });
 }
 
+if (exportUniformButton) {
+  exportUniformButton.addEventListener("click", () => {
+    openUniformPrintView();
+  });
+}
+
+if (exportGatepassButton) {
+  exportGatepassButton.addEventListener("click", () => {
+    openGatepassPrintView();
+  });
+}
+
+if (exportGoodmoralButton) {
+  exportGoodmoralButton.addEventListener("click", () => {
+    openGoodmoralPrintView();
+  });
+}
+
+if (exportIdreplacementButton) {
+  exportIdreplacementButton.addEventListener("click", () => {
+    openIdreplacementPrintView();
+  });
+}
+
+if (exportLeaveofabsenceButton) {
+  exportLeaveofabsenceButton.addEventListener("click", () => {
+    openLeaveofabsencePrintView();
+  });
+}
+
 document.querySelectorAll("[data-archive]").forEach((button) => {
   button.addEventListener("click", () => {
     exportArchiveCsv(button.dataset.archive);
@@ -1314,7 +1705,7 @@ attachRowActions({
   tableName: TABLES.leaveofabsence,
   getRecords: () => leaveofabsenceRecords,
   form: leaveofabsenceForm,
-  fields: ["date", "time_in", "time_out", "name", "sr_code", "course", "sex", "reason"],
+  fields: ["date", "time_in", "time_out", "name", "sr_code", "course", "sex", "semester_period_covered"],
   reloadFn: loadLeaveofabsenceRecords,
 });
 
@@ -1349,15 +1740,20 @@ attachCancelEdit(leaveofabsenceForm);
   }
   
   // Check if user is head (should not access this page)
-  const { data: userAccount } = await supabase
-    .from("user_accounts")
-    .select("role")
-    .eq("email", session.user.email)
-    .single();
-  
-  if (userAccount && userAccount.role === "head") {
-    alert("This page is for Coordinators only. Redirecting to Reports Dashboard...");
-    window.location.href = "reports.html";
-    return;
+  try {
+    const { data: userAccount } = await supabase
+      .from("user_accounts")
+      .select("role")
+      .eq("email", session.user.email)
+      .single();
+    
+    if (userAccount && userAccount.role === "head") {
+      alert("This page is for Coordinators only. Redirecting to Reports Dashboard...");
+      window.location.href = "reports.html";
+      return;
+    }
+  } catch (error) {
+    // user_accounts table doesn't exist or RLS blocking - ignore and continue
+    console.log("Could not check user role, continuing anyway");
   }
 })();

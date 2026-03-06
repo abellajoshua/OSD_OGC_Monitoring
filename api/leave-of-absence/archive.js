@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
     "sr_code",
     "course",
     "sex",
-    "reason",
+    "semester_period_covered",
   ];
   const csv = buildCsv(headers, data || []);
   res.setHeader("Content-Type", "text/csv");

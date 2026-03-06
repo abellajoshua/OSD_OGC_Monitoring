@@ -18,19 +18,25 @@ async function redirectIfLoggedIn() {
     }
     
     // Check user role from database
-    const { data: userAccount } = await supabase
-      .from("user_accounts")
-      .select("role")
-      .eq("email", session.user.email)
-      .single();
-    
-    if (userAccount) {
-      if (userAccount.role === "head") {
-        window.location.href = "reports.html";
+    try {
+      const { data: userAccount } = await supabase
+        .from("user_accounts")
+        .select("role")
+        .eq("email", session.user.email)
+        .single();
+      
+      if (userAccount) {
+        if (userAccount.role === "head") {
+          window.location.href = "reports.html";
+        } else {
+          window.location.href = "index.html";
+        }
       } else {
         window.location.href = "index.html";
       }
-    } else {
+    } catch (error) {
+      // user_accounts table doesn't exist - default to index
+      console.log("Could not check user role, defaulting to index");
       window.location.href = "index.html";
     }
   }
