@@ -4,16 +4,19 @@
 grant usage on schema public to authenticated;
 
 grant select, insert, update, delete on table public.minor_offenses to authenticated;
+grant select, insert, update, delete on table public.major_offenses to authenticated;
 grant select, insert, update, delete on table public.non_wearing_uniform to authenticated;
 grant select, insert, update, delete on table public.gatepass to authenticated;
 grant select, insert, update, delete on table public.good_moral to authenticated;
 
 grant usage, select on sequence public.minor_offenses_id_seq to authenticated;
+grant usage, select on sequence public.major_offenses_id_seq to authenticated;
 grant usage, select on sequence public.non_wearing_uniform_id_seq to authenticated;
 grant usage, select on sequence public.gatepass_id_seq to authenticated;
 grant usage, select on sequence public.good_moral_id_seq to authenticated;
 
 alter table public.minor_offenses enable row level security;
+alter table public.major_offenses enable row level security;
 alter table public.non_wearing_uniform enable row level security;
 alter table public.gatepass enable row level security;
 alter table public.good_moral enable row level security;
@@ -21,6 +24,14 @@ alter table public.good_moral enable row level security;
 drop policy if exists "authenticated_minor_offenses_all" on public.minor_offenses;
 create policy "authenticated_minor_offenses_all"
 on public.minor_offenses
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "authenticated_major_offenses_all" on public.major_offenses;
+create policy "authenticated_major_offenses_all"
+on public.major_offenses
 for all
 to authenticated
 using (true)
