@@ -3,9 +3,9 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 let supabaseClient;
 
 const FALLBACK_CONFIG = {
-  SUPABASE_URL: "https://axmuxanqmhuvxefhazot.supabase.co",
+  SUPABASE_URL: "https://fwbbxwnmchbuhwulrzhw.supabase.co",
   SUPABASE_ANON_KEY:
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bXV4YW5xbWh1dnhlZmhhem90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMjc5NjgsImV4cCI6MjA4NTgwMzk2OH0.u4O0TXfrpAL9Tt7b-Yv5KEU9OFV5fhtRMf74KFohKJw",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3YmJ4d25tY2hidWh3dWxyemh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1OTg3NTIsImV4cCI6MjA4ODE3NDc1Mn0.unSrCNshGFXmhaba3Gm7Zgm6jjQSThKX9UC6U5d_sBY",
 };
 
 async function loadConfig() {

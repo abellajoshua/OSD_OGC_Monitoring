@@ -2,6 +2,7 @@ import { getSupabase } from "./supabaseClient.js?v=3";
 
 const TABLES = {
   minor: "minor_offenses",
+  major: "major_offenses",
   uniform: "non_wearing_uniform",
   gatepass: "gatepass",
   goodmoral: "good_moral",
@@ -14,6 +15,10 @@ const tableBody = document.querySelector("#minor-table-body");
 const recordForm = document.querySelector("#record-form");
 const formStatus = document.querySelector("#form-status");
 const exportButton = document.querySelector("#export-pdf");
+const majorTableBody = document.querySelector("#major-table-body");
+const majorForm = document.querySelector("#major-form");
+const majorStatus = document.querySelector("#major-status");
+const exportMajorButton = document.querySelector("#export-major-pdf");
 const uniformTableBody = document.querySelector("#uniform-table-body");
 const uniformForm = document.querySelector("#uniform-form");
 const uniformStatus = document.querySelector("#uniform-status");
@@ -29,17 +34,20 @@ const statPending = document.querySelector("[data-stat='pending']");
 const statResolved = document.querySelector("[data-stat='resolved']");
 const statFollowups = document.querySelector("[data-stat='followups']");
 const kpiMinor = document.querySelector("[data-kpi='minor']");
+const kpiMajor = document.querySelector("[data-kpi='major']");
 const kpiUniform = document.querySelector("[data-kpi='uniform']");
 const kpiGatepass = document.querySelector("[data-kpi='gatepass']");
 const kpiGoodmoral = document.querySelector("[data-kpi='goodmoral']");
 const kpiGoodmoralFlagged = document.querySelector("[data-kpi='goodmoral-flagged']");
 
 const minorFilter = document.querySelector("[data-filter-scope='minor']");
+const majorFilter = document.querySelector("[data-filter-scope='major']");
 const uniformFilter = document.querySelector("[data-filter-scope='uniform']");
 const gatepassFilter = document.querySelector("[data-filter-scope='gatepass']");
 const goodmoralFilter = document.querySelector("[data-filter-scope='goodmoral']");
 
 let minorRecords = [];
+let majorRecords = [];
 let uniformRecords = [];
 let gatepassRecords = [];
 let goodmoralRecords = [];
@@ -125,6 +133,7 @@ function formatDate(value) {
 
 function formatDashboardDetail(item) {
   if (item.type === "Minor Offense") return item.record.offense || "";
+  if (item.type === "Major Offense") return item.record.offense || "";
   if (item.type === "Good Moral") {
     const purpose = item.record.purpose || "";
     return item.record.has_minor_offense ? `${purpose} (Minor offense tagged)` : purpose;
@@ -135,6 +144,13 @@ function formatDashboardDetail(item) {
 function buildRecentDashboardItems() {
   const mappedMinor = minorRecords.map((record) => ({
     type: "Minor Offense",
+    date: normalizeDateValue(record),
+    name: record.name_of_student || "",
+    srCode: record.sr_code || "",
+    record,
+  }));
+  const mappedMajor = majorRecords.map((record) => ({
+    type: "Major Offense",
     date: normalizeDateValue(record),
     name: record.name_of_student || "",
     srCode: record.sr_code || "",
@@ -162,7 +178,7 @@ function buildRecentDashboardItems() {
     record,
   }));
 
-  return [...mappedMinor, ...mappedUniform, ...mappedGatepass, ...mappedGoodmoral]
+  return [...mappedMinor, ...mappedMajor, ...mappedUniform, ...mappedGatepass, ...mappedGoodmoral]
     .sort((a, b) => (a.date < b.date ? 1 : -1))
     .slice(0, 10);
 }
@@ -194,6 +210,7 @@ function renderDashboardActivity() {
 
 function updateDashboardCounters() {
   if (kpiMinor) kpiMinor.textContent = minorRecords.length;
+  if (kpiMajor) kpiMajor.textContent = majorRecords.length;
   if (kpiUniform) kpiUniform.textContent = uniformRecords.length;
   if (kpiGatepass) kpiGatepass.textContent = gatepassRecords.length;
   if (kpiGoodmoral) kpiGoodmoral.textContent = goodmoralRecords.length;
@@ -207,7 +224,7 @@ function updateDashboardCounters() {
 function flagGoodMoralFromMinor() {
   if (!goodmoralRecords.length) return;
   const codeSet = new Set(
-    minorRecords.map((row) => String(row.sr_code || "").trim().toLowerCase())
+    [...minorRecords, ...majorRecords].map((row) => String(row.sr_code || "").trim().toLowerCase())
   );
   goodmoralRecords = goodmoralRecords.map((row) => ({
     ...row,
@@ -252,6 +269,43 @@ function openPrintView() {
   printWindow.print();
 }
 
+function openMajorPrintView() {
+  const table = document.querySelector("#major .table-wrap table");
+  const title = document.querySelector("#major .log-title");
+
+  if (!table || !title) return;
+
+  const printWindow = window.open("", "_blank", "width=980,height=720");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Major Offense Logsheet</title>
+        <style>
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; }
+          .log-title { text-align: center; margin-bottom: 18px; }
+          .log-title h2 { margin: 0; font-size: 24px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; letter-spacing: 1px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #111; padding: 6px; text-align: center; }
+          th { background: #f5f5f5; text-transform: uppercase; }
+          th:last-child, td:last-child { display: none; }
+        </style>
+      </head>
+      <body>
+        ${title.outerHTML}
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
 const archiveConfig = {
   "minor-offenses": {
     headers: [
@@ -270,6 +324,24 @@ const archiveConfig = {
     ],
     getRows: () => minorRecords,
     fileName: "minor-offenses-archive.csv",
+  },
+  "major-offenses": {
+    headers: [
+      "id",
+      "date_of_complaint",
+      "name_of_student",
+      "sr_code",
+      "year_program",
+      "contact_number",
+      "reported_by",
+      "sex",
+      "offense",
+      "sanction",
+      "date_of_sanction",
+      "created_at",
+    ],
+    getRows: () => majorRecords,
+    fileName: "major-offenses-archive.csv",
   },
   "non-wearing-uniform": {
     headers: [
@@ -358,6 +430,38 @@ function renderRows(records) {
       </td>
     `;
     tableBody.appendChild(row);
+  });
+}
+
+function renderMajorRows(records) {
+  majorTableBody.innerHTML = "";
+  if (!records.length) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td colspan="12">No records yet. Create the first entry below.</td>`;
+    majorTableBody.appendChild(row);
+    return;
+  }
+
+  records.forEach((record) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${formatDate(record.date_of_complaint)}</td>
+      <td>${record.name_of_student || ""}</td>
+      <td>${record.sr_code || ""}</td>
+      <td>${record.year_program || ""}</td>
+      <td>${record.contact_number || ""}</td>
+      <td>${record.reported_by || ""}</td>
+      <td>${record.sex === "M" ? "✔" : ""}</td>
+      <td>${record.sex === "F" ? "✔" : ""}</td>
+      <td>${record.offense || ""}</td>
+      <td>${record.sanction || ""}</td>
+      <td>${formatDate(record.date_of_sanction)}</td>
+      <td>
+        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
+        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
+      </td>
+    `;
+    majorTableBody.appendChild(row);
   });
 }
 
@@ -490,6 +594,20 @@ function applyMinorFilters() {
     return inRange && matches;
   });
   renderRows(filtered);
+}
+
+function applyMajorFilters() {
+  if (!majorFilter) return;
+  const query = majorFilter.querySelector("[data-filter='query']").value.trim();
+  const from = majorFilter.querySelector("[data-filter='from']").value;
+  const to = majorFilter.querySelector("[data-filter='to']").value;
+
+  const filtered = majorRecords.filter((record) => {
+    const inRange = withinDateRange(record.date_of_complaint, from, to);
+    const matches = matchesQuery(record, ["name_of_student", "sr_code", "offense", "reported_by", "year_program"], query);
+    return inRange && matches;
+  });
+  renderMajorRows(filtered);
 }
 
 function applyUniformFilters() {
@@ -652,10 +770,23 @@ async function loadRecords() {
   }
 }
 
+async function loadMajorRecords() {
+  try {
+    majorRecords = await fetchTableRows(TABLES.major, "date_of_complaint");
+    flagGoodMoralFromMinor();
+    applyMajorFilters();
+    updateDashboardCounters();
+  } catch (error) {
+    majorRecords = [];
+    renderMajorRows([]);
+    updateDashboardCounters();
+  }
+}
+
 async function loadDashboard() {
   const activeCases =
-    minorRecords.length + uniformRecords.length + gatepassRecords.length + goodmoralRecords.length;
-  const pendingSanctions = minorRecords.filter(
+    minorRecords.length + majorRecords.length + uniformRecords.length + gatepassRecords.length + goodmoralRecords.length;
+  const pendingSanctions = [...minorRecords, ...majorRecords].filter(
     (item) => !String(item.sanction || "").trim() || !item.date_of_sanction
   ).length;
 
@@ -663,7 +794,7 @@ async function loadDashboard() {
   start.setDate(start.getDate() - 6);
   const startMs = start.setHours(0, 0, 0, 0);
   const nowMs = new Date().setHours(23, 59, 59, 999);
-  const resolvedThisWeek = minorRecords.filter((item) => {
+  const resolvedThisWeek = [...minorRecords, ...majorRecords].filter((item) => {
     if (!item.date_of_sanction) return false;
     const value = new Date(item.date_of_sanction).getTime();
     return !Number.isNaN(value) && value >= startMs && value <= nowMs;
@@ -787,6 +918,28 @@ if (recordForm) {
   });
 }
 
+if (majorForm) {
+  majorForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    majorStatus.textContent = "Saving record...";
+    const formData = new FormData(majorForm);
+    const payload = Object.fromEntries(formData.entries());
+    const editId = majorForm.dataset.editId;
+
+    try {
+      if (editId) await updateRow(TABLES.major, editId, payload);
+      else await createRow(TABLES.major, payload);
+
+      setFormEditState(majorForm, false);
+      majorStatus.textContent = editId ? "Record updated." : "Record saved.";
+      await loadMajorRecords();
+      await loadDashboard();
+    } catch (error) {
+      majorStatus.textContent = error.message || "Something went wrong. Please try again.";
+    }
+  });
+}
+
 if (uniformForm) {
   uniformForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -859,6 +1012,12 @@ if (exportButton) {
   });
 }
 
+if (exportMajorButton) {
+  exportMajorButton.addEventListener("click", () => {
+    openMajorPrintView();
+  });
+}
+
 document.querySelectorAll("[data-archive]").forEach((button) => {
   button.addEventListener("click", () => {
     exportArchiveCsv(button.dataset.archive);
@@ -866,6 +1025,7 @@ document.querySelectorAll("[data-archive]").forEach((button) => {
 });
 
 loadRecords();
+loadMajorRecords();
 loadUniformRecords();
 loadGatepassRecords();
 loadGoodmoralRecords();
@@ -873,6 +1033,7 @@ loadDashboard();
 updateDashboardCounters();
 
 setupFilters(minorFilter, applyMinorFilters);
+setupFilters(majorFilter, applyMajorFilters);
 setupFilters(uniformFilter, applyUniformFilters);
 setupFilters(gatepassFilter, applyGatepassFilters);
 setupFilters(goodmoralFilter, applyGoodmoralFilters);
@@ -895,6 +1056,26 @@ attachRowActions({
     "date_of_sanction",
   ],
   reloadFn: loadRecords,
+});
+
+attachRowActions({
+  tableElement: majorTableBody,
+  tableName: TABLES.major,
+  getRecords: () => majorRecords,
+  form: majorForm,
+  fields: [
+    "date_of_complaint",
+    "name_of_student",
+    "sr_code",
+    "year_program",
+    "contact_number",
+    "reported_by",
+    "sex",
+    "offense",
+    "sanction",
+    "date_of_sanction",
+  ],
+  reloadFn: loadMajorRecords,
 });
 
 attachRowActions({
@@ -925,6 +1106,7 @@ attachRowActions({
 });
 
 attachCancelEdit(recordForm);
+attachCancelEdit(majorForm);
 attachCancelEdit(uniformForm);
 attachCancelEdit(gatepassForm);
 attachCancelEdit(goodmoralForm);

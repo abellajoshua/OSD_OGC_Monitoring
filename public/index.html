@@ -49,6 +49,7 @@
         <nav class="nav nav-sidebar">
           <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
           <button class="nav-btn" data-tab="minor">Minor Offense</button>
+          <button class="nav-btn" data-tab="major">Major Offense</button>
           <button class="nav-btn" data-tab="uniform">Non-Wearing Uniform</button>
           <button class="nav-btn" data-tab="gatepass">Gatepass</button>
           <button class="nav-btn" data-tab="goodmoral">Good Moral</button>
@@ -102,6 +103,10 @@
               <div>
                 <span>Minor Offense</span>
                 <strong data-kpi="minor">0</strong>
+              </div>
+              <div>
+                <span>Major Offense</span>
+                <strong data-kpi="major">0</strong>
               </div>
               <div>
                 <span>Non-Wearing Uniform</span>
@@ -266,6 +271,111 @@
             </div>
             <button class="primary" type="submit">Save Record</button>
             <p class="form-status" id="form-status" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
+
+      <section id="major" class="tab">
+        <div class="sheet">
+          <div class="log-title">
+            <h2>LOGSHEET</h2>
+            <h3>MAJOR OFFENSES</h3>
+          </div>
+
+          <div class="filter-bar" data-filter-scope="major">
+            <input type="search" placeholder="Search name, SR code, offense, reported by..." data-filter="query" />
+            <label>
+              From
+              <input type="date" data-filter="from" />
+            </label>
+            <label>
+              To
+              <input type="date" data-filter="to" />
+            </label>
+            <button class="primary" type="button" data-filter="apply">Filter</button>
+            <button class="ghost" type="button" data-filter="clear">Clear</button>
+          </div>
+
+          <div class="sheet-actions">
+            <button class="primary" id="export-major-pdf">Export Logsheet PDF</button>
+            <button class="ghost" type="button" data-archive="major-offenses">Archive CSV</button>
+          </div>
+
+          <div class="table-wrap table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th rowspan="2">Date of Complaint</th>
+                  <th rowspan="2">Name of Student</th>
+                  <th rowspan="2">SR Code</th>
+                  <th rowspan="2">Year / Program</th>
+                  <th rowspan="2">Contact Number</th>
+                  <th rowspan="2">Reported By</th>
+                  <th colspan="2">Sex</th>
+                  <th rowspan="2">Offense</th>
+                  <th rowspan="2">Sanction</th>
+                  <th rowspan="2">Date of Sanction</th>
+                </tr>
+                <tr>
+                  <th>M</th>
+                  <th>F</th>
+                </tr>
+              </thead>
+              <tbody id="major-table-body"></tbody>
+            </table>
+          </div>
+          <p class="footnote">Prepared by OSD staff for monitoring and compliance tracking.</p>
+
+          <form id="major-form" class="record-form">
+            <div class="form-header">
+              <img src="assets/logo.png" alt="Batangas State University logo" />
+              <h3>Create Record</h3>
+            </div>
+            <div class="form-grid">
+              <label>
+                Date of Complaint
+                <input type="date" name="date_of_complaint" required />
+              </label>
+              <label>
+                Name of Student
+                <input type="text" name="name_of_student" placeholder="Full name" required />
+              </label>
+              <label>
+                SR Code
+                <input type="text" name="sr_code" placeholder="2024-0000" required />
+              </label>
+              <label>
+                Year / Program
+                <input type="text" name="year_program" placeholder="2nd Year / BSIT" required />
+              </label>
+              <label>
+                Contact Number
+                <input type="text" name="contact_number" placeholder="09xx-xxx-xxxx" required />
+              </label>
+              <label>
+                Reported By
+                <input type="text" name="reported_by" placeholder="Staff / Faculty" required />
+              </label>
+              <fieldset class="sex-field">
+                <legend>Sex</legend>
+                <label><input type="radio" name="sex" value="M" required /> M</label>
+                <label><input type="radio" name="sex" value="F" /> F</label>
+              </fieldset>
+              <label>
+                Offense
+                <input type="text" name="offense" required />
+              </label>
+              <label>
+                Sanction
+                <input type="text" name="sanction" required />
+              </label>
+              <label>
+                Date of Sanction
+                <input type="date" name="date_of_sanction" required />
+              </label>
+            </div>
+            <button class="primary" type="submit">Save Record</button>
+            <p class="form-status" id="major-status" aria-live="polite"></p>
           </form>
         </div>
       </section>
