@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabaseClient.js?v=3";
+import { getSupabase } from "./supabaseClient.js?v=4";
 
 const ADMIN_EMAIL = "mcdoelfamini10@gmail.com";
 

@@ -1,30 +1,107 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
 let supabaseClient;
+let supabaseClientPromise;
 
 const FALLBACK_CONFIG = {
-  SUPABASE_URL: "https://plziabdipbwvatlbcbyp.supabase.co",
-  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsemlhYmRpcGJ3dmF0bGJjYnlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1OTc2OTAsImV4cCI6MjA4ODE3MzY5MH0.Zi2a0mXMy2ogtflwQYM36WUp0M2QqwdAsgObwQNagno",
+  SUPABASE_URL: "",
+  SUPABASE_ANON_KEY: "",
 };
 
+function normalizeConfig(rawConfig = {}) {
+  const normalizedUrl = String(rawConfig.SUPABASE_URL || "")
+    .trim()
+    .replace(/\/$/, "");
+
+  return {
+    SUPABASE_URL: normalizedUrl,
+    SUPABASE_ANON_KEY: String(rawConfig.SUPABASE_ANON_KEY || "").trim(),
+  };
+}
+
+function isValidSupabaseUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === "https:" &&
+      parsed.hostname.endsWith(".supabase.co") &&
+      !parsed.hostname.startsWith("YOUR_PROJECT_REF")
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function fetchServerConfig() {
+  try {
+    const response = await fetch("/api/config", { cache: "no-store" });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return normalizeConfig(data || {});
+  } catch {
+    return null;
+  }
+}
+
 async function loadConfig() {
-  if (window.APP_CONFIG) {
-    return window.APP_CONFIG;
+  const runtimeConfig = normalizeConfig(window.APP_CONFIG || {});
+  const serverConfig = await fetchServerConfig();
+
+  if (runtimeConfig.SUPABASE_URL && runtimeConfig.SUPABASE_ANON_KEY) {
+    return runtimeConfig;
   }
 
-  return FALLBACK_CONFIG;
+  if (serverConfig?.SUPABASE_URL && serverConfig?.SUPABASE_ANON_KEY) {
+    return serverConfig;
+  }
+
+  return normalizeConfig(FALLBACK_CONFIG);
 }
 
 export async function getSupabase() {
   if (supabaseClient) return supabaseClient;
-  const config = await loadConfig();
 
-  if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) {
-    throw new Error(
-      "Missing Supabase configuration. Check SUPABASE_URL and SUPABASE_ANON_KEY."
-    );
+  if (window.__OSD_SUPABASE_CLIENT__) {
+    supabaseClient = window.__OSD_SUPABASE_CLIENT__;
+    return supabaseClient;
   }
 
-  supabaseClient = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
-  return supabaseClient;
+  if (supabaseClientPromise) {
+    return supabaseClientPromise;
+  }
+
+  if (window.__OSD_SUPABASE_CLIENT_PROMISE__) {
+    supabaseClientPromise = window.__OSD_SUPABASE_CLIENT_PROMISE__;
+    return supabaseClientPromise;
+  }
+
+  supabaseClientPromise = (async () => {
+    const config = await loadConfig();
+
+    if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) {
+      throw new Error(
+        "Missing Supabase configuration. Set SUPABASE_URL and SUPABASE_ANON_KEY in /api/config env or public/runtime-config.js."
+      );
+    }
+
+    if (!isValidSupabaseUrl(config.SUPABASE_URL)) {
+      throw new Error(
+        `Invalid SUPABASE_URL (${config.SUPABASE_URL}). Use https://<project-ref>.supabase.co in public/runtime-config.js or server env.`
+      );
+    }
+
+    const client = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
+    window.__OSD_SUPABASE_CLIENT__ = client;
+    supabaseClient = client;
+    return client;
+  })();
+
+  window.__OSD_SUPABASE_CLIENT_PROMISE__ = supabaseClientPromise;
+
+  try {
+    return await supabaseClientPromise;
+  } finally {
+    window.__OSD_SUPABASE_CLIENT_PROMISE__ = null;
+    supabaseClientPromise = null;
+  }
 }

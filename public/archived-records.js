@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabaseClient.js?v=3";
+import { getSupabase } from "./supabaseClient.js?v=4";
 
 // Tab navigation
 const navBtns = document.querySelectorAll(".nav-btn");

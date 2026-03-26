@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabaseClient.js?v=3";
+import { getSupabase } from "./supabaseClient.js?v=4";
 
 const ADMIN_EMAIL = "mcdoelfamini10@gmail.com";
 
@@ -56,7 +56,7 @@ async function loadUsers() {
               Follow these steps to fix this:
             </p>
             <ol style="margin: 0; padding-left: 1.5rem; line-height: 1.8;">
-              <li>Open <a href="https://supabase.com/dashboard/project/plziabdipbwvatlbcbyp/sql" target="_blank" style="color: white; text-decoration: underline; font-weight: 600;">Supabase SQL Editor</a> in a new tab</li>
+              <li>Open <a href="https://supabase.com/dashboard/projects" target="_blank" style="color: white; text-decoration: underline; font-weight: 600;">Supabase SQL Editor</a> in a new tab</li>
               <li>Copy all contents from <code style="background: rgba(0,0,0,0.2); padding: 0.25rem 0.5rem; border-radius: 4px;">create_user_accounts_table.sql</code></li>
               <li>Paste into SQL Editor and click <strong>"Run"</strong></li>
               <li>Come back and click the Refresh button above</li>
