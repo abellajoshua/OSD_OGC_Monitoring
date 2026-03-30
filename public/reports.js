@@ -1,6 +1,7 @@
 import { getSupabase } from "./supabaseClient.js?v=4";
 
 const HEAD_ROLE = "head";
+let currentOrganizationId = null;
 
 // Check if user is head
 async function checkHeadAccess() {
@@ -19,8 +20,8 @@ async function checkHeadAccess() {
   // Get user role from database
   const { data: userAccount, error } = await supabase
     .from("user_accounts")
-    .select("role")
-    .eq("email", session.user.email)
+    .select("role, organization_id")
+    .eq("user_id", session.user.id)
     .single();
 
   console.log("User account:", userAccount, "Error:", error);
@@ -37,10 +38,12 @@ async function checkHeadAccess() {
   }
 
   if (!userAccount || userAccount.role !== HEAD_ROLE) {
-    alert("Access denied. This page is for HEAD role only.");
+    alert("Access denied. This page is for Head role only.");
     window.location.href = "index.html";
     return false;
   }
+
+  currentOrganizationId = userAccount.organization_id;
 
   console.log("HEAD access granted");
   return true;
@@ -136,6 +139,7 @@ async function loadMinorOffenses() {
       .from("minor_offenses")
       .select("*")
       .eq("archived", false)
+      .eq("organization_id", currentOrganizationId)
       .order("date_of_complaint", { ascending: false });
 
     console.log("Minor offenses result:", { data, error });
@@ -187,6 +191,7 @@ async function loadMajorOffenses() {
       .from("major_offenses")
       .select("*")
       .eq("archived", false)
+      .eq("organization_id", currentOrganizationId)
       .order("date_of_complaint", { ascending: false });
 
     console.log("Major offenses result:", { data, error });
@@ -236,6 +241,7 @@ async function loadUniformViolations() {
       .from("non_wearing_uniform")
       .select("*")
       .eq("archived", false)
+      .eq("organization_id", currentOrganizationId)
       .order("date", { ascending: false });
 
     if (error) throw error;
@@ -279,6 +285,7 @@ async function loadGatepassRequests() {
       .from("gatepass")
       .select("*")
       .eq("archived", false)
+      .eq("organization_id", currentOrganizationId)
       .order("date", { ascending: false });
 
     if (error) throw error;
@@ -323,6 +330,7 @@ async function loadGoodMoralRequests() {
       .from("good_moral")
       .select("*")
       .eq("archived", false)
+      .eq("organization_id", currentOrganizationId)
       .order("date", { ascending: false });
 
     if (error) throw error;
@@ -366,6 +374,7 @@ async function loadIdReplacementRequests() {
       .from("id_replacement")
       .select("*")
       .eq("archived", false)
+      .eq("organization_id", currentOrganizationId)
       .order("date", { ascending: false });
 
     if (error) throw error;
@@ -410,6 +419,7 @@ async function loadLeaveOfAbsenceRequests() {
       .from("leave_of_absence")
       .select("*")
       .eq("archived", false)
+      .eq("organization_id", currentOrganizationId)
       .order("date", { ascending: false });
 
     if (error) throw error;

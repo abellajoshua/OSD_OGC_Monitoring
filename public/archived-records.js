@@ -41,14 +41,36 @@ document.addEventListener("DOMContentLoaded", () => {
   loadArchivedRecords("minor");
 });
 
+let currentOrganizationId = null;
+
+async function getCurrentOrganizationId() {
+  if (currentOrganizationId) return currentOrganizationId;
+  const supabase = await getSupabase();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return null;
+
+  const { data: account } = await supabase
+    .from("user_accounts")
+    .select("organization_id")
+    .eq("user_id", session.user.id)
+    .single();
+
+  currentOrganizationId = account?.organization_id || null;
+  return currentOrganizationId;
+}
+
 // Fetch archived rows from a table
 async function fetchArchivedRows(table) {
   try {
     const supabase = await getSupabase();
+    const organizationId = await getCurrentOrganizationId();
     const { data, error } = await supabase
       .from(table)
       .select("*")
       .eq("archived", true)
+      .eq("organization_id", organizationId)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -65,10 +87,12 @@ async function restoreRow(table, id) {
 
   try {
     const supabase = await getSupabase();
+    const organizationId = await getCurrentOrganizationId();
     const { error } = await supabase
       .from(table)
       .update({ archived: false })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("organization_id", organizationId);
 
     if (error) throw error;
 
@@ -93,10 +117,12 @@ async function permanentlyDeleteRow(table, id) {
 
   try {
     const supabase = await getSupabase();
+    const organizationId = await getCurrentOrganizationId();
     const { error } = await supabase
       .from(table)
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("organization_id", organizationId);
 
     if (error) throw error;
 

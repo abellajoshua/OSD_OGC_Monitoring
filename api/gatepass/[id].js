@@ -1,4 +1,10 @@
-const { getSupabaseClient, getPayload } = require("../_supabase");
+const {
+  getSupabaseClient,
+  getPayload,
+  getRequestUserContext,
+  ensureRole,
+  getErrorStatus,
+} = require("../_supabase");
 
 const REQUIRED_FIELDS = [
   "date",
@@ -12,54 +18,63 @@ const REQUIRED_FIELDS = [
 ];
 
 module.exports = async (req, res) => {
-  const supabase = getSupabaseClient();
-  const { id } = req.query;
+  try {
+    const context = await getRequestUserContext(req);
+    ensureRole(context, ["coordinator"]);
+    const supabase = getSupabaseClient();
+    const { id } = req.query;
 
-  if (!id) {
-    return res.status(400).json({ error: "Missing id." });
+    if (!id) {
+      return res.status(400).json({ error: "Missing id." });
+    }
+
+    if (req.method === "PUT") {
+      const payload = getPayload(req);
+      const missing = REQUIRED_FIELDS.filter((field) => !payload[field]);
+      if (missing.length) {
+        return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
+      }
+
+      const { organization_id, ...safePayload } = payload;
+      const { data, error } = await supabase
+        .from("gatepass")
+        .update(safePayload)
+        .eq("id", id)
+        .eq("organization_id", context.organizationId)
+        .select("id");
+
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+
+      if (!data || data.length === 0) {
+        return res.status(404).json({ error: "Record not found." });
+      }
+
+      return res.status(200).json({ updated: data.length });
+    }
+
+    if (req.method === "DELETE") {
+      const { data, error } = await supabase
+        .from("gatepass")
+        .delete()
+        .eq("id", id)
+        .eq("organization_id", context.organizationId)
+        .select("id");
+
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+
+      if (!data || data.length === 0) {
+        return res.status(404).json({ error: "Record not found." });
+      }
+
+      return res.status(200).json({ deleted: data.length });
+    }
+
+    return res.status(405).json({ error: "Method not allowed." });
+  } catch (error) {
+    return res.status(getErrorStatus(error)).json({ error: error.message });
   }
-
-  if (req.method === "PUT") {
-    const payload = getPayload(req);
-    const missing = REQUIRED_FIELDS.filter((field) => !payload[field]);
-    if (missing.length) {
-      return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
-    }
-
-    const { data, error } = await supabase
-      .from("gatepass")
-      .update(payload)
-      .eq("id", id)
-      .select("id");
-
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-
-    if (!data || data.length === 0) {
-      return res.status(404).json({ error: "Record not found." });
-    }
-
-    return res.status(200).json({ updated: data.length });
-  }
-
-  if (req.method === "DELETE") {
-    const { data, error } = await supabase
-      .from("gatepass")
-      .delete()
-      .eq("id", id)
-      .select("id");
-
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-
-    if (!data || data.length === 0) {
-      return res.status(404).json({ error: "Record not found." });
-    }
-
-    return res.status(200).json({ deleted: data.length });
-  }
-
-  return res.status(405).json({ error: "Method not allowed." });
 };

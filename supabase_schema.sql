@@ -111,12 +111,20 @@ create table if not exists public.leave_of_absence (
   created_at timestamptz default now()
 );
 
+create table if not exists public.organizations (
+  id bigserial primary key,
+  name text unique not null,
+  type text not null check (type in ('college', 'campus')),
+  created_at timestamptz default now()
+);
+
 create table if not exists public.user_accounts (
   id bigserial primary key,
   user_id uuid unique references auth.users(id) on delete cascade,
   email text unique not null,
   full_name text,
-  role text default 'coordinator' check (role in ('coordinator', 'head')),
+  role text default 'coordinator' check (role in ('admin', 'head', 'coordinator')),
+  organization_id bigint references public.organizations(id),
   created_at timestamptz default now()
 );
 
@@ -132,6 +140,84 @@ alter table public.gatepass add column if not exists archived boolean default fa
 alter table public.good_moral add column if not exists archived boolean default false;
 alter table public.id_replacement add column if not exists archived boolean default false;
 alter table public.leave_of_absence add column if not exists archived boolean default false;
+
+-- Organization seed set for required campuses/municipalities
+insert into public.organizations (name, type)
+values
+  ('CICS', 'college'),
+  ('COE', 'college'),
+  ('CET', 'college'),
+  ('CAFAD', 'college'),
+  ('Mabini', 'campus'),
+  ('Balayan', 'campus'),
+  ('Lobo', 'campus')
+on conflict (name) do nothing;
+
+-- Add organization ownership columns to all operational tables
+alter table public.minor_offenses add column if not exists organization_id bigint references public.organizations(id);
+alter table public.major_offenses add column if not exists organization_id bigint references public.organizations(id);
+alter table public.non_wearing_uniform add column if not exists organization_id bigint references public.organizations(id);
+alter table public.gatepass add column if not exists organization_id bigint references public.organizations(id);
+alter table public.good_moral add column if not exists organization_id bigint references public.organizations(id);
+alter table public.id_replacement add column if not exists organization_id bigint references public.organizations(id);
+alter table public.leave_of_absence add column if not exists organization_id bigint references public.organizations(id);
+alter table public.user_accounts add column if not exists organization_id bigint references public.organizations(id);
+
+-- Normalize older role values to new role model
+update public.user_accounts
+set role = 'head'
+where role = 'admin_head';
+
+alter table public.user_accounts drop constraint if exists user_accounts_role_check;
+alter table public.user_accounts
+  add constraint user_accounts_role_check
+  check (role in ('admin', 'head', 'coordinator'));
+
+drop index if exists public.user_accounts_single_admin_idx;
+create unique index user_accounts_single_admin_idx
+  on public.user_accounts ((role))
+  where role = 'admin';
+
+-- Backfill missing organization_id to CICS for existing records
+update public.user_accounts
+set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
+where organization_id is null
+  and role <> 'admin';
+
+update public.minor_offenses
+set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
+where organization_id is null;
+
+update public.major_offenses
+set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
+where organization_id is null;
+
+update public.non_wearing_uniform
+set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
+where organization_id is null;
+
+update public.gatepass
+set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
+where organization_id is null;
+
+update public.good_moral
+set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
+where organization_id is null;
+
+update public.id_replacement
+set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
+where organization_id is null;
+
+update public.leave_of_absence
+set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
+where organization_id is null;
+
+alter table public.user_accounts alter column organization_id drop not null;
+
+alter table public.user_accounts drop constraint if exists user_accounts_org_required_non_admin_check;
+alter table public.user_accounts
+  add constraint user_accounts_org_required_non_admin_check
+  check (role = 'admin' or organization_id is not null);
 
 -- Rename 'reason' to 'semester_period_covered' for existing databases
 do $$
@@ -220,6 +306,14 @@ create index if not exists gatepass_archived_idx on public.gatepass (archived);
 create index if not exists good_moral_archived_idx on public.good_moral (archived);
 create index if not exists id_replacement_archived_idx on public.id_replacement (archived);
 create index if not exists leave_of_absence_archived_idx on public.leave_of_absence (archived);
+create index if not exists minor_offenses_org_idx on public.minor_offenses (organization_id);
+create index if not exists major_offenses_org_idx on public.major_offenses (organization_id);
+create index if not exists non_wearing_uniform_org_idx on public.non_wearing_uniform (organization_id);
+create index if not exists gatepass_org_idx on public.gatepass (organization_id);
+create index if not exists good_moral_org_idx on public.good_moral (organization_id);
+create index if not exists id_replacement_org_idx on public.id_replacement (organization_id);
+create index if not exists leave_of_absence_org_idx on public.leave_of_absence (organization_id);
+create index if not exists user_accounts_org_idx on public.user_accounts (organization_id);
 
 -- Indexes on user_accounts
 create index if not exists user_accounts_email_idx on public.user_accounts (email);
@@ -239,6 +333,7 @@ grant select, insert, update, delete on table public.gatepass to authenticated;
 grant select, insert, update, delete on table public.good_moral to authenticated;
 grant select, insert, update, delete on table public.id_replacement to authenticated;
 grant select, insert, update, delete on table public.leave_of_absence to authenticated;
+grant select on table public.organizations to authenticated;
 grant select, insert, update, delete on table public.user_accounts to authenticated;
 
 -- Grant sequence permissions
@@ -249,4 +344,5 @@ grant usage, select on sequence public.gatepass_id_seq to authenticated;
 grant usage, select on sequence public.good_moral_id_seq to authenticated;
 grant usage, select on sequence public.id_replacement_id_seq to authenticated;
 grant usage, select on sequence public.leave_of_absence_id_seq to authenticated;
+grant usage, select on sequence public.organizations_id_seq to authenticated;
 grant usage, select on sequence public.user_accounts_id_seq to authenticated;

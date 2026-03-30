@@ -1,9 +1,21 @@
 import { getSupabase } from "./supabaseClient.js?v=4";
 
-const ADMIN_EMAIL = "mcdoelfamini10@gmail.com";
-
 const loginForm = document.querySelector("#login-form");
 const statusEl = document.querySelector("#login-status");
+
+function persistUserContext(userAccount) {
+  if (!userAccount) return;
+  localStorage.setItem("userRole", userAccount.role || "");
+  localStorage.setItem("organizationId", String(userAccount.organization_id || ""));
+}
+
+function routeByRole(role) {
+  if (role === "admin") {
+    window.location.href = "admin.html";
+    return;
+  }
+  window.location.href = "index.html";
+}
 
 async function redirectIfLoggedIn() {
   const supabase = await getSupabase();
@@ -11,26 +23,17 @@ async function redirectIfLoggedIn() {
     data: { session },
   } = await supabase.auth.getSession();
   if (session) {
-    // Check if user is admin
-    if (session.user.email === ADMIN_EMAIL) {
-      window.location.href = "admin.html";
-      return;
-    }
-    
-    // Check user role from database
+    // Load role + organization from database profile
     try {
       const { data: userAccount } = await supabase
         .from("user_accounts")
-        .select("role")
-        .eq("email", session.user.email)
+        .select("role, organization_id")
+        .eq("user_id", session.user.id)
         .single();
       
       if (userAccount) {
-        if (userAccount.role === "head") {
-          window.location.href = "reports.html";
-        } else {
-          window.location.href = "index.html";
-        }
+        persistUserContext(userAccount);
+        routeByRole(userAccount.role);
       } else {
         window.location.href = "index.html";
       }
@@ -63,24 +66,15 @@ if (loginForm) {
       }
 
       statusEl.textContent = "Success! Redirecting...";
-      
-      // Check if user is admin and redirect accordingly
-      if (data?.user?.email === ADMIN_EMAIL) {
-        window.location.href = "admin.html";
-      } else {
-        // Check user role from database
-        const { data: userAccount } = await supabase
-          .from("user_accounts")
-          .select("role")
-          .eq("email", data.user.email)
-          .single();
-        
-        if (userAccount && userAccount.role === "head") {
-          window.location.href = "reports.html";
-        } else {
-          window.location.href = "index.html";
-        }
-      }
+
+      const { data: userAccount } = await supabase
+        .from("user_accounts")
+        .select("role, organization_id")
+        .eq("user_id", data.user.id)
+        .single();
+
+      persistUserContext(userAccount);
+      routeByRole(userAccount?.role);
     } catch (error) {
       statusEl.textContent =
         error?.message?.includes("Failed to fetch")

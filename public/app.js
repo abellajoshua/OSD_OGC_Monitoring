@@ -72,6 +72,88 @@ let gatepassRecords = [];
 let goodmoralRecords = [];
 let idreplacementRecords = [];
 let leaveofabsenceRecords = [];
+let currentOrganizationId = null;
+let currentUserRole = localStorage.getItem("userRole") || "";
+
+const ROLE_ADMIN = "admin";
+const ROLE_HEAD = "head";
+const ROLE_COORDINATOR = "coordinator";
+
+function canEditRecords() {
+  return currentUserRole === ROLE_COORDINATOR;
+}
+
+function ensureCoordinatorAccess() {
+  if (!canEditRecords()) {
+    throw new Error("Read-only access: Head can view and export records only.");
+  }
+}
+
+function renderRecordActions(recordId) {
+  if (!canEditRecords()) {
+    return `<span class="text-muted">Read Only</span>`;
+  }
+
+  return `
+    <button class="btn-edit" type="button" data-action="edit" data-id="${recordId}">Edit</button>
+    <button class="btn-delete" type="button" data-action="archive" data-id="${recordId}">Archive</button>
+  `;
+}
+
+function applyReadOnlyMode() {
+  [recordForm, majorForm, uniformForm, gatepassForm, goodmoralForm, idreplacementForm, leaveofabsenceForm]
+    .filter(Boolean)
+    .forEach((form) => {
+      form.querySelectorAll("input, select, textarea, button").forEach((field) => {
+        if (field.type === "button") return;
+        if (field.dataset && field.dataset.editCancel !== undefined) return;
+        field.disabled = true;
+      });
+
+      const submitButton = form.querySelector("[data-submit-label]");
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Read Only";
+      }
+
+      const cancelButton = form.querySelector("[data-edit-cancel]");
+      if (cancelButton) {
+        cancelButton.classList.add("is-hidden");
+      }
+    });
+}
+
+async function getCurrentOrganizationId() {
+  if (currentOrganizationId) return currentOrganizationId;
+  const cached = localStorage.getItem("organizationId");
+  if (cached) {
+    currentOrganizationId = Number(cached);
+    return currentOrganizationId;
+  }
+
+  const supabase = await getSupabase();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return null;
+
+  const { data: account } = await supabase
+    .from("user_accounts")
+    .select("role, organization_id")
+    .eq("user_id", session.user.id)
+    .single();
+
+  currentUserRole = account?.role || currentUserRole;
+  if (currentUserRole) {
+    localStorage.setItem("userRole", currentUserRole);
+  }
+
+  currentOrganizationId = account?.organization_id || null;
+  if (currentOrganizationId) {
+    localStorage.setItem("organizationId", String(currentOrganizationId));
+  }
+  return currentOrganizationId;
+}
 
 function buildCsv(headers, rows) {
   const escape = (value) => {
@@ -98,9 +180,11 @@ function downloadCsv(fileName, csvContent) {
 async function fetchTableRows(table, dateColumn) {
   const supabase = await getSupabase();
   const primaryOrderColumn = dateColumn || "id";
+  const orgId = await getCurrentOrganizationId();
   
   // Try with archived filter first
   let query = supabase.from(table).select("*").eq("archived", false);
+  if (orgId) query = query.eq("organization_id", orgId);
   let { data, error } = await query
     .order(primaryOrderColumn, { ascending: false })
     .order("id", { ascending: false });
@@ -108,6 +192,7 @@ async function fetchTableRows(table, dateColumn) {
   // If archived column doesn't exist, try without it
   if (error && error.message && error.message.includes("archived")) {
     query = supabase.from(table).select("*");
+    if (orgId) query = query.eq("organization_id", orgId);
     const result = await query
       .order(primaryOrderColumn, { ascending: false })
       .order("id", { ascending: false });
@@ -120,26 +205,42 @@ async function fetchTableRows(table, dateColumn) {
 }
 
 async function createRow(table, payload) {
+  ensureCoordinatorAccess();
   const supabase = await getSupabase();
-  const { error } = await supabase.from(table).insert(payload);
+  const orgId = await getCurrentOrganizationId();
+  const safePayload = { ...payload, organization_id: orgId };
+  const { error } = await supabase.from(table).insert(safePayload);
   if (error) throw error;
 }
 
 async function updateRow(table, id, payload) {
+  ensureCoordinatorAccess();
   const supabase = await getSupabase();
-  const { error } = await supabase.from(table).update(payload).eq("id", id);
+  const orgId = await getCurrentOrganizationId();
+  const { organization_id, ...safePayload } = payload;
+  let query = supabase.from(table).update(safePayload).eq("id", id);
+  if (orgId) query = query.eq("organization_id", orgId);
+  const { error } = await query;
   if (error) throw error;
 }
 
 async function archiveRow(table, id) {
+  ensureCoordinatorAccess();
   const supabase = await getSupabase();
-  const { error } = await supabase.from(table).update({ archived: true }).eq("id", id);
+  const orgId = await getCurrentOrganizationId();
+  let query = supabase.from(table).update({ archived: true }).eq("id", id);
+  if (orgId) query = query.eq("organization_id", orgId);
+  const { error } = await query;
   if (error) throw error;
 }
 
 async function deleteRow(table, id) {
+  ensureCoordinatorAccess();
   const supabase = await getSupabase();
-  const { error } = await supabase.from(table).delete().eq("id", id);
+  const orgId = await getCurrentOrganizationId();
+  let query = supabase.from(table).delete().eq("id", id);
+  if (orgId) query = query.eq("organization_id", orgId);
+  const { error } = await query;
   if (error) throw error;
 }
 
@@ -824,10 +925,7 @@ function renderRows(records) {
       <td>${record.offense || ""}</td>
       <td>${record.sanction || ""}</td>
       <td>${formatDate(record.date_of_suspension)}</td>
-      <td>
-        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
-      </td>
+      <td>${renderRecordActions(record.id)}</td>
     `;
     tableBody.appendChild(row);
   });
@@ -859,10 +957,7 @@ function renderMajorRows(records) {
       <td>${record.sanction || ""}</td>
       <td>${formatDate(record.date_of_suspension)}</td>
       <td>${formatDate(record.date_of_post_counseling)}</td>
-      <td>
-        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
-      </td>
+      <td>${renderRecordActions(record.id)}</td>
     `;
     majorTableBody.appendChild(row);
   });
@@ -890,10 +985,7 @@ function renderUniformRows(records) {
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.reason || ""}</td>
-      <td>
-        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
-      </td>
+      <td>${renderRecordActions(record.id)}</td>
     `;
     uniformTableBody.appendChild(row);
   });
@@ -921,10 +1013,7 @@ function renderGatepassRows(records) {
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.reason || ""}</td>
-      <td>
-        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
-      </td>
+      <td>${renderRecordActions(record.id)}</td>
     `;
     gatepassTableBody.appendChild(row);
   });
@@ -955,10 +1044,7 @@ function renderGoodmoralRows(records) {
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.purpose || ""}</td>
-      <td>
-        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
-      </td>
+      <td>${renderRecordActions(record.id)}</td>
     `;
     goodmoralTableBody.appendChild(row);
   });
@@ -1077,10 +1163,7 @@ function renderIdreplacementRows(records) {
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.reason || ""}</td>
-      <td>
-        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
-      </td>
+      <td>${renderRecordActions(record.id)}</td>
     `;
     idreplacementTableBody.appendChild(row);
   });
@@ -1122,10 +1205,7 @@ function renderLeaveofabsenceRows(records) {
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.semester_period_covered || ""}</td>
-      <td>
-        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="archive" data-id="${record.id}">Archive</button>
-      </td>
+      <td>${renderRecordActions(record.id)}</td>
     `;
     leaveofabsenceTableBody.appendChild(row);
   });
@@ -1213,6 +1293,11 @@ function attachRowActions({ tableElement, tableName, getRecords, form, fields, r
   tableElement.addEventListener("click", async (event) => {
     const editButton = event.target.closest("[data-action='edit']");
     const archiveButton = event.target.closest("[data-action='archive']");
+
+    if ((editButton || archiveButton) && !canEditRecords()) {
+      alert("Read-only access: Head can view and export records only.");
+      return;
+    }
 
     if (editButton) {
       const id = editButton.dataset.id;
@@ -1507,6 +1592,10 @@ if (reportButton) {
 if (recordForm) {
   recordForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!canEditRecords()) {
+      formStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
     formStatus.textContent = "Saving record...";
     const formData = new FormData(recordForm);
     const payload = Object.fromEntries(formData.entries());
@@ -1529,6 +1618,10 @@ if (recordForm) {
 if (majorForm) {
   majorForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!canEditRecords()) {
+      majorStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
     majorStatus.textContent = "Saving record...";
     const formData = new FormData(majorForm);
     const payload = Object.fromEntries(formData.entries());
@@ -1551,6 +1644,10 @@ if (majorForm) {
 if (uniformForm) {
   uniformForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!canEditRecords()) {
+      uniformStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
     uniformStatus.textContent = "Saving record...";
     const formData = new FormData(uniformForm);
     const payload = Object.fromEntries(formData.entries());
@@ -1573,6 +1670,10 @@ if (uniformForm) {
 if (gatepassForm) {
   gatepassForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!canEditRecords()) {
+      gatepassStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
     gatepassStatus.textContent = "Saving record...";
     const formData = new FormData(gatepassForm);
     const payload = Object.fromEntries(formData.entries());
@@ -1595,6 +1696,10 @@ if (gatepassForm) {
 if (goodmoralForm) {
   goodmoralForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!canEditRecords()) {
+      goodmoralStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
     goodmoralStatus.textContent = "Saving record...";
     const formData = new FormData(goodmoralForm);
     const payload = Object.fromEntries(formData.entries());
@@ -1617,6 +1722,10 @@ if (goodmoralForm) {
 if (idreplacementForm) {
   idreplacementForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!canEditRecords()) {
+      idreplacementStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
     idreplacementStatus.textContent = "Saving record...";
     const formData = new FormData(idreplacementForm);
     const payload = Object.fromEntries(formData.entries());
@@ -1639,6 +1748,10 @@ if (idreplacementForm) {
 if (leaveofabsenceForm) {
   leaveofabsenceForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!canEditRecords()) {
+      leaveofabsenceStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
     leaveofabsenceStatus.textContent = "Saving record...";
     const formData = new FormData(leaveofabsenceForm);
     const payload = Object.fromEntries(formData.entries());
@@ -1818,9 +1931,8 @@ attachCancelEdit(goodmoralForm);
 attachCancelEdit(idreplacementForm);
 attachCancelEdit(leaveofabsenceForm);
 
-// Check if user is admin and show admin link
+// Check page access by role
 (async function checkAdminUser() {
-  const ADMIN_EMAIL = "mcdoelfamini10@gmail.com";
   const supabase = await getSupabase();
   const {
     data: { session },
@@ -1831,27 +1943,32 @@ attachCancelEdit(leaveofabsenceForm);
     return;
   }
   
-  // Check if user is admin
-  if (session.user.email === ADMIN_EMAIL) {
-    const adminLink = document.querySelector("#admin-link");
-    if (adminLink) {
-      adminLink.style.display = "block";
-    }
-    return;
-  }
-  
-  // Check if user is head (should not access this page)
+  // Admin should use admin page. Head and coordinator use this page.
   try {
     const { data: userAccount } = await supabase
       .from("user_accounts")
-      .select("role")
-      .eq("email", session.user.email)
+      .select("role, organization_id")
+      .eq("user_id", session.user.id)
       .single();
+
+    if (userAccount?.role) {
+      currentUserRole = userAccount.role;
+      localStorage.setItem("userRole", userAccount.role);
+    }
     
-    if (userAccount && userAccount.role === "head") {
-      alert("This page is for Coordinators only. Redirecting to Reports Dashboard...");
-      window.location.href = "reports.html";
+    if (userAccount && userAccount.organization_id) {
+      localStorage.setItem("organizationId", String(userAccount.organization_id));
+      currentOrganizationId = userAccount.organization_id;
+    }
+
+    if (userAccount && userAccount.role === ROLE_ADMIN) {
+      alert("Admin account detected. Redirecting to Admin page...");
+      window.location.href = "admin.html";
       return;
+    }
+
+    if (userAccount && userAccount.role === ROLE_HEAD) {
+      applyReadOnlyMode();
     }
   } catch (error) {
     // user_accounts table doesn't exist or RLS blocking - ignore and continue

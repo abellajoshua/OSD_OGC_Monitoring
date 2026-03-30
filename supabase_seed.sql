@@ -7,6 +7,17 @@ begin;
 
 create extension if not exists pgcrypto;
 
+insert into public.organizations (name, type)
+values
+  ('CICS', 'college'),
+  ('COE', 'college'),
+  ('CET', 'college'),
+  ('CAFAD', 'college'),
+  ('Mabini', 'campus'),
+  ('Balayan', 'campus'),
+  ('Lobo', 'campus')
+on conflict (name) do nothing;
+
 -- --------------------------------------------------------------------------
 -- AUTH USERS + USER ACCOUNTS (sample app users)
 -- Default passwords:
@@ -63,8 +74,8 @@ set
   updated_at = now()
 where email = 'admin.sample@example.com';
 
-insert into public.user_accounts (user_id, email, full_name, role)
-select u.id, 'admin.sample@example.com', 'System Admin', 'admin'
+insert into public.user_accounts (user_id, email, full_name, role, organization_id)
+select u.id, 'admin.sample@example.com', 'System Admin', 'admin', null
 from auth.users u
 where u.email = 'admin.sample@example.com'
   and not exists (
@@ -72,7 +83,8 @@ where u.email = 'admin.sample@example.com'
   );
 
 update public.user_accounts
-set role = 'admin'
+set role = 'admin',
+    organization_id = null
 where email = 'admin.sample@example.com';
 
 do $$
@@ -124,9 +136,10 @@ set
   updated_at = now()
 where email = 'coordinator.osd@example.com';
 
-insert into public.user_accounts (user_id, email, full_name, role)
-select u.id, 'coordinator.osd@example.com', 'OSD Coordinator', 'coordinator'
+insert into public.user_accounts (user_id, email, full_name, role, organization_id)
+select u.id, 'coordinator.osd@example.com', 'OSD Coordinator', 'coordinator', o.id
 from auth.users u
+join public.organizations o on o.name = 'CICS'
 where u.email = 'coordinator.osd@example.com'
   and not exists (
     select 1 from public.user_accounts where email = 'coordinator.osd@example.com'
@@ -181,9 +194,10 @@ set
   updated_at = now()
 where email = 'coordinator.ogc@example.com';
 
-insert into public.user_accounts (user_id, email, full_name, role)
-select u.id, 'coordinator.ogc@example.com', 'OGC Coordinator', 'coordinator'
+insert into public.user_accounts (user_id, email, full_name, role, organization_id)
+select u.id, 'coordinator.ogc@example.com', 'OGC Coordinator', 'coordinator', o.id
 from auth.users u
+join public.organizations o on o.name = 'COE'
 where u.email = 'coordinator.ogc@example.com'
   and not exists (
     select 1 from public.user_accounts where email = 'coordinator.ogc@example.com'

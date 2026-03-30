@@ -1,13 +1,22 @@
 import { getSupabase } from "./supabaseClient.js?v=4";
 
-const ADMIN_EMAIL = "mcdoelfamini10@gmail.com";
-
 const createUserForm = document.querySelector("#create-user-form");
 const createStatus = document.querySelector("#create-status");
 const usersTableBody = document.querySelector("#users-table-body");
 const usersStatus = document.querySelector("#users-status");
 const logoutBtn = document.querySelector("#logout-btn");
 const refreshBtn = document.querySelector("#refresh-btn");
+const organizationSelect = document.querySelector("#new-organization");
+
+let currentUserAccount = null;
+
+async function getAccessToken() {
+  const supabase = await getSupabase();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session?.access_token || "";
+}
 
 // Check if user is admin
 async function checkAdminAccess() {
@@ -21,13 +30,44 @@ async function checkAdminAccess() {
     return false;
   }
 
-  if (session.user.email !== ADMIN_EMAIL) {
+  const { data: userAccount } = await supabase
+    .from("user_accounts")
+    .select("role, organization_id")
+    .eq("user_id", session.user.id)
+    .single();
+
+  if (!userAccount || userAccount.role !== "admin") {
     alert("Access denied. Admin privileges required.");
     window.location.href = "index.html";
     return false;
   }
 
+  currentUserAccount = userAccount;
+
+  if (organizationSelect && currentUserAccount.organization_id) {
+    organizationSelect.value = String(currentUserAccount.organization_id);
+    organizationSelect.setAttribute("disabled", "disabled");
+  }
+
   return true;
+}
+
+async function loadOrganizations() {
+  if (!organizationSelect) return;
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id, name, type")
+    .order("type", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  organizationSelect.innerHTML = (data || [])
+    .map((org) => `<option value="${org.id}">${escapeHtml(org.name)} (${escapeHtml(org.type)})</option>`)
+    .join("");
 }
 
 // Load all user accounts
@@ -38,7 +78,7 @@ async function loadUsers() {
     // Get all users from user_accounts table
     const { data: accounts, error: accountsError } = await supabase
       .from("user_accounts")
-      .select("*")
+      .select("*, organizations(name, type)")
       .order("created_at", { ascending: false });
 
     if (accountsError) {
@@ -65,7 +105,7 @@ async function loadUsers() {
         `;
         usersTableBody.innerHTML = `
           <tr>
-            <td colspan="5" class="text-center py-5">
+            <td colspan="6" class="text-center py-5">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="#f59e0b" style="margin-bottom: 1rem;">
                 <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
               </svg>
@@ -82,7 +122,7 @@ async function loadUsers() {
     if (!accounts || accounts.length === 0) {
       usersTableBody.innerHTML = `
         <tr>
-          <td colspan="5" class="text-center py-5">
+          <td colspan="6" class="text-center py-5">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="#d1d5db" style="margin-bottom: 1rem;">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
             </svg>
@@ -109,10 +149,15 @@ async function loadUsers() {
             <span class="badge" style="padding: 0.5rem 1rem; font-weight: 600; font-size: 0.75rem; border-radius: 6px; background: ${
               account.role === "admin"
                 ? "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)"
+                : account.role === "head"
+                ? "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)"
                 : "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)"
             }; color: white; text-transform: uppercase; letter-spacing: 0.05em;">
               ${escapeHtml(account.role || "user")}
             </span>
+          </td>
+          <td style="padding: 1rem 1.5rem; color: #374151;">
+            ${escapeHtml(account.organizations?.name || "N/A")}
           </td>
           <td style="padding: 1rem 1.5rem;">
             <div style="color: #6b7280; font-size: 0.875rem;">${new Date(account.created_at).toLocaleDateString("en-US", {
@@ -171,7 +216,7 @@ async function loadUsers() {
     `;
     usersTableBody.innerHTML = `
       <tr>
-        <td colspan="5" class="text-center py-5">
+        <td colspan="6" class="text-center py-5">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="#ef4444" style="margin-bottom: 1rem;">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
           </svg>
@@ -184,15 +229,18 @@ async function loadUsers() {
 }
 
 // Create new user account
-async function createUser(email, password, fullName, role) {
+async function createUser(email, password, fullName, role, organizationId) {
   try {
+    const token = await getAccessToken();
+
     // Call the API endpoint to create user without affecting admin session
     const response = await fetch('/api/admin/create-user', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ email, password, fullName, role }),
+      body: JSON.stringify({ email, password, fullName, role, organization_id: Number(organizationId) }),
     });
 
     const result = await response.json();
@@ -236,11 +284,14 @@ async function createUser(email, password, fullName, role) {
 // Delete user
 async function deleteUser(email) {
   try {
+    const token = await getAccessToken();
+
     // Call the API endpoint to delete user from both Auth and database
     const response = await fetch('/api/admin/delete-user', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ email }),
     });
@@ -301,8 +352,9 @@ if (createUserForm) {
     const password = formData.get("password");
     const fullName = formData.get("name");
     const role = formData.get("role");
+    const organizationId = formData.get("organization_id");
 
-    const success = await createUser(email, password, fullName, role);
+    const success = await createUser(email, password, fullName, role, organizationId);
     
     // Close modal on success
     if (success) {
@@ -346,6 +398,7 @@ if (logoutBtn) {
 (async function init() {
   const isAdmin = await checkAdminAccess();
   if (isAdmin) {
+    await loadOrganizations();
     await loadUsers();
   }
 })();

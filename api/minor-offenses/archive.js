@@ -1,35 +1,46 @@
-const { getSupabaseClient, buildCsv } = require("../_supabase");
+const {
+  getSupabaseClient,
+  buildCsv,
+  getRequestUserContext,
+  getErrorStatus,
+} = require("../_supabase");
 
 module.exports = async (req, res) => {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed." });
   }
 
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("minor_offenses")
-    .select("*")
-    .order("date_of_complaint", { ascending: false })
-    .order("id", { ascending: false });
+  try {
+    const context = await getRequestUserContext(req);
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("minor_offenses")
+      .select("*")
+      .eq("organization_id", context.organizationId)
+      .order("date_of_complaint", { ascending: false })
+      .order("id", { ascending: false });
 
-  if (error) {
-    return res.status(500).json({ error: error.message });
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    const headers = [
+      "date_of_complaint",
+      "name_of_student",
+      "sr_code",
+      "year_program",
+      "contact_number",
+      "complainant",
+      "sex",
+      "offense",
+      "sanction",
+      "date_of_suspension",
+    ];
+    const csv = buildCsv(headers, data || []);
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", "attachment; filename=minor-offenses.csv");
+    res.status(200).send(csv);
+  } catch (error) {
+    return res.status(getErrorStatus(error)).json({ error: error.message });
   }
-
-  const headers = [
-    "date_of_complaint",
-    "name_of_student",
-    "sr_code",
-    "year_program",
-    "contact_number",
-    "reported_by",
-    "sex",
-    "offense",
-    "sanction",
-    "date_of_sanction",
-  ];
-  const csv = buildCsv(headers, data || []);
-  res.setHeader("Content-Type", "text/csv");
-  res.setHeader("Content-Disposition", "attachment; filename=minor-offenses.csv");
-  res.status(200).send(csv);
 };
