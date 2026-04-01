@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reports Dashboard - OSD & OGC Monitoring</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .report-section {
+        margin-bottom: 3rem;
+      }
+      .report-header {
+        background: linear-gradient(135deg, #a41321 0%, #8b0f1a 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 12px 12px 0 0;
+        margin-bottom: 0;
+      }
+      .report-header h3 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+      .report-header p {
+        margin: 0.5rem 0 0 0;
+        opacity: 0.9;
+        font-size: 0.95rem;
+      }
+      .report-body {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-top: none;
+        border-radius: 0 0 12px 12px;
+        padding: 0;
+      }
+      .table-container {
+        overflow-x: auto;
+      }
+      .report-table {
+        margin: 0;
+        font-size: 0.95rem;
+      }
+      .report-table thead {
+        background: #f9fafb;
+        border-bottom: 2px solid #e5e7eb;
+      }
+      .report-table th {
+        padding: 1rem;
+        font-weight: 600;
+        color: #374151;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+      }
+      .report-table td {
+        padding: 1rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #f3f4f6;
+      }
+      .report-table tbody tr:hover {
+        background-color: #f9fafb;
+      }
+      .status-badge {
+        padding: 0.375rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.813rem;
+        font-weight: 600;
+        display: inline-block;
+      }
+      .status-pending {
+        background: #fef3c7;
+        color: #92400e;
+      }
+      .status-resolved {
+        background: #d1fae5;
+        color: #065f46;
+      }
+      .status-active {
+        background: #dbeafe;
+        color: #1e40af;
+      }
+      .filter-bar {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        border: 1px solid #e5e7eb;
+      }
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+      }
+      .stat-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        text-align: center;
+      }
+      .stat-card h4 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #a41321;
+        margin: 0;
+      }
+      .stat-card p {
+        margin: 0.5rem 0 0 0;
+        color: #6b7280;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="ambient">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+
+    <header class="topbar">
+      <div class="topbar-left">
+        <button
+          class="menu-icon-btn"
+          type="button"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#sidebarNav"
+          aria-controls="sidebarNav"
+          aria-label="Open Menu"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="brand">
+          <div class="logo">
+            <img src="assets/logo.png" alt="Batangas State University logo" />
+          </div>
+          <div>
+            <p class="brand-title">Reports Dashboard</p>
+            <p class="brand-subtitle">View all violations and reports - Head Access</p>
+          </div>
+        </div>
+      </div>
+      <button class="back-btn" id="back-to-overview-btn" style="display: none;" aria-label="Back to Overview">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        Back
+      </button>
+    </header>
+
+    <div class="offcanvas offcanvas-start sidebar-modal" tabindex="-1" id="sidebarNav" aria-labelledby="sidebarNavLabel">
+      <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="sidebarNavLabel">Navigation</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+      <div class="offcanvas-body">
+        <nav class="nav nav-sidebar">
+          <button class="nav-btn active" data-section="overview">Overview</button>
+          <button class="nav-btn" data-section="minor-offenses">Minor Offenses</button>
+          <button class="nav-btn" data-section="major-offenses">Major Offenses</button>
+          <button class="nav-btn" data-section="uniform-violations">Uniform Violations</button>
+          <button class="nav-btn" data-section="gatepass-requests">Gatepass Requests</button>
+          <button class="nav-btn" data-section="good-moral">Good Moral Requests</button>
+          <button class="nav-btn" data-section="id-replacement">ID Replacement</button>
+          <button class="nav-btn" data-section="leave-of-absence">Leave of Absence</button>
+          <button class="nav-btn" id="logout-btn">Logout</button>
+        </nav>
+      </div>
+    </div>
+
+    <main class="container-fluid container-xl">
+      <!-- Overview Section -->
+      <section id="overview-section" class="report-section active" style="display: block;">
+        <div class="hero" style="margin-bottom: 2rem;">
+          <div>
+            <p class="eyebrow">Head Dashboard</p>
+            <h1>All Reports Overview</h1>
+            <p class="lead">
+              Comprehensive view of all violations, requests, and student discipline records across the system.
+            </p>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h4 id="total-minor">--</h4>
+            <p>Minor Offenses</p>
+          </div>
+          <div class="stat-card">
+            <h4 id="total-major">--</h4>
+            <p>Major Offenses</p>
+          </div>
+          <div class="stat-card">
+            <h4 id="total-uniform">--</h4>
+            <p>Uniform Violations</p>
+          </div>
+          <div class="stat-card">
+            <h4 id="total-gatepass">--</h4>
+            <p>Gatepass Requests</p>
+          </div>
+          <div class="stat-card">
+            <h4 id="total-goodmoral">--</h4>
+            <p>Good Moral Requests</p>
+          </div>
+          <div class="stat-card">
+            <h4 id="total-idreplacement">--</h4>
+            <p>ID Replacement</p>
+          </div>
+          <div class="stat-card">
+            <h4 id="total-leaveofabsence">--</h4>
+            <p>Leave of Absence</p>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Filter by Status</label>
+              <select class="form-select" id="filter-status">
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="resolved">Resolved</option>
+                <option value="active">Active</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Filter by Date</label>
+              <input type="date" class="form-control" id="filter-date" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Search Student</label>
+              <input type="text" class="form-control" id="search-student" placeholder="Search by name or SR-Code..." />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Minor Offenses Section -->
+      <section id="minor-offenses-section" class="report-section" style="display: none;">
+        <div class="report-header">
+          <h3>Minor Offenses</h3>
+          <p>All recorded minor offenses and disciplinary actions</p>
+        </div>
+        <div class="report-body">
+          <div class="table-container">
+            <table class="table report-table">
+              <thead>
+                <tr>
+                  <th>SR-Code</th>
+                  <th>Student Name</th>
+                  <th>Violation</th>
+                  <th>Date</th>
+                  <th>Sanction</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="minor-offenses-tbody">
+                <tr>
+                  <td colspan="6" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Major Offenses Section -->
+      <section id="major-offenses-section" class="report-section" style="display: none;">
+        <div class="report-header">
+          <h3>Major Offenses</h3>
+          <p>All recorded major offenses and disciplinary actions</p>
+        </div>
+        <div class="report-body">
+          <div class="table-container">
+            <table class="table report-table">
+              <thead>
+                <tr>
+                  <th>SR-Code</th>
+                  <th>Student Name</th>
+                  <th>Violation</th>
+                  <th>Date</th>
+                  <th>Sanction</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="major-offenses-tbody">
+                <tr>
+                  <td colspan="6" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Uniform Violations Section -->
+      <section id="uniform-violations-section" class="report-section" style="display: none;">
+        <div class="report-header">
+          <h3>Non-Wearing Uniform Violations</h3>
+          <p>All recorded uniform policy violations</p>
+        </div>
+        <div class="report-body">
+          <div class="table-container">
+            <table class="table report-table">
+              <thead>
+                <tr>
+                  <th>SR-Code</th>
+                  <th>Student Name</th>
+                  <th>Reason</th>
+                  <th>Date</th>
+                  <th>Time In/Out</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="uniform-violations-tbody">
+                <tr>
+                  <td colspan="6" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Gatepass Requests Section -->
+      <section id="gatepass-requests-section" class="report-section" style="display: none;">
+        <div class="report-header">
+          <h3>Gatepass Requests</h3>
+          <p>All gatepass requests and approvals</p>
+        </div>
+        <div class="report-body">
+          <div class="table-container">
+            <table class="table report-table">
+              <thead>
+                <tr>
+                  <th>SR-Code</th>
+                  <th>Student Name</th>
+                  <th>Reason</th>
+                  <th>Date</th>
+                  <th>Time Out</th>
+                  <th>Time In</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="gatepass-requests-tbody">
+                <tr>
+                  <td colspan="7" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Good Moral Requests Section -->
+      <section id="good-moral-section" class="report-section" style="display: none;">
+        <div class="report-header">
+          <h3>Good Moral Certificate Requests</h3>
+          <p>All good moral certificate requests and verifications</p>
+        </div>
+        <div class="report-body">
+          <div class="table-container">
+            <table class="table report-table">
+              <thead>
+                <tr>
+                  <th>SR-Code</th>
+                  <th>Student Name</th>
+                  <th>Purpose</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="good-moral-tbody">
+                <tr>
+                  <td colspan="6" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ID Replacement Section -->
+      <section id="id-replacement-section" class="report-section" style="display: none;">
+        <div class="report-header">
+          <h3>ID Replacement Requests</h3>
+          <p>All ID replacement requests and approvals</p>
+        </div>
+        <div class="report-body">
+          <div class="table-container">
+            <table class="table report-table">
+              <thead>
+                <tr>
+                  <th>SR-Code</th>
+                  <th>Student Name</th>
+                  <th>Reason</th>
+                  <th>Date</th>
+                  <th>Time Out</th>
+                  <th>Time In</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="id-replacement-tbody">
+                <tr>
+                  <td colspan="7" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Leave of Absence Section -->
+      <section id="leave-of-absence-section" class="report-section" style="display: none;">
+        <div class="report-header">
+          <h3>Leave of Absence Requests</h3>
+          <p>All leave of absence requests and approvals</p>
+        </div>
+        <div class="report-body">
+          <div class="table-container">
+            <table class="table report-table">
+              <thead>
+                <tr>
+                  <th>SR-Code</th>
+                  <th>Student Name</th>
+                  <th>Semester/Period Covered</th>
+                  <th>Date</th>
+                  <th>Time Out</th>
+                  <th>Time In</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="leave-of-absence-tbody">
+                <tr>
+                  <td colspan="7" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script src="runtime-config.js?v=4"></script>
+<script type="module" src="reports.js?v=4"></script>
+  </body>
+</html>

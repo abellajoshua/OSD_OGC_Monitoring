@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabaseClient.js?v=3";
+import { getSupabase } from "./supabaseClient.js?v=4";
 
 const statusEl = document.getElementById("archive-status");
 
@@ -102,9 +102,25 @@ async function exportArchive(type) {
 
   try {
     const supabase = await getSupabase();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error("Session expired. Please login again.");
+    }
+
+    const { data: account } = await supabase
+      .from("user_accounts")
+      .select("organization_id")
+      .eq("user_id", session.user.id)
+      .single();
+
+    const organizationId = account?.organization_id;
+
     const { data, error } = await supabase
       .from(config.table)
       .select("*")
+      .eq("organization_id", organizationId)
       .order("id", { ascending: false });
 
     if (error) throw error;

@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabaseClient.js?v=3";
+import { getSupabase } from "./supabaseClient.js?v=4";
 
 const TABLES = {
   minor: "minor_offenses",
@@ -6,6 +6,8 @@ const TABLES = {
   uniform: "non_wearing_uniform",
   gatepass: "gatepass",
   goodmoral: "good_moral",
+  idreplacement: "id_replacement",
+  leaveofabsence: "leave_of_absence",
 };
 
 const navButtons = document.querySelectorAll(".nav-btn");
@@ -22,12 +24,23 @@ const exportMajorButton = document.querySelector("#export-major-pdf");
 const uniformTableBody = document.querySelector("#uniform-table-body");
 const uniformForm = document.querySelector("#uniform-form");
 const uniformStatus = document.querySelector("#uniform-status");
+const exportUniformButton = document.querySelector("#export-uniform-pdf");
 const gatepassTableBody = document.querySelector("#gatepass-table-body");
 const gatepassForm = document.querySelector("#gatepass-form");
 const gatepassStatus = document.querySelector("#gatepass-status");
+const exportGatepassButton = document.querySelector("#export-gatepass-pdf");
 const goodmoralTableBody = document.querySelector("#goodmoral-table-body");
 const goodmoralForm = document.querySelector("#goodmoral-form");
 const goodmoralStatus = document.querySelector("#goodmoral-status");
+const exportGoodmoralButton = document.querySelector("#export-goodmoral-pdf");
+const idreplacementTableBody = document.querySelector("#idreplacement-table-body");
+const idreplacementForm = document.querySelector("#idreplacement-form");
+const idreplacementStatus = document.querySelector("#idreplacement-status");
+const exportIdreplacementButton = document.querySelector("#export-idreplacement-pdf");
+const leaveofabsenceTableBody = document.querySelector("#leaveofabsence-table-body");
+const leaveofabsenceForm = document.querySelector("#leaveofabsence-form");
+const leaveofabsenceStatus = document.querySelector("#leaveofabsence-status");
+const exportLeaveofabsenceButton = document.querySelector("#export-leaveofabsence-pdf");
 const dashboardActivityBody = document.querySelector("#dashboard-activity-body");
 const statActive = document.querySelector("[data-stat='active']");
 const statPending = document.querySelector("[data-stat='pending']");
@@ -40,17 +53,107 @@ const kpiGatepass = document.querySelector("[data-kpi='gatepass']");
 const kpiGoodmoral = document.querySelector("[data-kpi='goodmoral']");
 const kpiGoodmoralFlagged = document.querySelector("[data-kpi='goodmoral-flagged']");
 
+const academicYearInput = document.querySelector("#academic-year-input");
+const semesterSelect = document.querySelector("#semester-select");
+const academicPeriodDisplay = document.querySelector("#academic-period-display");
+
 const minorFilter = document.querySelector("[data-filter-scope='minor']");
 const majorFilter = document.querySelector("[data-filter-scope='major']");
 const uniformFilter = document.querySelector("[data-filter-scope='uniform']");
 const gatepassFilter = document.querySelector("[data-filter-scope='gatepass']");
 const goodmoralFilter = document.querySelector("[data-filter-scope='goodmoral']");
+const idreplacementFilter = document.querySelector("[data-filter-scope='idreplacement']");
+const leaveofabsenceFilter = document.querySelector("[data-filter-scope='leaveofabsence']");
 
 let minorRecords = [];
 let majorRecords = [];
 let uniformRecords = [];
 let gatepassRecords = [];
 let goodmoralRecords = [];
+let idreplacementRecords = [];
+let leaveofabsenceRecords = [];
+let currentOrganizationId = null;
+let currentUserRole = localStorage.getItem("userRole") || "";
+
+const ROLE_ADMIN = "admin";
+const ROLE_HEAD = "head";
+const ROLE_COORDINATOR = "coordinator";
+
+function canEditRecords() {
+  return currentUserRole === ROLE_COORDINATOR;
+}
+
+function ensureCoordinatorAccess() {
+  if (!canEditRecords()) {
+    throw new Error("Read-only access: Head can view and export records only.");
+  }
+}
+
+function renderRecordActions(recordId) {
+  if (!canEditRecords()) {
+    return `<span class="text-muted">Read Only</span>`;
+  }
+
+  return `
+    <button class="btn-edit" type="button" data-action="edit" data-id="${recordId}">Edit</button>
+    <button class="btn-delete" type="button" data-action="archive" data-id="${recordId}">Archive</button>
+  `;
+}
+
+function applyReadOnlyMode() {
+  [recordForm, majorForm, uniformForm, gatepassForm, goodmoralForm, idreplacementForm, leaveofabsenceForm]
+    .filter(Boolean)
+    .forEach((form) => {
+      form.querySelectorAll("input, select, textarea, button").forEach((field) => {
+        if (field.type === "button") return;
+        if (field.dataset && field.dataset.editCancel !== undefined) return;
+        field.disabled = true;
+      });
+
+      const submitButton = form.querySelector("[data-submit-label]");
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Read Only";
+      }
+
+      const cancelButton = form.querySelector("[data-edit-cancel]");
+      if (cancelButton) {
+        cancelButton.classList.add("is-hidden");
+      }
+    });
+}
+
+async function getCurrentOrganizationId() {
+  if (currentOrganizationId) return currentOrganizationId;
+  const cached = localStorage.getItem("organizationId");
+  if (cached) {
+    currentOrganizationId = Number(cached);
+    return currentOrganizationId;
+  }
+
+  const supabase = await getSupabase();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return null;
+
+  const { data: account } = await supabase
+    .from("user_accounts")
+    .select("role, organization_id")
+    .eq("user_id", session.user.id)
+    .single();
+
+  currentUserRole = account?.role || currentUserRole;
+  if (currentUserRole) {
+    localStorage.setItem("userRole", currentUserRole);
+  }
+
+  currentOrganizationId = account?.organization_id || null;
+  if (currentOrganizationId) {
+    localStorage.setItem("organizationId", String(currentOrganizationId));
+  }
+  return currentOrganizationId;
+}
 
 function buildCsv(headers, rows) {
   const escape = (value) => {
@@ -76,30 +179,68 @@ function downloadCsv(fileName, csvContent) {
 
 async function fetchTableRows(table, dateColumn) {
   const supabase = await getSupabase();
-  const query = supabase.from(table).select("*");
   const primaryOrderColumn = dateColumn || "id";
-  const { data, error } = await query
+  const orgId = await getCurrentOrganizationId();
+  
+  // Try with archived filter first
+  let query = supabase.from(table).select("*").eq("archived", false);
+  if (orgId) query = query.eq("organization_id", orgId);
+  let { data, error } = await query
     .order(primaryOrderColumn, { ascending: false })
     .order("id", { ascending: false });
+  
+  // If archived column doesn't exist, try without it
+  if (error && error.message && error.message.includes("archived")) {
+    query = supabase.from(table).select("*");
+    if (orgId) query = query.eq("organization_id", orgId);
+    const result = await query
+      .order(primaryOrderColumn, { ascending: false })
+      .order("id", { ascending: false });
+    data = result.data;
+    error = result.error;
+  }
+  
   if (error) throw error;
   return data || [];
 }
 
 async function createRow(table, payload) {
+  ensureCoordinatorAccess();
   const supabase = await getSupabase();
-  const { error } = await supabase.from(table).insert(payload);
+  const orgId = await getCurrentOrganizationId();
+  const safePayload = { ...payload, organization_id: orgId };
+  const { error } = await supabase.from(table).insert(safePayload);
   if (error) throw error;
 }
 
 async function updateRow(table, id, payload) {
+  ensureCoordinatorAccess();
   const supabase = await getSupabase();
-  const { error } = await supabase.from(table).update(payload).eq("id", id);
+  const orgId = await getCurrentOrganizationId();
+  const { organization_id, ...safePayload } = payload;
+  let query = supabase.from(table).update(safePayload).eq("id", id);
+  if (orgId) query = query.eq("organization_id", orgId);
+  const { error } = await query;
+  if (error) throw error;
+}
+
+async function archiveRow(table, id) {
+  ensureCoordinatorAccess();
+  const supabase = await getSupabase();
+  const orgId = await getCurrentOrganizationId();
+  let query = supabase.from(table).update({ archived: true }).eq("id", id);
+  if (orgId) query = query.eq("organization_id", orgId);
+  const { error } = await query;
   if (error) throw error;
 }
 
 async function deleteRow(table, id) {
+  ensureCoordinatorAccess();
   const supabase = await getSupabase();
-  const { error } = await supabase.from(table).delete().eq("id", id);
+  const orgId = await getCurrentOrganizationId();
+  let query = supabase.from(table).delete().eq("id", id);
+  if (orgId) query = query.eq("organization_id", orgId);
+  const { error } = await query;
   if (error) throw error;
 }
 
@@ -118,6 +259,12 @@ function switchTab(targetId) {
   navButtons.forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.tab === targetId);
   });
+  
+  // Show/hide back button based on active tab
+  const backBtn = document.getElementById("back-to-dashboard-btn");
+  if (backBtn) {
+    backBtn.style.display = targetId === "dashboard" ? "none" : "flex";
+  }
 }
 
 function formatDate(value) {
@@ -234,9 +381,10 @@ function flagGoodMoralFromMinor() {
 
 function openPrintView() {
   const table = document.querySelector("#minor .table-wrap table");
-  const title = document.querySelector("#minor .log-title");
 
-  if (!table || !title) return;
+  if (!table) return;
+  
+  const { year, semester } = getAcademicPeriod();
 
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
@@ -248,18 +396,42 @@ function openPrintView() {
         <meta charset="UTF-8" />
         <title>Minor Offense Logsheet</title>
         <style>
-          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; }
-          .log-title { text-align: center; margin-bottom: 18px; }
-          .log-title h2 { margin: 0; font-size: 24px; }
-          .log-title h3 { margin: 4px 0 0; font-size: 16px; letter-spacing: 1px; }
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
           table { width: 100%; border-collapse: collapse; font-size: 11px; }
           th, td { border: 1px solid #111; padding: 6px; text-align: center; }
-          th { background: #f5f5f5; text-transform: uppercase; }
-          th:last-child, td:last-child { display: none; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
         </style>
       </head>
       <body>
-        ${title.outerHTML}
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>${semester} AY ${year}</h4>
+          </div>
+        </div>
+        <div class="log-title">
+          <h2>LOGSHEET</h2>
+          <h3>MINOR OFFENSES</h3>
+        </div>
         ${table.outerHTML}
       </body>
     </html>
@@ -274,6 +446,8 @@ function openMajorPrintView() {
   const title = document.querySelector("#major .log-title");
 
   if (!table || !title) return;
+  
+  const { year, semester } = getAcademicPeriod();
 
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
@@ -285,17 +459,338 @@ function openMajorPrintView() {
         <meta charset="UTF-8" />
         <title>Major Offense Logsheet</title>
         <style>
-          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; }
-          .log-title { text-align: center; margin-bottom: 18px; }
-          .log-title h2 { margin: 0; font-size: 24px; }
-          .log-title h3 { margin: 4px 0 0; font-size: 16px; letter-spacing: 1px; }
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
           table { width: 100%; border-collapse: collapse; font-size: 11px; }
           th, td { border: 1px solid #111; padding: 6px; text-align: center; }
-          th { background: #f5f5f5; text-transform: uppercase; }
-          th:last-child, td:last-child { display: none; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
         </style>
       </head>
       <body>
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>${semester} AY ${year}</h4>
+          </div>
+        </div>
+        ${title.outerHTML}
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function openUniformPrintView() {
+  const table = document.querySelector("#uniform .table-wrap table");
+  const title = document.querySelector("#uniform .log-title");
+
+  if (!table || !title) return;
+  
+  const { year, semester } = getAcademicPeriod();
+
+  const printWindow = window.open("", "_blank", "width=980,height=720");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Non-Wearing Uniform Logsheet</title>
+        <style>
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #111; padding: 6px; text-align: center; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
+        </style>
+      </head>
+      <body>
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>${semester} AY ${year}</h4>
+          </div>
+        </div>
+        ${title.outerHTML}
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function openGatepassPrintView() {
+  const table = document.querySelector("#gatepass .table-wrap table");
+  const title = document.querySelector("#gatepass .log-title");
+
+  if (!table || !title) return;
+  
+  const { year, semester } = getAcademicPeriod();
+
+  const printWindow = window.open("", "_blank", "width=980,height=720");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Gatepass Logsheet</title>
+        <style>
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #111; padding: 6px; text-align: center; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
+        </style>
+      </head>
+      <body>
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>${semester} AY ${year}</h4>
+          </div>
+        </div>
+        ${title.outerHTML}
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function openGoodmoralPrintView() {
+  const table = document.querySelector("#goodmoral .table-wrap table");
+  const title = document.querySelector("#goodmoral .log-title");
+
+  if (!table || !title) return;
+  
+  const { year, semester } = getAcademicPeriod();
+
+  const printWindow = window.open("", "_blank", "width=980,height=720");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Good Moral Verification Logsheet</title>
+        <style>
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #111; padding: 6px; text-align: center; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
+        </style>
+      </head>
+      <body>
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>${semester} AY ${year}</h4>
+          </div>
+        </div>
+        ${title.outerHTML}
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function openIdreplacementPrintView() {
+  const table = document.querySelector("#idreplacement .table-wrap table");
+  const title = document.querySelector("#idreplacement .log-title");
+
+  if (!table || !title) return;
+  
+  const { year, semester } = getAcademicPeriod();
+
+  const printWindow = window.open("", "_blank", "width=980,height=720");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>ID Replacement Logsheet</title>
+        <style>
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #111; padding: 6px; text-align: center; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
+        </style>
+      </head>
+      <body>
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>${semester} AY ${year}</h4>
+          </div>
+        </div>
+        ${title.outerHTML}
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function openLeaveofabsencePrintView() {
+  const table = document.querySelector("#leaveofabsence .table-wrap table");
+  const title = document.querySelector("#leaveofabsence .log-title");
+
+  if (!table || !title) return;
+  
+  const { year, semester } = getAcademicPeriod();
+
+  const printWindow = window.open("", "_blank", "width=980,height=720");
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Leave of Absence Logsheet</title>
+        <style>
+          @page { size: landscape; margin: 0.5in; }
+          body { font-family: "Times New Roman", serif; color: #111; padding: 24px; position: relative; }
+          .header-container { margin-bottom: 20px; border-bottom: 2px solid #111; padding-bottom: 10px; text-align: center; position: relative; min-height: 80px; }
+          .header-logo { position: absolute; left: 120px; top: 12px; width: 80px; height: 80px; object-fit: contain; }
+          .header-text { margin: 0 auto; }
+          .header-text h1 { margin: 0; font-size: 14px; font-weight: normal; }
+          .header-text h2 { margin: 2px 0; font-size: 16px; font-weight: bold; color: #c00; }
+          .header-text h3 { margin: 2px 0; font-size: 13px; font-weight: bold; }
+          .header-text h4 { margin: 2px 0; font-size: 13px; font-weight: normal; }
+          .log-title { text-align: center; margin: 20px 0; }
+          .log-title h2 { margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+          .log-title h3 { margin: 4px 0 0; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #111; padding: 6px; text-align: center; }
+          th { background: #f5f5f5; font-weight: bold; }
+          thead tr:first-child th { text-transform: uppercase; }
+          thead tr:first-child th:last-child { display: none; }
+          tbody tr td:last-child { display: none; }
+        </style>
+      </head>
+      <body>
+        <div class="header-container">
+          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <div class="header-text">
+            <h1>Republic of the Philippines</h1>
+            <h2>Batangas State University</h2>
+            <h3>The National Engineering University</h3>
+            <h4>Alangilan Campus</h4>
+            <h3>OFFICE OF STUDENT DISCIPLINE</h3>
+            <h4>${semester} AY ${year}</h4>
+          </div>
+        </div>
         ${title.outerHTML}
         ${table.outerHTML}
       </body>
@@ -314,12 +809,15 @@ const archiveConfig = {
       "name_of_student",
       "sr_code",
       "year_program",
-      "contact_number",
-      "reported_by",
       "sex",
+      "contact_number",
+      "complainant",
+      "written_reply",
+      "date_of_hearing",
       "offense",
       "sanction",
-      "date_of_sanction",
+      "date_of_suspension",
+      "date_of_post_counseling",
       "created_at",
     ],
     getRows: () => minorRecords,
@@ -332,12 +830,15 @@ const archiveConfig = {
       "name_of_student",
       "sr_code",
       "year_program",
-      "contact_number",
-      "reported_by",
       "sex",
+      "contact_number",
+      "complainant",
+      "written_reply",
+      "date_of_hearing",
       "offense",
       "sanction",
-      "date_of_sanction",
+      "date_of_suspension",
+      "date_of_post_counseling",
       "created_at",
     ],
     getRows: () => majorRecords,
@@ -418,16 +919,13 @@ function renderRows(records) {
       <td>${record.sr_code || ""}</td>
       <td>${record.year_program || ""}</td>
       <td>${record.contact_number || ""}</td>
-      <td>${record.reported_by || ""}</td>
+      <td>${record.complainant || ""}</td>
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.offense || ""}</td>
       <td>${record.sanction || ""}</td>
-      <td>${formatDate(record.date_of_sanction)}</td>
-      <td>
-        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
-      </td>
+      <td>${formatDate(record.date_of_suspension)}</td>
+      <td>${renderRecordActions(record.id)}</td>
     `;
     tableBody.appendChild(row);
   });
@@ -437,7 +935,7 @@ function renderMajorRows(records) {
   majorTableBody.innerHTML = "";
   if (!records.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="12">No records yet. Create the first entry below.</td>`;
+    row.innerHTML = `<td colspan="15">No records yet. Create the first entry below.</td>`;
     majorTableBody.appendChild(row);
     return;
   }
@@ -449,17 +947,17 @@ function renderMajorRows(records) {
       <td>${record.name_of_student || ""}</td>
       <td>${record.sr_code || ""}</td>
       <td>${record.year_program || ""}</td>
-      <td>${record.contact_number || ""}</td>
-      <td>${record.reported_by || ""}</td>
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
+      <td>${record.contact_number || ""}</td>
+      <td>${record.complainant || ""}</td>
+      <td>${record.written_reply || ""}</td>
+      <td>${formatDate(record.date_of_hearing)}</td>
       <td>${record.offense || ""}</td>
       <td>${record.sanction || ""}</td>
-      <td>${formatDate(record.date_of_sanction)}</td>
-      <td>
-        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
-      </td>
+      <td>${formatDate(record.date_of_suspension)}</td>
+      <td>${formatDate(record.date_of_post_counseling)}</td>
+      <td>${renderRecordActions(record.id)}</td>
     `;
     majorTableBody.appendChild(row);
   });
@@ -487,10 +985,7 @@ function renderUniformRows(records) {
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.reason || ""}</td>
-      <td>
-        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
-      </td>
+      <td>${renderRecordActions(record.id)}</td>
     `;
     uniformTableBody.appendChild(row);
   });
@@ -518,10 +1013,7 @@ function renderGatepassRows(records) {
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.reason || ""}</td>
-      <td>
-        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
-      </td>
+      <td>${renderRecordActions(record.id)}</td>
     `;
     gatepassTableBody.appendChild(row);
   });
@@ -552,10 +1044,7 @@ function renderGoodmoralRows(records) {
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
       <td>${record.purpose || ""}</td>
-      <td>
-        <button class="btn-edit" type="button" data-action="edit" data-id="${record.id}">Edit</button>
-        <button class="btn-delete" type="button" data-action="delete" data-id="${record.id}">Delete</button>
-      </td>
+      <td>${renderRecordActions(record.id)}</td>
     `;
     goodmoralTableBody.appendChild(row);
   });
@@ -590,7 +1079,7 @@ function applyMinorFilters() {
 
   const filtered = minorRecords.filter((record) => {
     const inRange = withinDateRange(record.date_of_complaint, from, to);
-    const matches = matchesQuery(record, ["name_of_student", "sr_code", "offense", "reported_by", "year_program"], query);
+    const matches = matchesQuery(record, ["name_of_student", "sr_code", "offense", "complainant", "year_program"], query);
     return inRange && matches;
   });
   renderRows(filtered);
@@ -650,6 +1139,90 @@ function applyGoodmoralFilters() {
     return inRange && matches;
   });
   renderGoodmoralRows(filtered);
+}
+
+function renderIdreplacementRows(records) {
+  idreplacementTableBody.innerHTML = "";
+  if (!records.length) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td colspan="11">No records yet. Create the first entry below.</td>`;
+    idreplacementTableBody.appendChild(row);
+    return;
+  }
+
+  records.forEach((record, index) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${index + 1}</td>
+      <td>${formatDate(record.date)}</td>
+      <td>${record.time_in || ""}</td>
+      <td>${record.time_out || ""}</td>
+      <td>${record.name || ""}</td>
+      <td>${record.sr_code || ""}</td>
+      <td>${record.course || ""}</td>
+      <td>${record.sex === "M" ? "✔" : ""}</td>
+      <td>${record.sex === "F" ? "✔" : ""}</td>
+      <td>${record.reason || ""}</td>
+      <td>${renderRecordActions(record.id)}</td>
+    `;
+    idreplacementTableBody.appendChild(row);
+  });
+}
+
+function applyIdreplacementFilters() {
+  if (!idreplacementFilter) return;
+  const query = idreplacementFilter.querySelector("[data-filter='query']").value.trim();
+  const from = idreplacementFilter.querySelector("[data-filter='from']").value;
+  const to = idreplacementFilter.querySelector("[data-filter='to']").value;
+
+  const filtered = idreplacementRecords.filter((record) => {
+    const inRange = withinDateRange(record.date, from, to);
+    const matches = matchesQuery(record, ["name", "sr_code", "course", "reason"], query);
+    return inRange && matches;
+  });
+  renderIdreplacementRows(filtered);
+}
+
+function renderLeaveofabsenceRows(records) {
+  leaveofabsenceTableBody.innerHTML = "";
+  if (!records.length) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td colspan="11">No records yet. Create the first entry below.</td>`;
+    leaveofabsenceTableBody.appendChild(row);
+    return;
+  }
+
+  records.forEach((record, index) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${index + 1}</td>
+      <td>${formatDate(record.date)}</td>
+      <td>${record.time_in || ""}</td>
+      <td>${record.time_out || ""}</td>
+      <td>${record.name || ""}</td>
+      <td>${record.sr_code || ""}</td>
+      <td>${record.course || ""}</td>
+      <td>${record.sex === "M" ? "✔" : ""}</td>
+      <td>${record.sex === "F" ? "✔" : ""}</td>
+      <td>${record.semester_period_covered || ""}</td>
+      <td>${renderRecordActions(record.id)}</td>
+    `;
+    leaveofabsenceTableBody.appendChild(row);
+  });
+}
+
+function applyLeaveofabsenceFilters() {
+  if (!leaveofabsenceFilter) return;
+  const query = leaveofabsenceFilter.querySelector("[data-filter='query']").value.trim();
+  const from = leaveofabsenceFilter.querySelector("[data-filter='from']").value;
+  const to = leaveofabsenceFilter.querySelector("[data-filter='to']").value;
+
+  const filtered = leaveofabsenceRecords.filter((record) => {
+    const inRange = withinDateRange(record.date, from, to);
+    const matches = matchesQuery(record, ["name", "sr_code", "course", "semester_period_covered"], query);
+    return inRange && matches;
+  });
+  renderLeaveofabsenceRows(filtered);
 }
 
 function setupFilters(scopeElement, applyFn) {
@@ -719,7 +1292,12 @@ function attachRowActions({ tableElement, tableName, getRecords, form, fields, r
   if (!tableElement) return;
   tableElement.addEventListener("click", async (event) => {
     const editButton = event.target.closest("[data-action='edit']");
-    const deleteButton = event.target.closest("[data-action='delete']");
+    const archiveButton = event.target.closest("[data-action='archive']");
+
+    if ((editButton || archiveButton) && !canEditRecords()) {
+      alert("Read-only access: Head can view and export records only.");
+      return;
+    }
 
     if (editButton) {
       const id = editButton.dataset.id;
@@ -733,18 +1311,19 @@ function attachRowActions({ tableElement, tableName, getRecords, form, fields, r
       return;
     }
 
-    if (deleteButton) {
-      const id = deleteButton.dataset.id;
+    if (archiveButton) {
+      const id = archiveButton.dataset.id;
       if (!id) return;
-      const confirmed = window.confirm("Delete this record?");
+      const confirmed = window.confirm("Archive this record? You can view and restore it later from the Archive page.");
       if (!confirmed) return;
 
     try {
-      await deleteRow(tableName, id);
+      await archiveRow(tableName, id);
       await reloadFn();
       await loadDashboard();
+      alert("Record archived successfully!");
     } catch (error) {
-      alert(error.message || "Unable to delete record.");
+      alert(error.message || "Unable to archive record.");
     }
     }
   });
@@ -781,6 +1360,88 @@ async function loadMajorRecords() {
     renderMajorRows([]);
     updateDashboardCounters();
   }
+}
+
+// Academic Period Management
+function getAcademicPeriod() {
+  const year = localStorage.getItem("academicYear") || "2024-2025";
+  const semester = localStorage.getItem("semester") || "First Semester";
+  return { year, semester };
+}
+
+function setAcademicPeriod(year, semester) {
+  localStorage.setItem("academicYear", year);
+  localStorage.setItem("semester", semester);
+}
+
+function formatAcademicYear(input) {
+  // Remove all non-digit characters
+  let digits = input.replace(/\D/g, '');
+  
+  // Limit to 8 digits max
+  if (digits.length > 8) {
+    digits = digits.substring(0, 8);
+  }
+  
+  // Format as YYYY-YYYY
+  if (digits.length >= 4) {
+    const firstYear = digits.substring(0, 4);
+    const secondYear = digits.substring(4, 8);
+    return secondYear ? `${firstYear}-${secondYear}` : firstYear;
+  }
+  
+  return digits;
+}
+
+function updateAcademicPeriodDisplay() {
+  if (!academicPeriodDisplay) return;
+  const { year, semester } = getAcademicPeriod();
+  academicPeriodDisplay.textContent = `${semester} AY ${year}`;
+}
+
+function initializeAcademicPeriod() {
+  const { year, semester } = getAcademicPeriod();
+  
+  if (academicYearInput) {
+    academicYearInput.value = year;
+    
+    academicYearInput.addEventListener("input", (e) => {
+      const cursorPosition = e.target.selectionStart;
+      const oldValue = e.target.value;
+      const formatted = formatAcademicYear(e.target.value);
+      
+      e.target.value = formatted;
+      
+      // Adjust cursor position after formatting
+      let newCursorPosition = cursorPosition;
+      if (formatted.length > oldValue.length && cursorPosition === 5) {
+        newCursorPosition = 6; // Move cursor after the hyphen
+      }
+      e.target.setSelectionRange(newCursorPosition, newCursorPosition);
+      
+      setAcademicPeriod(formatted, getAcademicPeriod().semester);
+      updateAcademicPeriodDisplay();
+    });
+    
+    academicYearInput.addEventListener("blur", (e) => {
+      // Ensure proper format on blur
+      const formatted = formatAcademicYear(e.target.value);
+      e.target.value = formatted;
+      setAcademicPeriod(formatted, getAcademicPeriod().semester);
+      updateAcademicPeriodDisplay();
+    });
+  }
+  
+  if (semesterSelect) {
+    semesterSelect.value = semester;
+    semesterSelect.addEventListener("change", (e) => {
+      const newSemester = e.target.value;
+      setAcademicPeriod(getAcademicPeriod().year, newSemester);
+      updateAcademicPeriodDisplay();
+    });
+  }
+  
+  updateAcademicPeriodDisplay();
 }
 
 async function loadDashboard() {
@@ -847,6 +1508,30 @@ async function loadGoodmoralRecords() {
   }
 }
 
+async function loadIdreplacementRecords() {
+  try {
+    idreplacementRecords = await fetchTableRows(TABLES.idreplacement, "date");
+    applyIdreplacementFilters();
+    updateDashboardCounters();
+  } catch (error) {
+    idreplacementRecords = [];
+    renderIdreplacementRows([]);
+    updateDashboardCounters();
+  }
+}
+
+async function loadLeaveofabsenceRecords() {
+  try {
+    leaveofabsenceRecords = await fetchTableRows(TABLES.leaveofabsence, "date");
+    applyLeaveofabsenceFilters();
+    updateDashboardCounters();
+  } catch (error) {
+    leaveofabsenceRecords = [];
+    renderLeaveofabsenceRows([]);
+    updateDashboardCounters();
+  }
+}
+
 navButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const targetTab = button.dataset.tab;
@@ -858,6 +1543,14 @@ navButtons.forEach((button) => {
     }
   });
 });
+
+// Back to Dashboard button
+const backToDashboardBtn = document.getElementById("back-to-dashboard-btn");
+if (backToDashboardBtn) {
+  backToDashboardBtn.addEventListener("click", () => {
+    switchTab("dashboard");
+  });
+}
 
 heroButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -899,6 +1592,10 @@ if (reportButton) {
 if (recordForm) {
   recordForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!canEditRecords()) {
+      formStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
     formStatus.textContent = "Saving record...";
     const formData = new FormData(recordForm);
     const payload = Object.fromEntries(formData.entries());
@@ -921,6 +1618,10 @@ if (recordForm) {
 if (majorForm) {
   majorForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!canEditRecords()) {
+      majorStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
     majorStatus.textContent = "Saving record...";
     const formData = new FormData(majorForm);
     const payload = Object.fromEntries(formData.entries());
@@ -943,6 +1644,10 @@ if (majorForm) {
 if (uniformForm) {
   uniformForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!canEditRecords()) {
+      uniformStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
     uniformStatus.textContent = "Saving record...";
     const formData = new FormData(uniformForm);
     const payload = Object.fromEntries(formData.entries());
@@ -965,6 +1670,10 @@ if (uniformForm) {
 if (gatepassForm) {
   gatepassForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!canEditRecords()) {
+      gatepassStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
     gatepassStatus.textContent = "Saving record...";
     const formData = new FormData(gatepassForm);
     const payload = Object.fromEntries(formData.entries());
@@ -987,6 +1696,10 @@ if (gatepassForm) {
 if (goodmoralForm) {
   goodmoralForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!canEditRecords()) {
+      goodmoralStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
     goodmoralStatus.textContent = "Saving record...";
     const formData = new FormData(goodmoralForm);
     const payload = Object.fromEntries(formData.entries());
@@ -1006,6 +1719,58 @@ if (goodmoralForm) {
   });
 }
 
+if (idreplacementForm) {
+  idreplacementForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!canEditRecords()) {
+      idreplacementStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
+    idreplacementStatus.textContent = "Saving record...";
+    const formData = new FormData(idreplacementForm);
+    const payload = Object.fromEntries(formData.entries());
+    const editId = idreplacementForm.dataset.editId;
+
+    try {
+      if (editId) await updateRow(TABLES.idreplacement, editId, payload);
+      else await createRow(TABLES.idreplacement, payload);
+
+      setFormEditState(idreplacementForm, false);
+      idreplacementStatus.textContent = editId ? "Record updated." : "Record saved.";
+      await loadIdreplacementRecords();
+      await loadDashboard();
+    } catch (error) {
+      idreplacementStatus.textContent = error.message || "Something went wrong. Please try again.";
+    }
+  });
+}
+
+if (leaveofabsenceForm) {
+  leaveofabsenceForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!canEditRecords()) {
+      leaveofabsenceStatus.textContent = "Read-only access: Head can view and export only.";
+      return;
+    }
+    leaveofabsenceStatus.textContent = "Saving record...";
+    const formData = new FormData(leaveofabsenceForm);
+    const payload = Object.fromEntries(formData.entries());
+    const editId = leaveofabsenceForm.dataset.editId;
+
+    try {
+      if (editId) await updateRow(TABLES.leaveofabsence, editId, payload);
+      else await createRow(TABLES.leaveofabsence, payload);
+
+      setFormEditState(leaveofabsenceForm, false);
+      leaveofabsenceStatus.textContent = editId ? "Record updated." : "Record saved.";
+      await loadLeaveofabsenceRecords();
+      await loadDashboard();
+    } catch (error) {
+      leaveofabsenceStatus.textContent = error.message || "Something went wrong. Please try again.";
+    }
+  });
+}
+
 if (exportButton) {
   exportButton.addEventListener("click", () => {
     openPrintView();
@@ -1015,6 +1780,36 @@ if (exportButton) {
 if (exportMajorButton) {
   exportMajorButton.addEventListener("click", () => {
     openMajorPrintView();
+  });
+}
+
+if (exportUniformButton) {
+  exportUniformButton.addEventListener("click", () => {
+    openUniformPrintView();
+  });
+}
+
+if (exportGatepassButton) {
+  exportGatepassButton.addEventListener("click", () => {
+    openGatepassPrintView();
+  });
+}
+
+if (exportGoodmoralButton) {
+  exportGoodmoralButton.addEventListener("click", () => {
+    openGoodmoralPrintView();
+  });
+}
+
+if (exportIdreplacementButton) {
+  exportIdreplacementButton.addEventListener("click", () => {
+    openIdreplacementPrintView();
+  });
+}
+
+if (exportLeaveofabsenceButton) {
+  exportLeaveofabsenceButton.addEventListener("click", () => {
+    openLeaveofabsencePrintView();
   });
 }
 
@@ -1029,14 +1824,19 @@ loadMajorRecords();
 loadUniformRecords();
 loadGatepassRecords();
 loadGoodmoralRecords();
+loadIdreplacementRecords();
+loadLeaveofabsenceRecords();
 loadDashboard();
 updateDashboardCounters();
+initializeAcademicPeriod();
 
 setupFilters(minorFilter, applyMinorFilters);
 setupFilters(majorFilter, applyMajorFilters);
 setupFilters(uniformFilter, applyUniformFilters);
 setupFilters(gatepassFilter, applyGatepassFilters);
 setupFilters(goodmoralFilter, applyGoodmoralFilters);
+setupFilters(idreplacementFilter, applyIdreplacementFilters);
+setupFilters(leaveofabsenceFilter, applyLeaveofabsenceFilters);
 
 attachRowActions({
   tableElement: tableBody,
@@ -1105,8 +1905,73 @@ attachRowActions({
   reloadFn: loadGoodmoralRecords,
 });
 
+attachRowActions({
+  tableElement: idreplacementTableBody,
+  tableName: TABLES.idreplacement,
+  getRecords: () => idreplacementRecords,
+  form: idreplacementForm,
+  fields: ["date", "time_in", "time_out", "name", "sr_code", "course", "sex", "reason"],
+  reloadFn: loadIdreplacementRecords,
+});
+
+attachRowActions({
+  tableElement: leaveofabsenceTableBody,
+  tableName: TABLES.leaveofabsence,
+  getRecords: () => leaveofabsenceRecords,
+  form: leaveofabsenceForm,
+  fields: ["date", "time_in", "time_out", "name", "sr_code", "course", "sex", "semester_period_covered"],
+  reloadFn: loadLeaveofabsenceRecords,
+});
+
 attachCancelEdit(recordForm);
 attachCancelEdit(majorForm);
 attachCancelEdit(uniformForm);
 attachCancelEdit(gatepassForm);
 attachCancelEdit(goodmoralForm);
+attachCancelEdit(idreplacementForm);
+attachCancelEdit(leaveofabsenceForm);
+
+// Check page access by role
+(async function checkAdminUser() {
+  const supabase = await getSupabase();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  
+  if (!session) {
+    window.location.href = "login.html";
+    return;
+  }
+  
+  // Admin should use admin page. Head and coordinator use this page.
+  try {
+    const { data: userAccount } = await supabase
+      .from("user_accounts")
+      .select("role, organization_id")
+      .eq("user_id", session.user.id)
+      .single();
+
+    if (userAccount?.role) {
+      currentUserRole = userAccount.role;
+      localStorage.setItem("userRole", userAccount.role);
+    }
+    
+    if (userAccount && userAccount.organization_id) {
+      localStorage.setItem("organizationId", String(userAccount.organization_id));
+      currentOrganizationId = userAccount.organization_id;
+    }
+
+    if (userAccount && userAccount.role === ROLE_ADMIN) {
+      alert("Admin account detected. Redirecting to Admin page...");
+      window.location.href = "admin.html";
+      return;
+    }
+
+    if (userAccount && userAccount.role === ROLE_HEAD) {
+      applyReadOnlyMode();
+    }
+  } catch (error) {
+    // user_accounts table doesn't exist or RLS blocking - ignore and continue
+    console.log("Could not check user role, continuing anyway");
+  }
+})();

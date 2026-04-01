@@ -1,7 +1,21 @@
-import { getSupabase } from "./supabaseClient.js?v=3";
+import { getSupabase } from "./supabaseClient.js?v=4";
 
 const loginForm = document.querySelector("#login-form");
 const statusEl = document.querySelector("#login-status");
+
+function persistUserContext(userAccount) {
+  if (!userAccount) return;
+  localStorage.setItem("userRole", userAccount.role || "");
+  localStorage.setItem("organizationId", String(userAccount.organization_id || ""));
+}
+
+function routeByRole(role) {
+  if (role === "admin") {
+    window.location.href = "admin.html";
+    return;
+  }
+  window.location.href = "index.html";
+}
 
 async function redirectIfLoggedIn() {
   const supabase = await getSupabase();
@@ -9,7 +23,25 @@ async function redirectIfLoggedIn() {
     data: { session },
   } = await supabase.auth.getSession();
   if (session) {
-    window.location.href = "index.html";
+    // Load role + organization from database profile
+    try {
+      const { data: userAccount } = await supabase
+        .from("user_accounts")
+        .select("role, organization_id")
+        .eq("user_id", session.user.id)
+        .single();
+      
+      if (userAccount) {
+        persistUserContext(userAccount);
+        routeByRole(userAccount.role);
+      } else {
+        window.location.href = "index.html";
+      }
+    } catch (error) {
+      // user_accounts table doesn't exist - default to index
+      console.log("Could not check user role, defaulting to index");
+      window.location.href = "index.html";
+    }
   }
 }
 
@@ -23,7 +55,7 @@ if (loginForm) {
 
     try {
       const supabase = await getSupabase();
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -34,7 +66,15 @@ if (loginForm) {
       }
 
       statusEl.textContent = "Success! Redirecting...";
-      window.location.href = "index.html";
+
+      const { data: userAccount } = await supabase
+        .from("user_accounts")
+        .select("role, organization_id")
+        .eq("user_id", data.user.id)
+        .single();
+
+      persistUserContext(userAccount);
+      routeByRole(userAccount?.role);
     } catch (error) {
       statusEl.textContent =
         error?.message?.includes("Failed to fetch")

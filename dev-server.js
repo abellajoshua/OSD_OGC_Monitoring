@@ -8,6 +8,9 @@ const configHandler = require("./api/config");
 const minorHandler = require("./api/minor-offenses/index");
 const minorByIdHandler = require("./api/minor-offenses/[id]");
 const minorArchiveHandler = require("./api/minor-offenses/archive");
+const majorHandler = require("./api/major-offenses/index");
+const majorByIdHandler = require("./api/major-offenses/[id]");
+const majorArchiveHandler = require("./api/major-offenses/archive");
 const uniformHandler = require("./api/non-wearing-uniform/index");
 const uniformByIdHandler = require("./api/non-wearing-uniform/[id]");
 const uniformArchiveHandler = require("./api/non-wearing-uniform/archive");
@@ -17,6 +20,14 @@ const gatepassArchiveHandler = require("./api/gatepass/archive");
 const goodMoralHandler = require("./api/good-moral/index");
 const goodMoralByIdHandler = require("./api/good-moral/[id]");
 const goodMoralArchiveHandler = require("./api/good-moral/archive");
+const idReplacementHandler = require("./api/id-replacement/index");
+const idReplacementByIdHandler = require("./api/id-replacement/[id]");
+const idReplacementArchiveHandler = require("./api/id-replacement/archive");
+const leaveOfAbsenceHandler = require("./api/leave-of-absence/index");
+const leaveOfAbsenceByIdHandler = require("./api/leave-of-absence/[id]");
+const leaveOfAbsenceArchiveHandler = require("./api/leave-of-absence/archive");
+const createUserHandler = require("./api/admin/create-user");
+const deleteUserHandler = require("./api/admin/delete-user");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -58,6 +69,30 @@ app.all("/api/good-moral/:id", (req, res) => {
   req.query = { ...req.query, id: req.params.id };
   return goodMoralByIdHandler(req, res);
 });
+
+app.all("/api/major-offenses", (req, res) => majorHandler(req, res));
+app.all("/api/major-offenses/archive", (req, res) => majorArchiveHandler(req, res));
+app.all("/api/major-offenses/:id", (req, res) => {
+  req.query = { ...req.query, id: req.params.id };
+  return majorByIdHandler(req, res);
+});
+
+app.all("/api/id-replacement", (req, res) => idReplacementHandler(req, res));
+app.all("/api/id-replacement/archive", (req, res) => idReplacementArchiveHandler(req, res));
+app.all("/api/id-replacement/:id", (req, res) => {
+  req.query = { ...req.query, id: req.params.id };
+  return idReplacementByIdHandler(req, res);
+});
+
+app.all("/api/leave-of-absence", (req, res) => leaveOfAbsenceHandler(req, res));
+app.all("/api/leave-of-absence/archive", (req, res) => leaveOfAbsenceArchiveHandler(req, res));
+app.all("/api/leave-of-absence/:id", (req, res) => {
+  req.query = { ...req.query, id: req.params.id };
+  return leaveOfAbsenceByIdHandler(req, res);
+});
+
+app.all("/api/admin/create-user", (req, res) => createUserHandler(req, res));
+app.all("/api/admin/delete-user", (req, res) => deleteUserHandler(req, res));
 
 app.listen(PORT, () => {
   console.log(`OSD/OGC Monitoring server running on http://localhost:${PORT}`);
