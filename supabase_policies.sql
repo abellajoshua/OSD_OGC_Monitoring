@@ -36,8 +36,36 @@ as $$
 	limit 1;
 $$;
 
+create or replace function public.current_user_organization_name()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+	select o.name
+	from public.user_accounts ua
+	left join public.organizations o on o.id = ua.organization_id
+	where ua.user_id = auth.uid()
+	limit 1;
+$$;
+
+create or replace function public.can_access_all_organizations()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+	select
+		public.current_user_role() = 'head'
+		and lower(coalesce(public.current_user_organization_name(), '')) = 'alangilan';
+$$;
+
 grant execute on function public.current_user_organization_id() to authenticated;
 grant execute on function public.current_user_role() to authenticated;
+grant execute on function public.current_user_organization_name() to authenticated;
+grant execute on function public.can_access_all_organizations() to authenticated;
 
 alter table public.organizations enable row level security;
 alter table public.minor_offenses enable row level security;
@@ -109,7 +137,10 @@ create policy minor_offenses_select_same_org
 on public.minor_offenses
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+	public.can_access_all_organizations()
+	or organization_id = public.current_user_organization_id()
+);
 
 drop policy if exists minor_offenses_modify_coordinator_only on public.minor_offenses;
 create policy minor_offenses_modify_coordinator_only
@@ -130,7 +161,10 @@ create policy major_offenses_select_same_org
 on public.major_offenses
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+	public.can_access_all_organizations()
+	or organization_id = public.current_user_organization_id()
+);
 
 drop policy if exists major_offenses_modify_coordinator_only on public.major_offenses;
 create policy major_offenses_modify_coordinator_only
@@ -151,7 +185,10 @@ create policy non_wearing_uniform_select_same_org
 on public.non_wearing_uniform
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+	public.can_access_all_organizations()
+	or organization_id = public.current_user_organization_id()
+);
 
 drop policy if exists non_wearing_uniform_modify_coordinator_only on public.non_wearing_uniform;
 create policy non_wearing_uniform_modify_coordinator_only
@@ -172,7 +209,10 @@ create policy gatepass_select_same_org
 on public.gatepass
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+	public.can_access_all_organizations()
+	or organization_id = public.current_user_organization_id()
+);
 
 drop policy if exists gatepass_modify_coordinator_only on public.gatepass;
 create policy gatepass_modify_coordinator_only
@@ -193,7 +233,10 @@ create policy good_moral_select_same_org
 on public.good_moral
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+	public.can_access_all_organizations()
+	or organization_id = public.current_user_organization_id()
+);
 
 drop policy if exists good_moral_modify_coordinator_only on public.good_moral;
 create policy good_moral_modify_coordinator_only
@@ -214,7 +257,10 @@ create policy id_replacement_select_same_org
 on public.id_replacement
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+	public.can_access_all_organizations()
+	or organization_id = public.current_user_organization_id()
+);
 
 drop policy if exists id_replacement_modify_coordinator_only on public.id_replacement;
 create policy id_replacement_modify_coordinator_only
@@ -235,7 +281,10 @@ create policy leave_of_absence_select_same_org
 on public.leave_of_absence
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+	public.can_access_all_organizations()
+	or organization_id = public.current_user_organization_id()
+);
 
 drop policy if exists leave_of_absence_modify_coordinator_only on public.leave_of_absence;
 create policy leave_of_absence_modify_coordinator_only

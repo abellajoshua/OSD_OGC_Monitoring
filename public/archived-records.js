@@ -38,10 +38,60 @@ document.getElementById("logout-btn")?.addEventListener("click", async () => {
 
 // Load archived records on page load
 document.addEventListener("DOMContentLoaded", () => {
-  loadArchivedRecords("minor");
+  enforceArchivePageAccess()
+    .then((allowed) => {
+      if (!allowed) return;
+      loadArchivedRecords("minor");
+    })
+    .catch(() => {
+      window.location.href = "login.html";
+    });
 });
 
 let currentOrganizationId = null;
+let currentUserRole = localStorage.getItem("userRole") || "";
+
+const ROLE_COORDINATOR = "coordinator";
+
+function canManageArchivedRecords() {
+  return currentUserRole === ROLE_COORDINATOR;
+}
+
+async function enforceArchivePageAccess() {
+  const supabase = await getSupabase();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    window.location.href = "login.html";
+    return false;
+  }
+
+  const { data: account } = await supabase
+    .from("user_accounts")
+    .select("role, organization_id")
+    .eq("user_id", session.user.id)
+    .single();
+
+  currentUserRole = account?.role || currentUserRole;
+  if (currentUserRole) {
+    localStorage.setItem("userRole", currentUserRole);
+  }
+
+  currentOrganizationId = account?.organization_id || null;
+  if (currentOrganizationId) {
+    localStorage.setItem("organizationId", String(currentOrganizationId));
+  }
+
+  if (!canManageArchivedRecords()) {
+    alert("Access denied. Archived records management is limited to coordinators.");
+    window.location.href = "index.html";
+    return false;
+  }
+
+  return true;
+}
 
 async function getCurrentOrganizationId() {
   if (currentOrganizationId) return currentOrganizationId;
@@ -83,6 +133,10 @@ async function fetchArchivedRows(table) {
 
 // Restore a record (set archived = false)
 async function restoreRow(table, id) {
+  if (!canManageArchivedRecords()) {
+    alert("Read-only access: Head users cannot manage archived records.");
+    return;
+  }
   if (!confirm("Restore this record to active records?")) return;
 
   try {
@@ -111,6 +165,10 @@ async function restoreRow(table, id) {
 
 // Permanently delete a record
 async function permanentlyDeleteRow(table, id) {
+  if (!canManageArchivedRecords()) {
+    alert("Read-only access: Head users cannot manage archived records.");
+    return;
+  }
   if (!confirm("⚠️ PERMANENTLY DELETE this record?\n\nThis action CANNOT be undone!")) {
     return;
   }

@@ -56,6 +56,8 @@ const kpiGoodmoralFlagged = document.querySelector("[data-kpi='goodmoral-flagged
 const academicYearInput = document.querySelector("#academic-year-input");
 const semesterSelect = document.querySelector("#semester-select");
 const academicPeriodDisplay = document.querySelector("#academic-period-display");
+const headOrgFilterGroup = document.querySelector("#head-org-filter-group");
+const headOrgFilterSelect = document.querySelector("#head-organization-filter");
 
 const minorFilter = document.querySelector("[data-filter-scope='minor']");
 const majorFilter = document.querySelector("[data-filter-scope='major']");
@@ -74,6 +76,9 @@ let idreplacementRecords = [];
 let leaveofabsenceRecords = [];
 let currentOrganizationId = null;
 let currentUserRole = localStorage.getItem("userRole") || "";
+let selectedHeadOrganizationId = null;
+let headFilterInitialized = false;
+let hasGlobalHeadAccess = false;
 
 const ROLE_ADMIN = "admin";
 const ROLE_HEAD = "head";
@@ -81,6 +86,14 @@ const ROLE_COORDINATOR = "coordinator";
 
 function canEditRecords() {
   return currentUserRole === ROLE_COORDINATOR;
+}
+
+function isHeadRole() {
+  return currentUserRole === ROLE_HEAD;
+}
+
+function canAccessAllOrganizations() {
+  return isHeadRole() && hasGlobalHeadAccess;
 }
 
 function ensureCoordinatorAccess() {
@@ -123,6 +136,31 @@ function applyReadOnlyMode() {
     });
 }
 
+function applyHeadInterfaceRestrictions() {
+  applyReadOnlyMode();
+
+  document.querySelectorAll(".record-form").forEach((form) => form.remove());
+  document.querySelectorAll("[data-archive]").forEach((button) => button.remove());
+
+  const archivedRecordsNavLink = document.querySelector('a[href="archived-records.html"]');
+  if (archivedRecordsNavLink) {
+    archivedRecordsNavLink.remove();
+  }
+
+  const archiveCenterButton = document.querySelector(".cards article:nth-child(2) .link");
+  if (archiveCenterButton) {
+    const archiveCard = archiveCenterButton.closest("article");
+    if (archiveCard) {
+      archiveCard.remove();
+    }
+  }
+
+  const brandTitle = document.querySelector(".brand-title");
+  if (brandTitle) {
+    brandTitle.textContent = "OSD & OGC Monitoring - Head (View Only)";
+  }
+}
+
 async function getCurrentOrganizationId() {
   if (currentOrganizationId) return currentOrganizationId;
   const cached = localStorage.getItem("organizationId");
@@ -139,11 +177,14 @@ async function getCurrentOrganizationId() {
 
   const { data: account } = await supabase
     .from("user_accounts")
-    .select("role, organization_id")
+    .select("role, organization_id, organizations(name)")
     .eq("user_id", session.user.id)
     .single();
 
-  currentUserRole = account?.role || currentUserRole;
+  currentUserRole = String(account?.role || currentUserRole || "").trim().toLowerCase();
+  hasGlobalHeadAccess =
+    String(account?.role || "").trim().toLowerCase() === ROLE_HEAD &&
+    String(account?.organizations?.name || "").trim().toLowerCase() === "alangilan";
   if (currentUserRole) {
     localStorage.setItem("userRole", currentUserRole);
   }
@@ -153,6 +194,77 @@ async function getCurrentOrganizationId() {
     localStorage.setItem("organizationId", String(currentOrganizationId));
   }
   return currentOrganizationId;
+}
+
+async function getScopedReadOrganizationId() {
+  if (canAccessAllOrganizations()) {
+    return selectedHeadOrganizationId || null;
+  }
+  return getCurrentOrganizationId();
+}
+
+async function initializeHeadOrganizationFilter() {
+  if (!canAccessAllOrganizations() || !headOrgFilterGroup || !headOrgFilterSelect) {
+    if (headOrgFilterGroup) {
+      headOrgFilterGroup.style.display = "none";
+    }
+    return;
+  }
+
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id, name, type")
+    .order("type", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("Failed to load organizations for Head filter:", error);
+    return;
+  }
+
+  const organizations = data || [];
+  if (!organizations.length) return;
+
+  const visibleOrganizations = organizations.filter(
+    (org) => String(org.name || "").trim().toLowerCase() !== "alangilan"
+  );
+
+  headOrgFilterSelect.innerHTML = [
+    '<option value="">All Campuses and Colleges</option>',
+    ...visibleOrganizations.map((org) => `<option value="${org.id}">${org.name} (${org.type})</option>`),
+  ].join("");
+
+  const storedSelectionRaw = localStorage.getItem("headOrganizationFilterId");
+  const storedSelection = Number(storedSelectionRaw || "");
+  if (storedSelectionRaw && !Number.isNaN(storedSelection)) {
+    const exists = visibleOrganizations.some((org) => Number(org.id) === storedSelection);
+    selectedHeadOrganizationId = exists ? storedSelection : null;
+  } else {
+    selectedHeadOrganizationId = null;
+  }
+
+  if (selectedHeadOrganizationId) {
+    localStorage.setItem("headOrganizationFilterId", String(selectedHeadOrganizationId));
+    headOrgFilterSelect.value = String(selectedHeadOrganizationId);
+  } else {
+    localStorage.removeItem("headOrganizationFilterId");
+    headOrgFilterSelect.value = "";
+  }
+  headOrgFilterGroup.style.display = "";
+
+  if (!headFilterInitialized) {
+    headOrgFilterSelect.addEventListener("change", async () => {
+      selectedHeadOrganizationId = Number(headOrgFilterSelect.value) || null;
+      if (selectedHeadOrganizationId) {
+        localStorage.setItem("headOrganizationFilterId", String(selectedHeadOrganizationId));
+      } else {
+        localStorage.removeItem("headOrganizationFilterId");
+      }
+      await reloadAllDataForCurrentScope();
+    });
+    headFilterInitialized = true;
+  }
 }
 
 function buildCsv(headers, rows) {
@@ -180,7 +292,7 @@ function downloadCsv(fileName, csvContent) {
 async function fetchTableRows(table, dateColumn) {
   const supabase = await getSupabase();
   const primaryOrderColumn = dateColumn || "id";
-  const orgId = await getCurrentOrganizationId();
+  const orgId = await getScopedReadOrganizationId();
   
   // Try with archived filter first
   let query = supabase.from(table).select("*").eq("archived", false);
@@ -1532,6 +1644,17 @@ async function loadLeaveofabsenceRecords() {
   }
 }
 
+async function reloadAllDataForCurrentScope() {
+  await loadRecords();
+  await loadMajorRecords();
+  await loadUniformRecords();
+  await loadGatepassRecords();
+  await loadGoodmoralRecords();
+  await loadIdreplacementRecords();
+  await loadLeaveofabsenceRecords();
+  await loadDashboard();
+}
+
 navButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const targetTab = button.dataset.tab;
@@ -1819,14 +1942,7 @@ document.querySelectorAll("[data-archive]").forEach((button) => {
   });
 });
 
-loadRecords();
-loadMajorRecords();
-loadUniformRecords();
-loadGatepassRecords();
-loadGoodmoralRecords();
-loadIdreplacementRecords();
-loadLeaveofabsenceRecords();
-loadDashboard();
+reloadAllDataForCurrentScope();
 updateDashboardCounters();
 initializeAcademicPeriod();
 
@@ -1947,14 +2063,18 @@ attachCancelEdit(leaveofabsenceForm);
   try {
     const { data: userAccount } = await supabase
       .from("user_accounts")
-      .select("role, organization_id")
+      .select("role, organization_id, organizations(name)")
       .eq("user_id", session.user.id)
       .single();
 
     if (userAccount?.role) {
-      currentUserRole = userAccount.role;
-      localStorage.setItem("userRole", userAccount.role);
+      currentUserRole = String(userAccount.role || "").trim().toLowerCase();
+      localStorage.setItem("userRole", currentUserRole);
     }
+
+    hasGlobalHeadAccess =
+      String(userAccount?.role || "").trim().toLowerCase() === ROLE_HEAD &&
+      String(userAccount?.organizations?.name || "").trim().toLowerCase() === "alangilan";
     
     if (userAccount && userAccount.organization_id) {
       localStorage.setItem("organizationId", String(userAccount.organization_id));
@@ -1968,7 +2088,9 @@ attachCancelEdit(leaveofabsenceForm);
     }
 
     if (userAccount && userAccount.role === ROLE_HEAD) {
-      applyReadOnlyMode();
+      applyHeadInterfaceRestrictions();
+      await initializeHeadOrganizationFilter();
+      await reloadAllDataForCurrentScope();
     }
   } catch (error) {
     // user_accounts table doesn't exist or RLS blocking - ignore and continue

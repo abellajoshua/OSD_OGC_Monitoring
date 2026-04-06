@@ -279,6 +279,11 @@ create unique index user_accounts_single_admin_idx
   on public.user_accounts ((role))
   where role = 'admin';
 
+drop index if exists public.user_accounts_single_head_idx;
+create unique index user_accounts_single_head_idx
+  on public.user_accounts ((role))
+  where role = 'head';
+
 -- ============================================================================
 -- REMOVE OLD PUBLIC DATA (RESET)
 -- ============================================================================
@@ -306,6 +311,7 @@ values
   ('COE', 'college'),
   ('CET', 'college'),
   ('CAFAD', 'college'),
+  ('Alangilan', 'campus'),
   ('Mabini', 'campus'),
   ('Balayan', 'campus'),
   ('Lobo', 'campus');
@@ -320,14 +326,8 @@ alter table public.user_accounts alter column organization_id drop not null;
 
 -- Single Admin account (account management page)
 -- admin@example.com
--- Head accounts (read/export only, same page as coordinator)
--- cics.head@example.com
--- coe.head@example.com
--- cet.head@example.com
--- cafad.head@example.com
--- mabini.head@example.com
--- balayan.head@example.com
--- lobo.head@example.com
+-- Head account (single, view-only, Alangilan only)
+-- alangilan.head@example.com
 -- Coordinator accounts (one per org, can edit records):
 -- cics.coordinator@example.com
 -- coe.coordinator@example.com
@@ -351,13 +351,7 @@ begin
   for v_email, v_full_name, v_role, v_org_name in
     select * from (values
       ('admin@example.com', 'System Admin', 'admin', null),
-      ('cics.head@example.com', 'CICS Head', 'head', 'CICS'),
-      ('coe.head@example.com', 'COE Head', 'head', 'COE'),
-      ('cet.head@example.com', 'CET Head', 'head', 'CET'),
-      ('cafad.head@example.com', 'CAFAD Head', 'head', 'CAFAD'),
-      ('mabini.head@example.com', 'Mabini Head', 'head', 'Mabini'),
-      ('balayan.head@example.com', 'Balayan Head', 'head', 'Balayan'),
-      ('lobo.head@example.com', 'Lobo Head', 'head', 'Lobo'),
+      ('alangilan.head@example.com', 'Alangilan Head', 'head', 'Alangilan'),
       ('cics.coordinator@example.com', 'CICS Coordinator', 'coordinator', 'CICS'),
       ('coe.coordinator@example.com', 'COE Coordinator', 'coordinator', 'COE'),
       ('cet.coordinator@example.com', 'CET Coordinator', 'coordinator', 'CET'),
@@ -613,8 +607,36 @@ as $$
   limit 1;
 $$;
 
+create or replace function public.current_user_organization_name()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select o.name
+  from public.user_accounts ua
+  left join public.organizations o on o.id = ua.organization_id
+  where ua.user_id = auth.uid()
+  limit 1;
+$$;
+
+create or replace function public.can_access_all_organizations()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    public.current_user_role() = 'head'
+    and lower(coalesce(public.current_user_organization_name(), '')) = 'alangilan';
+$$;
+
 grant execute on function public.current_user_organization_id() to authenticated;
 grant execute on function public.current_user_role() to authenticated;
+grant execute on function public.current_user_organization_name() to authenticated;
+grant execute on function public.can_access_all_organizations() to authenticated;
 
 alter table public.organizations enable row level security;
 alter table public.user_accounts enable row level security;
@@ -703,7 +725,10 @@ create policy minor_offenses_select_same_org
 on public.minor_offenses
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+  public.can_access_all_organizations()
+  or organization_id = public.current_user_organization_id()
+);
 
 create policy minor_offenses_modify_coordinator_only
 on public.minor_offenses
@@ -722,7 +747,10 @@ create policy major_offenses_select_same_org
 on public.major_offenses
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+  public.can_access_all_organizations()
+  or organization_id = public.current_user_organization_id()
+);
 
 create policy major_offenses_modify_coordinator_only
 on public.major_offenses
@@ -741,7 +769,10 @@ create policy non_wearing_uniform_select_same_org
 on public.non_wearing_uniform
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+  public.can_access_all_organizations()
+  or organization_id = public.current_user_organization_id()
+);
 
 create policy non_wearing_uniform_modify_coordinator_only
 on public.non_wearing_uniform
@@ -760,7 +791,10 @@ create policy gatepass_select_same_org
 on public.gatepass
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+  public.can_access_all_organizations()
+  or organization_id = public.current_user_organization_id()
+);
 
 create policy gatepass_modify_coordinator_only
 on public.gatepass
@@ -779,7 +813,10 @@ create policy good_moral_select_same_org
 on public.good_moral
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+  public.can_access_all_organizations()
+  or organization_id = public.current_user_organization_id()
+);
 
 create policy good_moral_modify_coordinator_only
 on public.good_moral
@@ -798,7 +835,10 @@ create policy id_replacement_select_same_org
 on public.id_replacement
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+  public.can_access_all_organizations()
+  or organization_id = public.current_user_organization_id()
+);
 
 create policy id_replacement_modify_coordinator_only
 on public.id_replacement
@@ -817,7 +857,10 @@ create policy leave_of_absence_select_same_org
 on public.leave_of_absence
 for select
 to authenticated
-using (organization_id = public.current_user_organization_id());
+using (
+  public.can_access_all_organizations()
+  or organization_id = public.current_user_organization_id()
+);
 
 create policy leave_of_absence_modify_coordinator_only
 on public.leave_of_absence

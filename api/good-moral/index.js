@@ -2,6 +2,8 @@ const {
   getSupabaseClient,
   getPayload,
   getRequestUserContext,
+  getScopedOrganizationId,
+  applyOrganizationScope,
   ensureRole,
   getErrorStatus,
 } = require("../_supabase");
@@ -12,20 +14,21 @@ module.exports = async (req, res) => {
   try {
     const context = await getRequestUserContext(req);
     const supabase = getSupabaseClient();
+    const scopedOrganizationId = getScopedOrganizationId(req, context);
 
     if (req.method === "GET") {
-      const { data: goodMoral, error: goodError } = await supabase
+      let goodMoralQuery = supabase
         .from("good_moral")
         .select("*")
-        .eq("organization_id", context.organizationId)
         .order("date", { ascending: false })
         .order("id", { ascending: false });
+      goodMoralQuery = applyOrganizationScope(goodMoralQuery, scopedOrganizationId);
+      const { data: goodMoral, error: goodError } = await goodMoralQuery;
       if (goodError) return res.status(500).json({ error: goodError.message });
 
-      const { data: minorData, error: minorError } = await supabase
-        .from("minor_offenses")
-        .select("sr_code")
-        .eq("organization_id", context.organizationId);
+      let minorQuery = supabase.from("minor_offenses").select("sr_code");
+      minorQuery = applyOrganizationScope(minorQuery, scopedOrganizationId);
+      const { data: minorData, error: minorError } = await minorQuery;
       if (minorError) return res.status(500).json({ error: minorError.message });
 
       const codeSet = new Set((minorData || []).map((item) => String(item.sr_code || "").trim()));

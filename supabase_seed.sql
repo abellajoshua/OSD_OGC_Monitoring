@@ -13,6 +13,7 @@ values
   ('COE', 'college'),
   ('CET', 'college'),
   ('CAFAD', 'college'),
+  ('Alangilan', 'campus'),
   ('Mabini', 'campus'),
   ('Balayan', 'campus'),
   ('Lobo', 'campus')

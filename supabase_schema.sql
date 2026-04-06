@@ -148,6 +148,7 @@ values
   ('COE', 'college'),
   ('CET', 'college'),
   ('CAFAD', 'college'),
+  ('Alangilan', 'campus'),
   ('Mabini', 'campus'),
   ('Balayan', 'campus'),
   ('Lobo', 'campus')
@@ -177,6 +178,11 @@ drop index if exists public.user_accounts_single_admin_idx;
 create unique index user_accounts_single_admin_idx
   on public.user_accounts ((role))
   where role = 'admin';
+
+drop index if exists public.user_accounts_single_head_idx;
+create unique index user_accounts_single_head_idx
+  on public.user_accounts ((role))
+  where role = 'head';
 
 -- Backfill missing organization_id to CICS for existing records
 update public.user_accounts
