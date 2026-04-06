@@ -79,6 +79,7 @@
       <div class="offcanvas-body">
         <nav class="nav nav-sidebar">
           <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
+          <button class="nav-btn" data-tab="analytics">Analytics</button>
           <button class="nav-btn" data-tab="minor">Minor Offense</button>
           <button class="nav-btn" data-tab="major">Major Offense</button>
           <button class="nav-btn" data-tab="uniform">Non-Wearing Uniform</button>
@@ -209,9 +210,88 @@
           <article>
             <h3>Analytics & Reports</h3>
             <p>Generate summaries for semester reports, governing councils, and campus leadership.</p>
-            <button class="link">Build Report</button>
+            <button class="link" data-tab="analytics">Open Analytics</button>
           </article>
         </section>
+      </section>
+
+      <section id="analytics" class="tab">
+        <div class="analytics-shell">
+          <div class="analytics-banner">
+            <div class="analytics-banner-copy">
+              <p class="eyebrow">Analytics Module</p>
+              <h1>Monitoring Insights</h1>
+              <p class="lead">
+                Review record volume, workflow health, and activity trends across every logsheet in one place.
+              </p>
+            </div>
+            <div class="analytics-banner-ornament" aria-hidden="true"></div>
+          </div>
+
+          <div class="analytics-metrics-strip">
+            <div class="analytics-summary-card analytics-summary-card-primary">
+              <span>Total Records</span>
+              <strong id="analytics-total-records">0</strong>
+              <small>Across all active logs</small>
+            </div>
+            <div class="analytics-summary-card">
+              <span>Resolution Rate</span>
+              <strong id="analytics-resolution-rate">0%</strong>
+              <small>Closed or completed entries</small>
+            </div>
+            <div class="analytics-summary-card">
+              <span>Pending Actions</span>
+              <strong id="analytics-pending-actions">0</strong>
+              <small>Items awaiting closure</small>
+            </div>
+            <div class="analytics-summary-card analytics-summary-card-trend" id="analytics-trend-card">
+              <span>Trend Change</span>
+              <strong id="analytics-trend-change">0%</strong>
+              <small id="analytics-trend-label">No change vs prior 7 days</small>
+            </div>
+            <div class="analytics-summary-card">
+              <span>Top Module</span>
+              <strong id="analytics-top-module">--</strong>
+              <small>Highest record volume</small>
+            </div>
+          </div>
+
+          <section class="analytics-grid">
+            <article class="analytics-card analytics-card-wide analytics-card-highlight">
+              <div class="analytics-card-head">
+                <div>
+                  <p class="analytics-kicker">Workload</p>
+                  <h3>Records by Module</h3>
+                </div>
+                <span class="analytics-pill">Count + trend</span>
+              </div>
+              <div class="chart-slot" id="analytics-module-chart"></div>
+            </article>
+
+            <article class="analytics-card">
+              <div class="analytics-card-head">
+                <div>
+                  <p class="analytics-kicker">Trend</p>
+                  <h3>Last 14 Days Activity</h3>
+                </div>
+                <span class="analytics-pill" id="analytics-trend-pill">Last 14 Days</span>
+              </div>
+              <div class="chart-slot chart-slot-line" id="analytics-trend-chart"></div>
+            </article>
+
+            <article class="analytics-card">
+              <div class="analytics-card-head">
+                <div>
+                  <p class="analytics-kicker">Process Health</p>
+                  <h3>Open vs Completed</h3>
+                </div>
+                <span class="analytics-pill">Case status</span>
+              </div>
+              <div class="chart-slot chart-slot-donut" id="analytics-status-chart"></div>
+            </article>
+
+          </section>
+        </div>
       </section>
 
       <section id="minor" class="tab">

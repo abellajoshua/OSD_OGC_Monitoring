@@ -52,6 +52,17 @@ const kpiUniform = document.querySelector("[data-kpi='uniform']");
 const kpiGatepass = document.querySelector("[data-kpi='gatepass']");
 const kpiGoodmoral = document.querySelector("[data-kpi='goodmoral']");
 const kpiGoodmoralFlagged = document.querySelector("[data-kpi='goodmoral-flagged']");
+const analyticsTotalRecords = document.querySelector("#analytics-total-records");
+const analyticsResolutionRate = document.querySelector("#analytics-resolution-rate");
+const analyticsPendingActions = document.querySelector("#analytics-pending-actions");
+const analyticsTopModule = document.querySelector("#analytics-top-module");
+const analyticsTrendPill = document.querySelector("#analytics-trend-pill");
+const analyticsTrendCard = document.querySelector("#analytics-trend-card");
+const analyticsTrendChange = document.querySelector("#analytics-trend-change");
+const analyticsTrendLabel = document.querySelector("#analytics-trend-label");
+const analyticsModuleChart = document.querySelector("#analytics-module-chart");
+const analyticsTrendChart = document.querySelector("#analytics-trend-chart");
+const analyticsStatusChart = document.querySelector("#analytics-status-chart");
 
 const academicYearInput = document.querySelector("#academic-year-input");
 const semesterSelect = document.querySelector("#semester-select");
@@ -67,6 +78,16 @@ const goodmoralFilter = document.querySelector("[data-filter-scope='goodmoral']"
 const idreplacementFilter = document.querySelector("[data-filter-scope='idreplacement']");
 const leaveofabsenceFilter = document.querySelector("[data-filter-scope='leaveofabsence']");
 
+const ANALYTICS_MODULES = [
+  { key: "minor", label: "Minor Offense", color: "#a41321" },
+  { key: "major", label: "Major Offense", color: "#7b1f1f" },
+  { key: "uniform", label: "Non-Wearing Uniform", color: "#0f766e" },
+  { key: "gatepass", label: "Gatepass", color: "#2563eb" },
+  { key: "goodmoral", label: "Good Moral", color: "#d97706" },
+  { key: "idreplacement", label: "ID Replacement", color: "#475569" },
+  { key: "leaveofabsence", label: "Leave of Absence", color: "#ef4444" },
+];
+
 let minorRecords = [];
 let majorRecords = [];
 let uniformRecords = [];
@@ -79,6 +100,7 @@ let currentUserRole = localStorage.getItem("userRole") || "";
 let selectedHeadOrganizationId = null;
 let headFilterInitialized = false;
 let hasGlobalHeadAccess = false;
+let analyticsSummary = null;
 
 const ROLE_ADMIN = "admin";
 const ROLE_HEAD = "head";
@@ -364,6 +386,12 @@ function normalizeDateValue(record) {
   );
 }
 
+function escapeHtml(value) {
+  const element = document.createElement("div");
+  element.textContent = String(value ?? "");
+  return element.innerHTML;
+}
+
 function switchTab(targetId) {
   tabs.forEach((tab) => {
     tab.classList.toggle("active", tab.id === targetId);
@@ -388,6 +416,472 @@ function formatDate(value) {
     day: "2-digit",
     year: "numeric",
   });
+}
+
+function isRecordCompleted(moduleKey, record) {
+  if (moduleKey === "minor" || moduleKey === "major") {
+    return Boolean(String(record.sanction || "").trim() && String(record.date_of_suspension || "").trim());
+  }
+
+  return Boolean(String(record.time_out || "").trim());
+}
+
+function getAnalyticsEntries() {
+  return [
+    ...minorRecords.map((record) => ({ moduleKey: "minor", label: "Minor Offense", record })),
+    ...majorRecords.map((record) => ({ moduleKey: "major", label: "Major Offense", record })),
+    ...uniformRecords.map((record) => ({ moduleKey: "uniform", label: "Non-Wearing Uniform", record })),
+    ...gatepassRecords.map((record) => ({ moduleKey: "gatepass", label: "Gatepass", record })),
+    ...goodmoralRecords.map((record) => ({ moduleKey: "goodmoral", label: "Good Moral", record })),
+    ...idreplacementRecords.map((record) => ({ moduleKey: "idreplacement", label: "ID Replacement", record })),
+    ...leaveofabsenceRecords.map((record) => ({ moduleKey: "leaveofabsence", label: "Leave of Absence", record })),
+  ].map((entry) => ({
+    ...entry,
+    date: normalizeDateValue(entry.record),
+    completed: isRecordCompleted(entry.moduleKey, entry.record),
+  }));
+}
+
+function getAnalyticsModuleRows() {
+  return ANALYTICS_MODULES.map((module) => {
+    const records =
+      module.key === "minor"
+        ? minorRecords
+        : module.key === "major"
+          ? majorRecords
+          : module.key === "uniform"
+            ? uniformRecords
+            : module.key === "gatepass"
+              ? gatepassRecords
+              : module.key === "goodmoral"
+                ? goodmoralRecords
+                : module.key === "idreplacement"
+                  ? idreplacementRecords
+                  : leaveofabsenceRecords;
+    const completed = records.filter((record) => isRecordCompleted(module.key, record)).length;
+
+    return {
+      ...module,
+      count: records.length,
+      completed,
+      pending: Math.max(records.length - completed, 0),
+    };
+  });
+}
+
+function getModuleRecords(moduleKey) {
+  if (moduleKey === "minor") return minorRecords;
+  if (moduleKey === "major") return majorRecords;
+  if (moduleKey === "uniform") return uniformRecords;
+  if (moduleKey === "gatepass") return gatepassRecords;
+  if (moduleKey === "goodmoral") return goodmoralRecords;
+  if (moduleKey === "idreplacement") return idreplacementRecords;
+  return leaveofabsenceRecords;
+}
+
+function getModuleTrendStats(records, moduleKey) {
+  const today = new Date();
+  const currentStart = getDaysAgo(today, 6);
+  const currentEnd = new Date(today);
+  currentEnd.setHours(23, 59, 59, 999);
+  const previousStart = getDaysAgo(today, 13);
+  const previousEnd = getDaysAgo(today, 6);
+  const datedRecords = records
+    .map((record) => ({ record, date: moduleKey === "minor" || moduleKey === "major" ? record.date_of_complaint : record.date }))
+    .filter((entry) => toSafeDate(entry.date));
+
+  const currentCount = datedRecords.filter((entry) => {
+    const date = toSafeDate(entry.date);
+    return date && date >= currentStart && date <= currentEnd;
+  }).length;
+
+  const previousCount = datedRecords.filter((entry) => {
+    const date = toSafeDate(entry.date);
+    return date && date >= previousStart && date < previousEnd;
+  }).length;
+
+  let percent = 0;
+  if (!previousCount && currentCount) {
+    percent = 100;
+  } else if (previousCount) {
+    percent = Math.round(((currentCount - previousCount) / previousCount) * 100);
+  }
+
+  const direction = percent > 0 ? "up" : percent < 0 ? "down" : "neutral";
+
+  return {
+    currentCount,
+    previousCount,
+    percent,
+    direction,
+  };
+}
+
+function getDaysAgo(date, dayOffset) {
+  const clone = new Date(date);
+  clone.setHours(0, 0, 0, 0);
+  clone.setDate(clone.getDate() - dayOffset);
+  return clone;
+}
+
+function toSafeDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function buildTrendSeries(entries, dayCount = 14) {
+  const today = new Date();
+  const labels = [];
+  const points = [];
+
+  for (let dayOffset = dayCount - 1; dayOffset >= 0; dayOffset -= 1) {
+    const day = getDaysAgo(today, dayOffset);
+    const nextDay = new Date(day);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    const count = entries.filter((entry) => {
+      const entryDate = toSafeDate(entry.date);
+      return entryDate && entryDate >= day && entryDate < nextDay;
+    }).length;
+
+    labels.push(day.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
+    points.push(count);
+  }
+
+  return { labels, points };
+}
+
+function countEntriesBetween(entries, startDate, endDate) {
+  return entries.filter((entry) => {
+    const entryDate = toSafeDate(entry.date);
+    return entryDate && entryDate >= startDate && entryDate < endDate;
+  }).length;
+}
+
+function getTopOffense() {
+  const offenseCounts = new Map();
+
+  [...minorRecords, ...majorRecords].forEach((record) => {
+    const offense = String(record.offense || "").trim();
+    if (!offense) return;
+    offenseCounts.set(offense, (offenseCounts.get(offense) || 0) + 1);
+  });
+
+  const topOffense = [...offenseCounts.entries()].sort((left, right) => right[1] - left[1])[0];
+  if (!topOffense) return null;
+
+  return { name: topOffense[0], count: topOffense[1] };
+}
+
+function buildLocalAnalyticsSummary() {
+  const entries = getAnalyticsEntries();
+  const modules = getAnalyticsModuleRows();
+  const totalRecords = entries.length;
+  const completedRecords = entries.filter((entry) => entry.completed).length;
+  const pendingRecords = Math.max(totalRecords - completedRecords, 0);
+  const resolutionRate = totalRecords ? Math.round((completedRecords / totalRecords) * 100) : 0;
+  const topModule = [...modules].sort((left, right) => right.count - left.count)[0] || null;
+  const topOffense = getTopOffense();
+  const trendSeries = buildTrendSeries(entries, 14);
+  const recentStart = getDaysAgo(new Date(), 6);
+  const recentEnd = new Date();
+  recentEnd.setHours(23, 59, 59, 999);
+  const previousStart = getDaysAgo(new Date(), 13);
+  const previousEnd = getDaysAgo(new Date(), 6);
+  const recentCount = countEntriesBetween(entries, recentStart, recentEnd);
+  const previousCount = countEntriesBetween(entries, previousStart, previousEnd);
+  const changePercent = previousCount ? Math.round(((recentCount - previousCount) / previousCount) * 100) : recentCount ? 100 : 0;
+  const goodMoralFlags = goodmoralRecords.filter((record) => record.has_minor_offense).length;
+
+  return {
+    totals: {
+      totalRecords,
+      completedRecords,
+      pendingRecords,
+      resolutionRate,
+      goodMoralFlags,
+    },
+    modules,
+    status: {
+      completed: completedRecords,
+      pending: pendingRecords,
+    },
+    trend: {
+      labels: trendSeries.labels,
+      values: trendSeries.points,
+      recentCount,
+      previousCount,
+      changePercent,
+    },
+    insights: {
+      topModule: topModule ? { key: topModule.key, label: topModule.label, count: topModule.count } : null,
+      topOffense,
+      recentShare: totalRecords ? Math.round((recentCount / totalRecords) * 100) : 0,
+    },
+  };
+}
+
+function normalizeAnalyticsSummary(data) {
+  const modules = Array.isArray(data?.modules)
+    ? data.modules.map((module) => ({
+        key: String(module.key || ""),
+        label: String(module.label || ""),
+        color: String(module.color || "#a41321"),
+        count: Number(module.count || 0),
+        completed: Number(module.completed || 0),
+        pending: Number(module.pending || 0),
+      }))
+    : [];
+
+  return {
+    totals: {
+      totalRecords: Number(data?.totals?.totalRecords || 0),
+      completedRecords: Number(data?.totals?.completedRecords || 0),
+      pendingRecords: Number(data?.totals?.pendingRecords || 0),
+      resolutionRate: Number(data?.totals?.resolutionRate || 0),
+      goodMoralFlags: Number(data?.totals?.goodMoralFlags || 0),
+    },
+    modules,
+    status: {
+      completed: Number(data?.status?.completed || data?.totals?.completedRecords || 0),
+      pending: Number(data?.status?.pending || data?.totals?.pendingRecords || 0),
+    },
+    trend: {
+      labels: Array.isArray(data?.trend?.labels) ? data.trend.labels : [],
+      values: Array.isArray(data?.trend?.values) ? data.trend.values.map((value) => Number(value) || 0) : [],
+      recentCount: Number(data?.trend?.recentCount || 0),
+      previousCount: Number(data?.trend?.previousCount || 0),
+      changePercent: Number(data?.trend?.changePercent || 0),
+    },
+    insights: {
+      topModule: data?.insights?.topModule || null,
+      topOffense: data?.insights?.topOffense || null,
+      recentShare: Number(data?.insights?.recentShare || 0),
+    },
+  };
+}
+
+function getAnalyticsSummary() {
+  return analyticsSummary || buildLocalAnalyticsSummary();
+}
+
+function formatTrendChange(changePercent, recentCount, previousCount) {
+  if (!previousCount && !recentCount) {
+    return {
+      value: "0%",
+      label: "No change vs prior 7 days",
+      direction: "neutral",
+    };
+  }
+
+  if (!previousCount && recentCount) {
+    return {
+      value: "+100%",
+      label: "Increase vs prior 7 days",
+      direction: "up",
+    };
+  }
+
+  const direction = changePercent > 0 ? "up" : changePercent < 0 ? "down" : "neutral";
+  const label = direction === "up" ? "Increase vs prior 7 days" : direction === "down" ? "Decrease vs prior 7 days" : "No change vs prior 7 days";
+
+  return {
+    value: `${changePercent > 0 ? "+" : changePercent < 0 ? "" : ""}${changePercent}%`,
+    label,
+    direction,
+  };
+}
+
+function formatModuleChangeBadge(stats) {
+  const sign = stats.percent > 0 ? "+" : "";
+  const label = stats.direction === "up" ? "increase" : stats.direction === "down" ? "decrease" : "no change";
+  return {
+    value: `${sign}${stats.percent}%`,
+    label: `${label} vs prior 7 days`,
+    direction: stats.direction,
+  };
+}
+
+function renderAnalyticsBarList(container, rows) {
+  if (!container) return;
+
+  if (!rows.length) {
+    container.innerHTML = '<div class="analytics-chart-empty">No records available yet.</div>';
+    return;
+  }
+  
+  container.innerHTML = `
+    <div class="analytics-module-stack">
+      ${rows
+        .map((row) => {
+          const stats = getModuleTrendStats(getModuleRecords(row.key), row.key);
+          const changeBadge = formatModuleChangeBadge(stats);
+          return `
+            <section class="analytics-module-section ${changeBadge.direction}">
+              <div class="analytics-module-head">
+                <div>
+                  <p class="analytics-module-name">${escapeHtml(row.label)}</p>
+                  <div class="analytics-module-count">${row.count} records</div>
+                </div>
+                <div class="analytics-module-badge ${changeBadge.direction}">
+                  <strong>${changeBadge.value}</strong>
+                  <span>${changeBadge.label}</span>
+                </div>
+              </div>
+              <div class="analytics-module-meta">${row.completed} completed • ${row.pending} pending</div>
+            </section>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderAnalyticsTrendChart(container, labels, values) {
+  if (!container) return;
+
+  if (!values.length || values.every((value) => value === 0)) {
+    container.innerHTML = '<div class="analytics-chart-empty">No activity recorded in the selected window.</div>';
+    return;
+  }
+
+  const width = 760;
+  const height = 260;
+  const paddingX = 36;
+  const paddingY = 28;
+  const maxValue = Math.max(...values, 1);
+  const stepX = values.length > 1 ? (width - paddingX * 2) / (values.length - 1) : 0;
+  const plotHeight = height - paddingY * 2;
+  const points = values.map((value, index) => {
+    const x = paddingX + stepX * index;
+    const y = paddingY + plotHeight - (value / maxValue) * plotHeight;
+    return { x, y, value, label: labels[index] };
+  });
+  const linePath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+  const areaPath = `${linePath} L ${points[points.length - 1].x} ${height - paddingY} L ${points[0].x} ${height - paddingY} Z`;
+  const gridLines = [0.25, 0.5, 0.75, 1].map((ratio) => {
+    const y = paddingY + plotHeight * ratio;
+    const value = Math.round(maxValue * (1 - ratio));
+    return `
+      <line x1="${paddingX}" y1="${y}" x2="${width - paddingX}" y2="${y}" class="analytics-grid-line"></line>
+      <text x="14" y="${y + 4}" class="analytics-axis-label">${value}</text>
+    `;
+  });
+  const tickStep = Math.max(Math.ceil(points.length / 6), 1);
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" class="analytics-svg" role="img" aria-label="Last 14 days activity chart">
+      ${gridLines.join("")}
+      <path d="${areaPath}" class="analytics-area"></path>
+      <path d="${linePath}" class="analytics-line"></path>
+      ${points
+        .map(
+          (point, index) => `
+            <circle cx="${point.x}" cy="${point.y}" r="5" class="analytics-point"></circle>
+            ${
+              index % tickStep === 0 || index === points.length - 1
+                ? `<text x="${point.x}" y="${height - 8}" class="analytics-axis-label analytics-axis-label-x">${escapeHtml(point.label)}</text>`
+                : ""
+            }
+          `
+        )
+        .join("")}
+    </svg>
+  `;
+}
+
+function renderAnalyticsDonutChart(container, segments) {
+  if (!container) return;
+
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+  if (!total) {
+    container.innerHTML = '<div class="analytics-chart-empty">No status data available yet.</div>';
+    return;
+  }
+
+  const size = 240;
+  const radius = 78;
+  const strokeWidth = 24;
+  const circumference = 2 * Math.PI * radius;
+  let accumulated = 0;
+
+  const circles = segments
+    .filter((segment) => segment.value > 0)
+    .map((segment) => {
+      const dashLength = (segment.value / total) * circumference;
+      const circle = `
+        <circle
+          cx="${size / 2}"
+          cy="${size / 2}"
+          r="${radius}"
+          fill="none"
+          stroke="${segment.color}"
+          stroke-width="${strokeWidth}"
+          stroke-linecap="round"
+          stroke-dasharray="${dashLength} ${circumference - dashLength}"
+          stroke-dashoffset="${-accumulated}"
+          transform="rotate(-90 ${size / 2} ${size / 2})"
+        ></circle>
+      `;
+      accumulated += dashLength;
+      return circle;
+    });
+
+  container.innerHTML = `
+    <div class="analytics-donut-wrap">
+      <svg viewBox="0 0 ${size} ${size}" class="analytics-svg analytics-donut-svg" role="img" aria-label="Open versus completed chart">
+        <circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="none" stroke="rgba(15, 23, 42, 0.08)" stroke-width="${strokeWidth}"></circle>
+        ${circles.join("")}
+        <text x="${size / 2}" y="${size / 2 - 2}" class="analytics-donut-value">${total}</text>
+        <text x="${size / 2}" y="${size / 2 + 20}" class="analytics-donut-label">records</text>
+      </svg>
+      <div class="analytics-donut-legend">
+        ${segments
+          .map(
+            (segment) => `
+              <div class="analytics-legend-item">
+                <span class="analytics-legend-swatch" style="background: ${segment.color};"></span>
+                <span>${escapeHtml(segment.label)}</span>
+                <span>${segment.value}</span>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderAnalyticsModule(summary = null) {
+  const analytics = summary || getAnalyticsSummary();
+  const totalRecords = analytics.totals.totalRecords;
+  const completedRecords = analytics.totals.completedRecords;
+  const pendingRecords = analytics.totals.pendingRecords;
+  const resolutionRate = analytics.totals.resolutionRate;
+  const topModule = analytics.insights.topModule;
+  const trendChange = formatTrendChange(
+    analytics.trend.changePercent,
+    analytics.trend.recentCount,
+    analytics.trend.previousCount
+  );
+  if (analyticsTotalRecords) analyticsTotalRecords.textContent = String(totalRecords);
+  if (analyticsResolutionRate) analyticsResolutionRate.textContent = `${resolutionRate}%`;
+  if (analyticsPendingActions) analyticsPendingActions.textContent = String(pendingRecords);
+  if (analyticsTopModule) analyticsTopModule.textContent = topModule ? topModule.label : "--";
+  if (analyticsTrendPill) analyticsTrendPill.textContent = "Last 14 Days";
+  if (analyticsTrendChange) analyticsTrendChange.textContent = trendChange.value;
+  if (analyticsTrendLabel) analyticsTrendLabel.textContent = trendChange.label;
+  if (analyticsTrendCard) {
+    analyticsTrendCard.classList.remove("is-up", "is-down", "is-neutral");
+    analyticsTrendCard.classList.add(`is-${trendChange.direction}`);
+  }
+
+  renderAnalyticsBarList(analyticsModuleChart, analytics.modules);
+  renderAnalyticsTrendChart(analyticsTrendChart, analytics.trend.labels, analytics.trend.values);
+  renderAnalyticsDonutChart(analyticsStatusChart, [
+    { label: "Completed", value: completedRecords, color: "#0f766e" },
+    { label: "Pending", value: pendingRecords, color: "#a41321" },
+  ]);
 }
 
 function formatDashboardDetail(item) {
@@ -457,11 +951,11 @@ function renderDashboardActivity() {
   items.forEach((item) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${formatDate(item.date)}</td>
-      <td>${item.type}</td>
-      <td>${item.name}</td>
-      <td>${item.srCode}</td>
-      <td>${formatDashboardDetail(item)}</td>
+      <td>${escapeHtml(formatDate(item.date))}</td>
+      <td>${escapeHtml(item.type)}</td>
+      <td>${escapeHtml(item.name)}</td>
+      <td>${escapeHtml(item.srCode)}</td>
+      <td>${escapeHtml(formatDashboardDetail(item))}</td>
     `;
     dashboardActivityBody.appendChild(row);
   });
@@ -477,6 +971,7 @@ function updateDashboardCounters() {
     kpiGoodmoralFlagged.textContent = goodmoralRecords.filter((row) => row.has_minor_offense).length;
   }
   renderDashboardActivity();
+  renderAnalyticsModule();
   loadDashboard();
 }
 
@@ -1556,6 +2051,46 @@ function initializeAcademicPeriod() {
   updateAcademicPeriodDisplay();
 }
 
+async function loadAnalyticsSummary() {
+  try {
+    const supabase = await getSupabase();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      analyticsSummary = null;
+      renderAnalyticsModule();
+      return null;
+    }
+
+    const query = new URLSearchParams();
+    if (canAccessAllOrganizations() && selectedHeadOrganizationId) {
+      query.set("organization_id", String(selectedHeadOrganizationId));
+    }
+
+    const response = await fetch(`/api/analytics${query.toString() ? `?${query.toString()}` : ""}`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Analytics request failed (${response.status})`);
+    }
+
+    const data = await response.json();
+    analyticsSummary = normalizeAnalyticsSummary(data);
+    renderAnalyticsModule(analyticsSummary);
+    return analyticsSummary;
+  } catch (error) {
+    analyticsSummary = null;
+    renderAnalyticsModule();
+    return null;
+  }
+}
+
 async function loadDashboard() {
   const activeCases =
     minorRecords.length + majorRecords.length + uniformRecords.length + gatepassRecords.length + goodmoralRecords.length;
@@ -1652,6 +2187,7 @@ async function reloadAllDataForCurrentScope() {
   await loadGoodmoralRecords();
   await loadIdreplacementRecords();
   await loadLeaveofabsenceRecords();
+  await loadAnalyticsSummary();
   await loadDashboard();
 }
 
@@ -1706,8 +2242,7 @@ if (archiveButton) {
 
 if (reportButton) {
   reportButton.addEventListener("click", () => {
-    switchTab("minor");
-    openPrintView();
+    switchTab("analytics");
   });
 }
 
