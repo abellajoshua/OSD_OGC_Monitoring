@@ -7,18 +7,25 @@ const {
 } = require("./_supabase");
 
 const MODULES = [
-  { key: "minor", label: "Minor Offense", table: "minor_offenses", dateColumn: "date_of_complaint", color: "#a41321" },
-  { key: "major", label: "Major Offense", table: "major_offenses", dateColumn: "date_of_complaint", color: "#7b1f1f" },
-  { key: "uniform", label: "Non-Wearing Uniform", table: "non_wearing_uniform", dateColumn: "date", color: "#0f766e" },
-  { key: "gatepass", label: "Gatepass", table: "gatepass", dateColumn: "date", color: "#2563eb" },
-  { key: "goodmoral", label: "Good Moral", table: "good_moral", dateColumn: "date", color: "#d97706" },
-  { key: "idreplacement", label: "ID Replacement", table: "id_replacement", dateColumn: "date", color: "#475569" },
-  { key: "leaveofabsence", label: "Leave of Absence", table: "leave_of_absence", dateColumn: "date", color: "#ef4444" },
+  { key: "minor", label: "Minor Offense", table: "minor_offenses", dateColumn: "date_of_complaint", color: "#ca8a04" },
+  { key: "major", label: "Major Offense", table: "major_offenses", dateColumn: "date_of_complaint", color: "#ec4899" },
+  { key: "uniform", label: "Non-Wearing Uniform", table: "non_wearing_uniform", dateColumn: "date", color: "#0891b2" },
+  { key: "gatepass", label: "Gatepass", table: "gatepass", dateColumn: "date", color: "#0f766e" },
+  { key: "goodmoral", label: "Good Moral", table: "good_moral", dateColumn: "date", color: "#1d4ed8" },
+  { key: "idreplacement", label: "ID Replacement", table: "id_replacement", dateColumn: "date", color: "#64748b" },
+  { key: "leaveofabsence", label: "Leave of Absence", table: "leave_of_absence", dateColumn: "date", color: "#059669" },
 ];
 
 function normalizeDate(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function clampPercent(value) {
+  const numeric = Number(value) || 0;
+  if (numeric > 100) return 100;
+  if (numeric < -100) return -100;
+  return numeric;
 }
 
 function startOfDay(date) {
@@ -31,6 +38,66 @@ function shiftDays(date, days) {
   const clone = new Date(date);
   clone.setDate(clone.getDate() + days);
   return clone;
+}
+
+function toISODate(date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function normalizeSemesterLabel(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "";
+
+  if (raw === "first" || raw === "1st" || raw.includes("first")) {
+    return "First Semester";
+  }
+  if (raw === "second" || raw === "2nd" || raw.includes("second")) {
+    return "Second Semester";
+  }
+  if (raw === "summer" || raw.includes("summer")) {
+    return "Summer Class";
+  }
+
+  return "";
+}
+
+function getAcademicPeriodRange(query) {
+  const year = String(query?.academic_year || "").trim();
+  const semester = normalizeSemesterLabel(query?.semester);
+  const match = year.match(/^(\d{4})-(\d{4})$/);
+  if (!match || !semester) return null;
+
+  const startYear = Number(match[1]);
+  const endYear = Number(match[2]);
+  if (!Number.isInteger(startYear) || !Number.isInteger(endYear) || endYear !== startYear + 1) {
+    return null;
+  }
+
+  let startDate;
+  let endDate;
+
+  if (semester === "First Semester") {
+    startDate = new Date(startYear, 7, 1);
+    endDate = new Date(startYear, 11, 31);
+  } else if (semester === "Second Semester") {
+    startDate = new Date(endYear, 0, 1);
+    endDate = new Date(endYear, 4, 31);
+  } else if (semester === "Summer Class") {
+    startDate = new Date(endYear, 5, 1);
+    endDate = new Date(endYear, 7, 0);
+  } else {
+    return null;
+  }
+
+  return {
+    year,
+    semester,
+    startDate: toISODate(startDate),
+    endDate: toISODate(endDate),
+  };
 }
 
 function isCompleted(moduleKey, record) {
@@ -46,38 +113,62 @@ function getRecordDate(moduleKey, record) {
   return normalizeDate(value || record.created_at);
 }
 
-async function fetchModuleRows(supabase, module, organizationId) {
-  let query = supabase
-    .from(module.table)
-    .select([
-      "id",
-      module.dateColumn,
-      "created_at",
-      module.key === "minor" || module.key === "major" ? "offense" : "time_out",
-      module.key === "minor" || module.key === "major" ? "sanction" : "sr_code",
-      module.key === "minor" || module.key === "major" ? "date_of_suspension" : "",
-      "sr_code",
-    ].filter(Boolean).join(","));
+async function fetchModuleRows(supabase, module, organizationId, academicPeriod) {
+  const selectColumns = [
+    "id",
+    module.dateColumn,
+    "created_at",
+    module.key === "minor" || module.key === "major" ? "offense" : "time_out",
+    module.key === "minor" || module.key === "major" ? "sanction" : "sr_code",
+    module.key === "minor" || module.key === "major" ? "date_of_suspension" : "",
+    "sr_code",
+  ].filter(Boolean).join(",");
 
-  query = applyOrganizationScope(query, organizationId).eq("archived", false);
-  let { data, error } = await query;
+  const attempts = [
+    { useArchived: true, useAcademicColumns: true, useDateRange: false },
+    { useArchived: false, useAcademicColumns: true, useDateRange: false },
+    { useArchived: true, useAcademicColumns: false, useDateRange: true },
+    { useArchived: false, useAcademicColumns: false, useDateRange: true },
+  ];
 
-  if (error && String(error.message || "").toLowerCase().includes("archived")) {
-    query = supabase.from(module.table).select([
-      "id",
-      module.dateColumn,
-      "created_at",
-      module.key === "minor" || module.key === "major" ? "offense" : "time_out",
-      module.key === "minor" || module.key === "major" ? "sanction" : "sr_code",
-      module.key === "minor" || module.key === "major" ? "date_of_suspension" : "",
-      "sr_code",
-    ].filter(Boolean).join(","));
+  let lastError = null;
+
+  for (const attempt of attempts) {
+    let query = supabase.from(module.table).select(selectColumns);
     query = applyOrganizationScope(query, organizationId);
-    ({ data, error } = await query);
+
+    if (attempt.useArchived) {
+      query = query.eq("archived", false);
+    }
+
+    if (academicPeriod) {
+      if (attempt.useAcademicColumns) {
+        query = query.eq("academic_year", academicPeriod.year).eq("semester", academicPeriod.semester);
+      } else if (attempt.useDateRange) {
+        query = query.gte(module.dateColumn, academicPeriod.startDate).lte(module.dateColumn, academicPeriod.endDate);
+      }
+    }
+
+    const { data, error } = await query;
+
+    if (!error) {
+      return data || [];
+    }
+
+    lastError = error;
+    const message = String(error.message || "").toLowerCase();
+
+    if (attempt.useArchived && !message.includes("archived")) {
+      continue;
+    }
+
+    if (attempt.useAcademicColumns && !(message.includes("academic_year") || message.includes("semester"))) {
+      continue;
+    }
   }
 
-  if (error) throw error;
-  return data || [];
+  if (lastError) throw lastError;
+  return [];
 }
 
 function countEntriesBetween(entries, startDate, endDate) {
@@ -93,10 +184,11 @@ module.exports = async (req, res) => {
     const context = await getRequestUserContext(req);
     const supabase = getSupabaseClient();
     const scopedOrganizationId = getScopedOrganizationId(req, context);
+    const academicPeriod = getAcademicPeriodRange(req.query);
 
     const moduleRows = await Promise.all(
       MODULES.map(async (module) => {
-        const rows = await fetchModuleRows(supabase, module, scopedOrganizationId);
+        const rows = await fetchModuleRows(supabase, module, scopedOrganizationId, academicPeriod);
         const completed = rows.filter((record) => isCompleted(module.key, record)).length;
         return {
           ...module,
@@ -165,16 +257,18 @@ module.exports = async (req, res) => {
     const previousEnd = shiftDays(today, -6);
     const recentCount = countEntriesBetween(entries, recentStart, shiftDays(today, 1));
     const previousCount = countEntriesBetween(entries, previousStart, previousEnd);
-    const changePercent = previousCount
+    const changePercent = clampPercent(previousCount
       ? Math.round(((recentCount - previousCount) / previousCount) * 100)
       : recentCount
         ? 100
-        : 0;
+        : 0);
 
     return res.status(200).json({
       generatedAt: new Date().toISOString(),
       scope: {
         organizationId: scopedOrganizationId || null,
+        academicYear: academicPeriod?.year || null,
+        semester: academicPeriod?.semester || null,
       },
       totals: {
         totalRecords,

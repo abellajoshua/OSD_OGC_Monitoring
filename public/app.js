@@ -55,7 +55,9 @@ const kpiGoodmoralFlagged = document.querySelector("[data-kpi='goodmoral-flagged
 const analyticsTotalRecords = document.querySelector("#analytics-total-records");
 const analyticsResolutionRate = document.querySelector("#analytics-resolution-rate");
 const analyticsPendingActions = document.querySelector("#analytics-pending-actions");
-const analyticsTopModule = document.querySelector("#analytics-top-module");
+const analyticsRecentShare = document.querySelector("#analytics-recent-share");
+const analyticsGoodMoralFlags = document.querySelector("#analytics-goodmoral-flags");
+const analyticsModulePill = document.querySelector("#analytics-module-pill");
 const analyticsTrendPill = document.querySelector("#analytics-trend-pill");
 const analyticsTrendCard = document.querySelector("#analytics-trend-card");
 const analyticsTrendChange = document.querySelector("#analytics-trend-change");
@@ -63,6 +65,19 @@ const analyticsTrendLabel = document.querySelector("#analytics-trend-label");
 const analyticsModuleChart = document.querySelector("#analytics-module-chart");
 const analyticsTrendChart = document.querySelector("#analytics-trend-chart");
 const analyticsStatusChart = document.querySelector("#analytics-status-chart");
+const analyticsTopOffense = document.querySelector("#analytics-top-offense");
+const analyticsTopOffenseCount = document.querySelector("#analytics-top-offense-count");
+const analyticsBusiestDay = document.querySelector("#analytics-busiest-day");
+const analyticsBusiestDayCount = document.querySelector("#analytics-busiest-day-count");
+const analyticsAttentionModule = document.querySelector("#analytics-attention-module");
+const analyticsAttentionModuleCount = document.querySelector("#analytics-attention-module-count");
+const analyticsOpsNote = document.querySelector("#analytics-ops-note");
+const analyticsRefreshStamp = document.querySelector("#analytics-refresh-stamp");
+const analyticsInsightCards = document.querySelectorAll(".analytics-insight-card[data-insight]");
+const analyticsInsightModal = document.querySelector("#analytics-insight-modal");
+const analyticsInsightModalTitle = document.querySelector("#analytics-insight-modal-title");
+const analyticsInsightModalBody = document.querySelector("#analytics-insight-modal-body");
+let activeInsightContext = null;
 
 const academicYearInput = document.querySelector("#academic-year-input");
 const semesterSelect = document.querySelector("#semester-select");
@@ -79,14 +94,18 @@ const idreplacementFilter = document.querySelector("[data-filter-scope='idreplac
 const leaveofabsenceFilter = document.querySelector("[data-filter-scope='leaveofabsence']");
 
 const ANALYTICS_MODULES = [
-  { key: "minor", label: "Minor Offense", color: "#a41321" },
-  { key: "major", label: "Major Offense", color: "#7b1f1f" },
-  { key: "uniform", label: "Non-Wearing Uniform", color: "#0f766e" },
-  { key: "gatepass", label: "Gatepass", color: "#2563eb" },
-  { key: "goodmoral", label: "Good Moral", color: "#d97706" },
-  { key: "idreplacement", label: "ID Replacement", color: "#475569" },
-  { key: "leaveofabsence", label: "Leave of Absence", color: "#ef4444" },
+  { key: "minor", label: "Minor Offense", color: "#ca8a04" },
+  { key: "major", label: "Major Offense", color: "#ec4899" },
+  { key: "uniform", label: "Non-Wearing Uniform", color: "#0891b2" },
+  { key: "gatepass", label: "Gatepass", color: "#0f766e" },
+  { key: "goodmoral", label: "Good Moral", color: "#1d4ed8" },
+  { key: "idreplacement", label: "ID Replacement", color: "#64748b" },
+  { key: "leaveofabsence", label: "Leave of Absence", color: "#059669" },
 ];
+
+const ANALYTICS_MODULE_COLOR_MAP = Object.fromEntries(
+  ANALYTICS_MODULES.map((module) => [module.key, module.color])
+);
 
 let minorRecords = [];
 let majorRecords = [];
@@ -101,6 +120,7 @@ let selectedHeadOrganizationId = null;
 let headFilterInitialized = false;
 let hasGlobalHeadAccess = false;
 let analyticsSummary = null;
+const ACTIVE_TAB_STORAGE_KEY = "activeTab";
 
 const ROLE_ADMIN = "admin";
 const ROLE_HEAD = "head";
@@ -392,13 +412,38 @@ function escapeHtml(value) {
   return element.innerHTML;
 }
 
-function switchTab(targetId) {
+function hasTab(targetId) {
+  return [...tabs].some((tab) => tab.id === targetId);
+}
+
+function getPreferredTab() {
+  const storedTab = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+  if (storedTab && hasTab(storedTab)) {
+    return storedTab;
+  }
+
+  const currentActiveTab = [...tabs].find((tab) => tab.classList.contains("active"));
+  if (currentActiveTab) {
+    return currentActiveTab.id;
+  }
+
+  return "dashboard";
+}
+
+function switchTab(targetId, options = {}) {
+  const { persist = true } = options;
+  if (!hasTab(targetId)) return;
+
   tabs.forEach((tab) => {
     tab.classList.toggle("active", tab.id === targetId);
   });
   navButtons.forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.tab === targetId);
   });
+
+  if (persist) {
+    localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, targetId);
+  }
   
   // Show/hide back button based on active tab
   const backBtn = document.getElementById("back-to-dashboard-btn");
@@ -506,6 +551,7 @@ function getModuleTrendStats(records, moduleKey) {
   } else if (previousCount) {
     percent = Math.round(((currentCount - previousCount) / previousCount) * 100);
   }
+  percent = clampPercent(percent);
 
   const direction = percent > 0 ? "up" : percent < 0 ? "down" : "neutral";
 
@@ -529,6 +575,38 @@ function toSafeDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function clampPercent(value) {
+  const numeric = Number(value) || 0;
+  if (numeric > 100) return 100;
+  if (numeric < -100) return -100;
+  return numeric;
+}
+
+function getModuleColor(moduleKey) {
+  return ANALYTICS_MODULE_COLOR_MAP[moduleKey] || "#64748b";
+}
+
+function hexToRgba(hex, alpha) {
+  const normalized = String(hex || "").replace("#", "").trim();
+  const isShort = normalized.length === 3;
+  const isLong = normalized.length === 6;
+  if (!isShort && !isLong) return `rgba(100, 116, 139, ${alpha})`;
+
+  const parts = isShort
+    ? normalized.split("").map((char) => parseInt(char + char, 16))
+    : [
+        parseInt(normalized.slice(0, 2), 16),
+        parseInt(normalized.slice(2, 4), 16),
+        parseInt(normalized.slice(4, 6), 16),
+      ];
+
+  if (parts.some((value) => Number.isNaN(value))) {
+    return `rgba(100, 116, 139, ${alpha})`;
+  }
+
+  return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha})`;
+}
+
 function buildTrendSeries(entries, dayCount = 14) {
   const today = new Date();
   const labels = [];
@@ -549,6 +627,39 @@ function buildTrendSeries(entries, dayCount = 14) {
   }
 
   return { labels, points };
+}
+
+function buildModuleTrendSeries(dayCount = 14) {
+  const today = new Date();
+  const labels = [];
+  const series = ANALYTICS_MODULES.map((module) => ({
+    key: module.key,
+    label: module.label,
+    color: module.color,
+    values: [],
+  }));
+
+  for (let dayOffset = dayCount - 1; dayOffset >= 0; dayOffset -= 1) {
+    const day = getDaysAgo(today, dayOffset);
+    const nextDay = new Date(day);
+    nextDay.setDate(nextDay.getDate() + 1);
+    labels.push(day.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
+
+    series.forEach((moduleSeries) => {
+      const records = getModuleRecords(moduleSeries.key);
+      const count = records.filter((record) => {
+        const rawDate = moduleSeries.key === "minor" || moduleSeries.key === "major" ? record.date_of_complaint : record.date;
+        const recordDate = toSafeDate(rawDate || record.created_at);
+        return recordDate && recordDate >= day && recordDate < nextDay;
+      }).length;
+      moduleSeries.values.push(count);
+    });
+  }
+
+  return {
+    labels,
+    series,
+  };
 }
 
 function countEntriesBetween(entries, startDate, endDate) {
@@ -590,10 +701,13 @@ function buildLocalAnalyticsSummary() {
   const previousEnd = getDaysAgo(new Date(), 6);
   const recentCount = countEntriesBetween(entries, recentStart, recentEnd);
   const previousCount = countEntriesBetween(entries, previousStart, previousEnd);
-  const changePercent = previousCount ? Math.round(((recentCount - previousCount) / previousCount) * 100) : recentCount ? 100 : 0;
+  const changePercent = clampPercent(
+    previousCount ? Math.round(((recentCount - previousCount) / previousCount) * 100) : recentCount ? 100 : 0
+  );
   const goodMoralFlags = goodmoralRecords.filter((record) => record.has_minor_offense).length;
 
   return {
+    generatedAt: new Date().toISOString(),
     totals: {
       totalRecords,
       completedRecords,
@@ -626,7 +740,7 @@ function normalizeAnalyticsSummary(data) {
     ? data.modules.map((module) => ({
         key: String(module.key || ""),
         label: String(module.label || ""),
-        color: String(module.color || "#a41321"),
+        color: getModuleColor(String(module.key || "")),
         count: Number(module.count || 0),
         completed: Number(module.completed || 0),
         pending: Number(module.pending || 0),
@@ -634,6 +748,7 @@ function normalizeAnalyticsSummary(data) {
     : [];
 
   return {
+    generatedAt: data?.generatedAt ? String(data.generatedAt) : new Date().toISOString(),
     totals: {
       totalRecords: Number(data?.totals?.totalRecords || 0),
       completedRecords: Number(data?.totals?.completedRecords || 0),
@@ -651,7 +766,7 @@ function normalizeAnalyticsSummary(data) {
       values: Array.isArray(data?.trend?.values) ? data.trend.values.map((value) => Number(value) || 0) : [],
       recentCount: Number(data?.trend?.recentCount || 0),
       previousCount: Number(data?.trend?.previousCount || 0),
-      changePercent: Number(data?.trend?.changePercent || 0),
+      changePercent: clampPercent(data?.trend?.changePercent),
     },
     insights: {
       topModule: data?.insights?.topModule || null,
@@ -665,7 +780,279 @@ function getAnalyticsSummary() {
   return analyticsSummary || buildLocalAnalyticsSummary();
 }
 
+function getBusiestDay(trend) {
+  if (!trend?.values?.length || !trend?.labels?.length) return null;
+  let maxIndex = 0;
+  let maxValue = Number(trend.values[0] || 0);
+  trend.values.forEach((value, index) => {
+    const numericValue = Number(value || 0);
+    if (numericValue > maxValue) {
+      maxValue = numericValue;
+      maxIndex = index;
+    }
+  });
+  if (!maxValue) return null;
+  return {
+    label: trend.labels[maxIndex] || "--",
+    count: maxValue,
+  };
+}
+
+function getAttentionModule(modules) {
+  if (!Array.isArray(modules) || !modules.length) return null;
+  const module = [...modules].sort((left, right) => (right.pending || 0) - (left.pending || 0))[0];
+  if (!module || !module.pending) return null;
+  return module;
+}
+
+function getTopOffenseBreakdown(limit = 6) {
+  const offenseCounts = new Map();
+  [...minorRecords, ...majorRecords].forEach((record) => {
+    const offense = String(record.offense || "").trim();
+    if (!offense) return;
+    offenseCounts.set(offense, (offenseCounts.get(offense) || 0) + 1);
+  });
+
+  return [...offenseCounts.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, limit)
+    .map(([name, count]) => ({ name, count }));
+}
+
+function getOffenseRecords(offenseName, limit = 8) {
+  const normalized = String(offenseName || "").trim().toLowerCase();
+  if (!normalized) return [];
+
+  return [
+    ...minorRecords.map((record) => ({ module: "Minor Offense", record })),
+    ...majorRecords.map((record) => ({ module: "Major Offense", record })),
+  ]
+    .map(({ module, record }) => ({
+      module,
+      date: normalizeDateValue(record),
+      name: record.name_of_student || "",
+      srCode: record.sr_code || "",
+      offense: String(record.offense || "").trim(),
+      rawDate: normalizeDateValue(record),
+    }))
+    .filter((row) => String(row.offense || "").trim().toLowerCase() === normalized)
+    .sort((left, right) => {
+      const leftDate = toSafeDate(left.rawDate)?.getTime() || 0;
+      const rightDate = toSafeDate(right.rawDate)?.getTime() || 0;
+      return rightDate - leftDate;
+    })
+    .slice(0, limit);
+}
+
+function getBusiestDays(limit = 6) {
+  const summary = getAnalyticsSummary();
+  const labels = summary?.trend?.labels || [];
+  const values = summary?.trend?.values || [];
+  const rows = labels
+    .map((label, index) => ({ label, count: Number(values[index] || 0), index }))
+    .filter((row) => row.count > 0);
+
+  if (!rows.length) return [];
+
+  const busiestRow = rows.reduce((best, row) => (row.count > best.count ? row : best), rows[0]);
+  const remainingRows = rows
+    .filter((row) => row.index !== busiestRow.index)
+    .sort((left, right) => right.index - left.index);
+
+  return [busiestRow, ...remainingRows].slice(0, limit).map(({ label, count }) => ({ label, count }));
+}
+
+function getInsightModalPayload(insightKey) {
+  const analytics = getAnalyticsSummary();
+  if (insightKey === "top-offense") {
+    const rows = getTopOffenseBreakdown(8);
+    return {
+      title: "Top Offense Details",
+      items: rows,
+    };
+  }
+
+  if (insightKey === "busiest-day") {
+    const rows = getBusiestDays(8);
+    return {
+      title: "Busiest Day Breakdown",
+      items: rows.length
+        ? rows.map((row) => ({ label: row.label, value: `${row.count} records` }))
+        : [{ label: "No activity in selected window", value: "--" }],
+    };
+  }
+
+  if (insightKey === "attention-module") {
+    const rows = [...(analytics.modules || [])]
+      .sort((left, right) => (right.pending || 0) - (left.pending || 0))
+      .map((module) => ({
+        label: module.label,
+        value: `${module.pending} pending / ${module.count} total`,
+      }));
+
+    return {
+      title: "Attention Module Details",
+      items: rows.length ? rows : [{ label: "No modules available", value: "--" }],
+    };
+  }
+
+  const pending = analytics.totals?.pendingRecords || 0;
+  const resolution = analytics.totals?.resolutionRate || 0;
+  const recentShare = analytics.insights?.recentShare || 0;
+  const generatedAt = formatGeneratedAt(analytics.generatedAt);
+  return {
+    title: "Analyst Notes Details",
+    items: [
+      { label: "Pending Records", value: String(pending) },
+      { label: "Resolution Rate", value: `${resolution}%` },
+      { label: "Recent Activity Share", value: `${recentShare}%` },
+      { label: "Last Refresh", value: generatedAt.replace("Updated ", "") },
+    ],
+  };
+}
+
+function openInsightModal(insightKey) {
+  if (!analyticsInsightModal || !analyticsInsightModalTitle || !analyticsInsightModalBody) return;
+  const payload = getInsightModalPayload(insightKey);
+  activeInsightContext = insightKey;
+  analyticsInsightModalTitle.textContent = payload.title;
+  if (insightKey === "top-offense") {
+    const items = Array.isArray(payload.items) && payload.items.length
+      ? payload.items
+      : [{ name: "No offense records yet", count: 0 }];
+
+    const defaultOffense = items[0]?.name || "";
+    const renderTopOffenseView = (selectedOffense) => {
+      const selectedRecords = selectedOffense ? getOffenseRecords(selectedOffense, 10) : [];
+      const selectedCount = items.find((item) => item.name === selectedOffense)?.count || 0;
+      const selectedLabel = selectedOffense || defaultOffense || "Select an offense";
+
+      analyticsInsightModalBody.innerHTML = `
+        <div class="analytics-insight-drilldown">
+          <div class="analytics-insight-drill-list">
+            <div class="analytics-insight-drill-hint">Select an offense to view the matching records below.</div>
+            ${items
+              .map(
+                (item) => `
+                  <button type="button" class="analytics-insight-drill-item ${item.name === selectedOffense ? "is-active" : ""}" data-offense-row="${escapeHtml(item.name)}">
+                    <strong>${escapeHtml(item.name)}</strong>
+                    <span>${item.count} records</span>
+                  </button>
+                `
+              )
+              .join("")}
+          </div>
+          <div class="analytics-insight-records-panel">
+            <div class="analytics-insight-records-head">
+              <div>
+                <strong>${escapeHtml(selectedLabel)}</strong>
+                <span>${selectedCount} total related records</span>
+              </div>
+              <span class="analytics-insight-records-count">Latest first</span>
+            </div>
+            <div class="analytics-insight-records-list">
+              ${selectedRecords.length
+                ? selectedRecords
+                    .map(
+                      (record) => `
+                        <div class="analytics-insight-record-item">
+                          <div>
+                            <strong>${escapeHtml(record.name)}</strong>
+                            <span>${escapeHtml(record.module)} • ${escapeHtml(formatDate(record.date))}</span>
+                            <small>${escapeHtml(record.offense)}</small>
+                          </div>
+                          <small>${escapeHtml(record.srCode)}</small>
+                        </div>
+                      `
+                    )
+                    .join("")
+                : '<div class="analytics-insight-empty-state">Click an offense row to view matching records.</div>'}
+            </div>
+          </div>
+        </div>
+      `;
+    };
+
+    analyticsInsightModalBody.dataset.insightMode = "top-offense";
+    analyticsInsightModalBody.innerHTML = "";
+    renderTopOffenseView(defaultOffense);
+    analyticsInsightModalBody.dataset.selectedOffense = defaultOffense;
+    activeInsightContext = { type: "top-offense", render: renderTopOffenseView };
+  } else {
+    analyticsInsightModalBody.dataset.insightMode = insightKey;
+    analyticsInsightModalBody.innerHTML = payload.items
+      .map(
+        (item) => `
+          <div class="analytics-insight-modal-item">
+            <strong>${escapeHtml(item.label)}</strong>
+            <span>${escapeHtml(item.value)}</span>
+          </div>
+        `
+      )
+      .join("");
+  }
+  analyticsInsightModal.hidden = false;
+}
+
+function closeInsightModal() {
+  if (!analyticsInsightModal) return;
+  analyticsInsightModal.hidden = true;
+  activeInsightContext = null;
+}
+
+function initializeInsightModal() {
+  if (!analyticsInsightCards.length || !analyticsInsightModal) return;
+
+  analyticsInsightCards.forEach((card) => {
+    const insightKey = card.dataset.insight;
+    if (!insightKey) return;
+    card.addEventListener("click", () => openInsightModal(insightKey));
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openInsightModal(insightKey);
+    });
+  });
+
+  analyticsInsightModal.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest("[data-insight-modal-close='true']")) {
+      closeInsightModal();
+      return;
+    }
+
+    if (activeInsightContext && activeInsightContext.type === "top-offense") {
+      const offenseButton = target.closest("[data-offense-row]");
+      if (offenseButton) {
+        const offenseName = offenseButton.getAttribute("data-offense-row") || "";
+        activeInsightContext.render(offenseName);
+      }
+    }
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && analyticsInsightModal && !analyticsInsightModal.hidden) {
+      closeInsightModal();
+    }
+  });
+}
+
+function formatGeneratedAt(value) {
+  if (!value) return "Updated just now";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Updated just now";
+  return `Updated ${date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
+}
+
 function formatTrendChange(changePercent, recentCount, previousCount) {
+  const safeChangePercent = clampPercent(changePercent);
+
   if (!previousCount && !recentCount) {
     return {
       value: "0%",
@@ -682,17 +1069,33 @@ function formatTrendChange(changePercent, recentCount, previousCount) {
     };
   }
 
-  const direction = changePercent > 0 ? "up" : changePercent < 0 ? "down" : "neutral";
+  const direction = safeChangePercent > 0 ? "up" : safeChangePercent < 0 ? "down" : "neutral";
   const label = direction === "up" ? "Increase vs prior 7 days" : direction === "down" ? "Decrease vs prior 7 days" : "No change vs prior 7 days";
 
   return {
-    value: `${changePercent > 0 ? "+" : changePercent < 0 ? "" : ""}${changePercent}%`,
+    value: `${safeChangePercent > 0 ? "+" : safeChangePercent < 0 ? "" : ""}${safeChangePercent}%`,
     label,
     direction,
   };
 }
 
 function formatModuleChangeBadge(stats) {
+  if (!stats.previousCount && !stats.currentCount) {
+    return {
+      value: "0%",
+      label: "no activity",
+      direction: "neutral",
+    };
+  }
+
+  if (!stats.previousCount && stats.currentCount) {
+    return {
+      value: "+100%",
+      label: "new activity",
+      direction: "up",
+    };
+  }
+
   const sign = stats.percent > 0 ? "+" : "";
   const label = stats.direction === "up" ? "increase" : stats.direction === "down" ? "decrease" : "no change";
   return {
@@ -709,26 +1112,43 @@ function renderAnalyticsBarList(container, rows) {
     container.innerHTML = '<div class="analytics-chart-empty">No records available yet.</div>';
     return;
   }
-  
+
+  const sortedRows = [...rows].sort((left, right) => {
+    if (right.count !== left.count) return right.count - left.count;
+    return left.label.localeCompare(right.label);
+  });
+  const totalCount = sortedRows.reduce((sum, row) => sum + row.count, 0);
+  const maxCount = Math.max(...sortedRows.map((row) => row.count), 1);
+
   container.innerHTML = `
     <div class="analytics-module-stack">
-      ${rows
-        .map((row) => {
+      ${sortedRows
+        .map((row, index) => {
           const stats = getModuleTrendStats(getModuleRecords(row.key), row.key);
           const changeBadge = formatModuleChangeBadge(stats);
+          const moduleColor = getModuleColor(row.key);
+          const moduleSoftColor = hexToRgba(moduleColor, 0.12);
+          const moduleBorderColor = hexToRgba(moduleColor, 0.34);
+          const sharePercent = totalCount ? Math.round((row.count / totalCount) * 100) : 0;
+          const completionRate = row.count ? Math.round((row.completed / row.count) * 100) : 0;
+          const widthPercent = Math.max((row.count / maxCount) * 100, 8);
           return `
-            <section class="analytics-module-section ${changeBadge.direction}">
-              <div class="analytics-module-head">
-                <div>
-                  <p class="analytics-module-name">${escapeHtml(row.label)}</p>
-                  <div class="analytics-module-count">${row.count} records</div>
-                </div>
-                <div class="analytics-module-badge ${changeBadge.direction}">
+            <section class="analytics-module-tile ${changeBadge.direction}" style="--module-color:${escapeHtml(moduleColor)}; --module-soft-color:${escapeHtml(moduleSoftColor)}; --module-border-color:${escapeHtml(moduleBorderColor)};">
+              <div class="analytics-module-tile-head">
+                <p class="analytics-module-name"><span class="analytics-module-name-dot" style="background:${escapeHtml(moduleColor)};"></span>${index + 1}. ${escapeHtml(row.label)}</p>
+                <div class="analytics-module-badge ${changeBadge.direction}" title="${escapeHtml(changeBadge.label)}">
                   <strong>${changeBadge.value}</strong>
-                  <span>${changeBadge.label}</span>
                 </div>
               </div>
-              <div class="analytics-module-meta">${row.completed} completed • ${row.pending} pending</div>
+              <div class="analytics-module-count">${row.count} <span>records</span></div>
+              <div class="analytics-module-bar" aria-hidden="true">
+                <span style="width:${widthPercent}%;"></span>
+              </div>
+              <div class="analytics-module-meta">
+                <span>${row.pending} pending</span>
+                <span>${completionRate}% done</span>
+                <span>${sharePercent}% share</span>
+              </div>
             </section>
           `;
         })
@@ -737,56 +1157,77 @@ function renderAnalyticsBarList(container, rows) {
   `;
 }
 
-function renderAnalyticsTrendChart(container, labels, values) {
+function renderAnalyticsTrendChart(container, labels, seriesRows) {
   if (!container) return;
 
-  if (!values.length || values.every((value) => value === 0)) {
+  const activeSeries = (seriesRows || []).filter(
+    (series) => Array.isArray(series.values) && series.values.some((value) => value > 0)
+  );
+
+  if (!labels.length || !activeSeries.length) {
     container.innerHTML = '<div class="analytics-chart-empty">No activity recorded in the selected window.</div>';
     return;
   }
 
-  const width = 760;
-  const height = 260;
-  const paddingX = 36;
-  const paddingY = 28;
-  const maxValue = Math.max(...values, 1);
-  const stepX = values.length > 1 ? (width - paddingX * 2) / (values.length - 1) : 0;
-  const plotHeight = height - paddingY * 2;
-  const points = values.map((value, index) => {
-    const x = paddingX + stepX * index;
-    const y = paddingY + plotHeight - (value / maxValue) * plotHeight;
-    return { x, y, value, label: labels[index] };
+  const totalsByDay = labels.map((label, index) => {
+    const total = activeSeries.reduce((sum, series) => sum + Number(series.values[index] || 0), 0);
+    return { label, total, index };
   });
-  const linePath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
-  const areaPath = `${linePath} L ${points[points.length - 1].x} ${height - paddingY} L ${points[0].x} ${height - paddingY} Z`;
-  const gridLines = [0.25, 0.5, 0.75, 1].map((ratio) => {
-    const y = paddingY + plotHeight * ratio;
-    const value = Math.round(maxValue * (1 - ratio));
-    return `
-      <line x1="${paddingX}" y1="${y}" x2="${width - paddingX}" y2="${y}" class="analytics-grid-line"></line>
-      <text x="14" y="${y + 4}" class="analytics-axis-label">${value}</text>
-    `;
-  });
-  const tickStep = Math.max(Math.ceil(points.length / 6), 1);
+  const maxValue = Math.max(...totalsByDay.map((item) => item.total), 1);
+  const tickStep = Math.max(Math.ceil(labels.length / 6), 1);
+
+  const barsMarkup = totalsByDay
+    .map((item) => {
+      const detailRows = activeSeries
+        .filter((series) => Number(series.values[item.index] || 0) > 0)
+        .map(
+          (series) => `
+            <div class="analytics-trend-tooltip-row">
+              <span class="analytics-trend-legend-swatch" style="background:${series.color};"></span>
+              <span>${escapeHtml(series.label)}: ${series.values[item.index]} records</span>
+            </div>
+          `
+        );
+      const detailsHtml = detailRows.length
+        ? detailRows.join("")
+        : '<div class="analytics-trend-tooltip-row"><span>No module activity</span></div>';
+      return `
+        <div class="analytics-trend-bar-wrap">
+          <div class="analytics-trend-bar-track">
+            <div class="analytics-trend-bar-fill" style="height:${Math.max((item.total / maxValue) * 100, item.total ? 8 : 0)}%;">
+              <span class="analytics-trend-bar-value">${item.total}</span>
+              <div class="analytics-trend-bar-tooltip">
+                <strong>${escapeHtml(item.label)}: ${item.total} total</strong>
+                <div>${detailsHtml}</div>
+              </div>
+            </div>
+          </div>
+          ${item.index % tickStep === 0 || item.index === totalsByDay.length - 1
+            ? `<span class="analytics-trend-bar-label">${escapeHtml(item.label)}</span>`
+            : '<span class="analytics-trend-bar-label is-ghost">.</span>'}
+        </div>
+      `;
+    })
+    .join("");
 
   container.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" class="analytics-svg" role="img" aria-label="Last 14 days activity chart">
-      ${gridLines.join("")}
-      <path d="${areaPath}" class="analytics-area"></path>
-      <path d="${linePath}" class="analytics-line"></path>
-      ${points
-        .map(
-          (point, index) => `
-            <circle cx="${point.x}" cy="${point.y}" r="5" class="analytics-point"></circle>
-            ${
-              index % tickStep === 0 || index === points.length - 1
-                ? `<text x="${point.x}" y="${height - 8}" class="analytics-axis-label analytics-axis-label-x">${escapeHtml(point.label)}</text>`
-                : ""
-            }
-          `
-        )
-        .join("")}
-    </svg>
+    <div class="analytics-trend-wrap">
+      <div class="analytics-trend-bar-chart" role="img" aria-label="Last 14 days activity bar chart">
+        ${barsMarkup}
+      </div>
+      <div class="analytics-trend-legend" aria-label="Trend legend">
+        ${activeSeries
+          .map(
+            (series) => `
+              <div class="analytics-trend-legend-item">
+                <span class="analytics-trend-legend-swatch" style="background:${series.color};"></span>
+                <span>${escapeHtml(series.label)}</span>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
   `;
 }
 
@@ -799,9 +1240,9 @@ function renderAnalyticsDonutChart(container, segments) {
     return;
   }
 
-  const size = 240;
-  const radius = 78;
-  const strokeWidth = 24;
+  const size = 280;
+  const radius = 92;
+  const strokeWidth = 28;
   const circumference = 2 * Math.PI * radius;
   let accumulated = 0;
 
@@ -827,13 +1268,18 @@ function renderAnalyticsDonutChart(container, segments) {
       return circle;
     });
 
+  const completedSegment = segments.find((segment) => String(segment.label || "").toLowerCase() === "completed");
+  const completedValue = completedSegment ? completedSegment.value : 0;
+  const completedPercent = total ? Math.round((completedValue / total) * 100) : 0;
+
   container.innerHTML = `
     <div class="analytics-donut-wrap">
       <svg viewBox="0 0 ${size} ${size}" class="analytics-svg analytics-donut-svg" role="img" aria-label="Open versus completed chart">
         <circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="none" stroke="rgba(15, 23, 42, 0.08)" stroke-width="${strokeWidth}"></circle>
         ${circles.join("")}
-        <text x="${size / 2}" y="${size / 2 - 2}" class="analytics-donut-value">${total}</text>
-        <text x="${size / 2}" y="${size / 2 + 20}" class="analytics-donut-label">records</text>
+        <text x="${size / 2}" y="${size / 2 - 14}" class="analytics-donut-value">${total}</text>
+        <text x="${size / 2}" y="${size / 2 + 8}" class="analytics-donut-label">records</text>
+        <text x="${size / 2}" y="${size / 2 + 30}" class="analytics-donut-subvalue">${completedPercent}% completed</text>
       </svg>
       <div class="analytics-donut-legend">
         ${segments
@@ -842,7 +1288,7 @@ function renderAnalyticsDonutChart(container, segments) {
               <div class="analytics-legend-item">
                 <span class="analytics-legend-swatch" style="background: ${segment.color};"></span>
                 <span>${escapeHtml(segment.label)}</span>
-                <span>${segment.value}</span>
+                <span>${segment.value} (${total ? Math.round((segment.value / total) * 100) : 0}%)</span>
               </div>
             `
           )
@@ -858,7 +1304,13 @@ function renderAnalyticsModule(summary = null) {
   const completedRecords = analytics.totals.completedRecords;
   const pendingRecords = analytics.totals.pendingRecords;
   const resolutionRate = analytics.totals.resolutionRate;
+  const goodMoralFlags = analytics.totals.goodMoralFlags || 0;
+  const recentShare = analytics.insights.recentShare || 0;
+  const backlogRate = totalRecords ? Math.round((pendingRecords / totalRecords) * 100) : 0;
   const topModule = analytics.insights.topModule;
+  const topOffense = analytics.insights.topOffense;
+  const busiestDay = getBusiestDay(analytics.trend);
+  const attentionModule = getAttentionModule(analytics.modules);
   const trendChange = formatTrendChange(
     analytics.trend.changePercent,
     analytics.trend.recentCount,
@@ -867,7 +1319,41 @@ function renderAnalyticsModule(summary = null) {
   if (analyticsTotalRecords) analyticsTotalRecords.textContent = String(totalRecords);
   if (analyticsResolutionRate) analyticsResolutionRate.textContent = `${resolutionRate}%`;
   if (analyticsPendingActions) analyticsPendingActions.textContent = String(pendingRecords);
-  if (analyticsTopModule) analyticsTopModule.textContent = topModule ? topModule.label : "--";
+  if (analyticsRecentShare) analyticsRecentShare.textContent = `${recentShare}%`;
+  if (analyticsGoodMoralFlags) analyticsGoodMoralFlags.textContent = String(goodMoralFlags);
+  if (analyticsModulePill) {
+    analyticsModulePill.textContent = topModule ? `Top module: ${topModule.label}` : "Top module: --";
+  }
+  if (analyticsTopOffense) {
+    analyticsTopOffense.textContent = topOffense ? topOffense.name : "No offense data yet";
+  }
+  if (analyticsTopOffenseCount) {
+    analyticsTopOffenseCount.textContent = topOffense ? `${topOffense.count} related records` : "No records yet";
+  }
+  if (analyticsBusiestDay) {
+    analyticsBusiestDay.textContent = busiestDay ? busiestDay.label : "No activity window";
+  }
+  if (analyticsBusiestDayCount) {
+    analyticsBusiestDayCount.textContent = busiestDay ? `${busiestDay.count} records posted` : "No activity yet";
+  }
+  if (analyticsAttentionModule) {
+    analyticsAttentionModule.textContent = attentionModule ? attentionModule.label : "All modules stable";
+  }
+  if (analyticsAttentionModuleCount) {
+    analyticsAttentionModuleCount.textContent = attentionModule
+      ? `${attentionModule.pending} pending records`
+      : "No pending records";
+  }
+  if (analyticsOpsNote) {
+    analyticsOpsNote.textContent = backlogRate >= 50
+      ? "Backlog pressure is high"
+      : backlogRate >= 30
+        ? "Monitor closure velocity"
+        : "Case flow is healthy";
+  }
+  if (analyticsRefreshStamp) {
+    analyticsRefreshStamp.textContent = formatGeneratedAt(analytics.generatedAt);
+  }
   if (analyticsTrendPill) analyticsTrendPill.textContent = "Last 14 Days";
   if (analyticsTrendChange) analyticsTrendChange.textContent = trendChange.value;
   if (analyticsTrendLabel) analyticsTrendLabel.textContent = trendChange.label;
@@ -877,7 +1363,8 @@ function renderAnalyticsModule(summary = null) {
   }
 
   renderAnalyticsBarList(analyticsModuleChart, analytics.modules);
-  renderAnalyticsTrendChart(analyticsTrendChart, analytics.trend.labels, analytics.trend.values);
+  const moduleTrend = buildModuleTrendSeries(14);
+  renderAnalyticsTrendChart(analyticsTrendChart, moduleTrend.labels, moduleTrend.series);
   renderAnalyticsDonutChart(analyticsStatusChart, [
     { label: "Completed", value: completedRecords, color: "#0f766e" },
     { label: "Pending", value: pendingRecords, color: "#a41321" },
@@ -2245,6 +2732,9 @@ if (reportButton) {
     switchTab("analytics");
   });
 }
+
+switchTab(getPreferredTab(), { persist: false });
+initializeInsightModal();
 
 
 if (recordForm) {

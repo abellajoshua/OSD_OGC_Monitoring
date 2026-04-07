@@ -228,42 +228,14 @@
             <div class="analytics-banner-ornament" aria-hidden="true"></div>
           </div>
 
-          <div class="analytics-metrics-strip">
-            <div class="analytics-summary-card analytics-summary-card-primary">
-              <span>Total Records</span>
-              <strong id="analytics-total-records">0</strong>
-              <small>Across all active logs</small>
-            </div>
-            <div class="analytics-summary-card">
-              <span>Resolution Rate</span>
-              <strong id="analytics-resolution-rate">0%</strong>
-              <small>Closed or completed entries</small>
-            </div>
-            <div class="analytics-summary-card">
-              <span>Pending Actions</span>
-              <strong id="analytics-pending-actions">0</strong>
-              <small>Items awaiting closure</small>
-            </div>
-            <div class="analytics-summary-card analytics-summary-card-trend" id="analytics-trend-card">
-              <span>Trend Change</span>
-              <strong id="analytics-trend-change">0%</strong>
-              <small id="analytics-trend-label">No change vs prior 7 days</small>
-            </div>
-            <div class="analytics-summary-card">
-              <span>Top Module</span>
-              <strong id="analytics-top-module">--</strong>
-              <small>Highest record volume</small>
-            </div>
-          </div>
-
           <section class="analytics-grid">
             <article class="analytics-card analytics-card-wide analytics-card-highlight">
               <div class="analytics-card-head">
                 <div>
-                  <p class="analytics-kicker">Workload</p>
-                  <h3>Records by Module</h3>
+                  <p class="analytics-kicker">Module Snapshot</p>
+                  <h3>Compact Performance View</h3>
                 </div>
-                <span class="analytics-pill">Count + trend</span>
+                <span class="analytics-pill" id="analytics-module-pill">Top module: --</span>
               </div>
               <div class="chart-slot" id="analytics-module-chart"></div>
             </article>
@@ -291,6 +263,45 @@
             </article>
 
           </section>
+
+          <section class="analytics-insights-grid" aria-label="Analytics insights">
+            <article class="analytics-insight-card" data-insight="top-offense" role="button" tabindex="0" aria-label="Open Top Offense details">
+              <p class="analytics-insight-label">Top Offense</p>
+              <h4 id="analytics-top-offense">--</h4>
+              <p class="analytics-insight-sub" id="analytics-top-offense-count">No records yet</p>
+            </article>
+
+            <article class="analytics-insight-card" data-insight="busiest-day" role="button" tabindex="0" aria-label="Open Busiest Day details">
+              <p class="analytics-insight-label">Busiest Day</p>
+              <h4 id="analytics-busiest-day">--</h4>
+              <p class="analytics-insight-sub" id="analytics-busiest-day-count">No activity yet</p>
+            </article>
+
+            <article class="analytics-insight-card" data-insight="attention-module" role="button" tabindex="0" aria-label="Open Attention Module details">
+              <p class="analytics-insight-label">Attention Module</p>
+              <h4 id="analytics-attention-module">--</h4>
+              <p class="analytics-insight-sub" id="analytics-attention-module-count">No pending records</p>
+            </article>
+
+            <article class="analytics-insight-card analytics-insight-card-note" data-insight="analyst-notes" role="button" tabindex="0" aria-label="Open Analyst Notes details">
+              <p class="analytics-insight-label">Analyst Notes</p>
+              <h4 id="analytics-ops-note">System stable</h4>
+              <p class="analytics-insight-sub" id="analytics-refresh-stamp">Updated just now</p>
+            </article>
+          </section>
+
+          <div class="analytics-insight-modal" id="analytics-insight-modal" hidden>
+            <div class="analytics-insight-modal-backdrop" data-insight-modal-close="true"></div>
+            <div class="analytics-insight-modal-panel" role="dialog" aria-modal="true" aria-labelledby="analytics-insight-modal-title">
+              <div class="analytics-insight-modal-scroll">
+                <div class="analytics-insight-modal-head">
+                  <h3 id="analytics-insight-modal-title">Insight Details</h3>
+                  <button type="button" class="analytics-insight-modal-close" data-insight-modal-close="true" aria-label="Close insight details">Close</button>
+                </div>
+                <div class="analytics-insight-modal-body" id="analytics-insight-modal-body"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
