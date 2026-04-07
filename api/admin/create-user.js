@@ -1,5 +1,6 @@
 const {
   getSupabaseClient,
+  hasServiceRolePrivileges,
   getPayload,
   getRequestUserContext,
   ensureRole,
@@ -12,6 +13,13 @@ module.exports = async (req, res) => {
   }
 
   try {
+    if (!hasServiceRolePrivileges()) {
+      return res.status(503).json({
+        error:
+          "Server admin key is not configured for account provisioning. Please set a valid SUPABASE_SERVICE_ROLE_KEY.",
+      });
+    }
+
     const requester = await getRequestUserContext(req);
     ensureRole(requester, ["admin"]);
 
@@ -25,15 +33,65 @@ module.exports = async (req, res) => {
       });
     }
 
-    if (!["head", "coordinator"].includes(role)) {
+    const normalizedRole = String(role || "").trim().toLowerCase();
+
+    if (!["head", "coordinator"].includes(normalizedRole)) {
       return res.status(400).json({ error: "Invalid role. Use head or coordinator." });
     }
 
-    const organizationId = Number(organizationIdRaw);
-    if (!organizationId) {
+    let organizationId = Number(organizationIdRaw);
+    if (!organizationId && normalizedRole === "coordinator") {
       return res.status(403).json({
         error: "organization_id is required for head and coordinator accounts.",
       });
+    }
+
+    const { data: organizations, error: organizationsError } = await supabase
+      .from("organizations")
+      .select("id, name");
+
+    if (organizationsError) {
+      return res.status(500).json({ error: `Unable to validate organizations: ${organizationsError.message}` });
+    }
+
+    const alangilanOrganization = (organizations || []).find(
+      (org) => String(org.name || "").trim().toLowerCase() === "alangilan"
+    );
+
+    if (normalizedRole === "head") {
+      if (!alangilanOrganization?.id) {
+        return res.status(400).json({
+          error: "Head account requires an existing Alangilan organization.",
+        });
+      }
+
+      const { data: existingHead, error: existingHeadError } = await supabase
+        .from("user_accounts")
+        .select("id, email")
+        .eq("role", "head")
+        .limit(1)
+        .maybeSingle();
+
+      if (existingHeadError) {
+        return res.status(500).json({
+          error: `Unable to verify existing Head account: ${existingHeadError.message}`,
+        });
+      }
+
+      if (existingHead) {
+        return res.status(409).json({
+          error: "A Head account already exists. Only one Head account is allowed.",
+        });
+      }
+
+      organizationId = Number(alangilanOrganization.id);
+    }
+
+    if (normalizedRole === "coordinator") {
+      const assignedOrganization = (organizations || []).find((org) => Number(org.id) === organizationId);
+      if (!assignedOrganization) {
+        return res.status(400).json({ error: "Invalid organization_id." });
+      }
     }
 
     const { data: existingUser } = await supabase
@@ -54,7 +112,7 @@ module.exports = async (req, res) => {
       email_confirm: true,
       user_metadata: {
         full_name: fullName,
-        role,
+        role: normalizedRole,
         organization_id: organizationId,
       },
     });
@@ -69,12 +127,17 @@ module.exports = async (req, res) => {
       user_id: authData.user.id,
       email,
       full_name: fullName,
-      role,
+      role: normalizedRole,
       organization_id: organizationId,
     });
 
     if (dbError) {
       await supabase.auth.admin.deleteUser(authData.user.id);
+      if (dbError.message && dbError.message.toLowerCase().includes("single_head")) {
+        return res.status(409).json({
+          error: "A Head account already exists. Only one Head account is allowed.",
+        });
+      }
       return res.status(500).json({
         error: `Database error: ${dbError.message}. Auth user was removed.`,
       });
@@ -86,7 +149,7 @@ module.exports = async (req, res) => {
       user: {
         email,
         full_name: fullName,
-        role,
+        role: normalizedRole,
         organization_id: organizationId,
       },
     });

@@ -1,5 +1,6 @@
 const {
   getSupabaseClient,
+  hasServiceRolePrivileges,
   getPayload,
   getRequestUserContext,
   ensureRole,
@@ -43,7 +44,7 @@ module.exports = async (req, res) => {
       return res.status(500).json({ error: `Failed to delete from database: ${dbError.message}` });
     }
 
-    if (userAccount.user_id) {
+    if (userAccount.user_id && hasServiceRolePrivileges()) {
       const { error: authError } = await supabase.auth.admin.deleteUser(userAccount.user_id);
       if (authError) {
         return res.status(200).json({
