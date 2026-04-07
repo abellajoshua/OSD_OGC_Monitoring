@@ -19,6 +19,8 @@ create table if not exists public.minor_offenses (
   date_of_suspension date not null,
   date_of_post_counseling date,
   archived boolean default false,
+  academic_year text,
+  semester text,
   created_at timestamptz default now()
 );
 
@@ -38,6 +40,8 @@ create table if not exists public.major_offenses (
   date_of_suspension date not null,
   date_of_post_counseling date,
   archived boolean default false,
+  academic_year text,
+  semester text,
   created_at timestamptz default now()
 );
 
@@ -52,6 +56,8 @@ create table if not exists public.non_wearing_uniform (
   sex text not null,
   reason text not null,
   archived boolean default false,
+  academic_year text,
+  semester text,
   created_at timestamptz default now()
 );
 
@@ -66,6 +72,8 @@ create table if not exists public.gatepass (
   sex text not null,
   reason text not null,
   archived boolean default false,
+  academic_year text,
+  semester text,
   created_at timestamptz default now()
 );
 
@@ -80,6 +88,8 @@ create table if not exists public.good_moral (
   sex text not null,
   purpose text not null,
   archived boolean default false,
+  academic_year text,
+  semester text,
   created_at timestamptz default now()
 );
 
@@ -94,6 +104,8 @@ create table if not exists public.id_replacement (
   sex text not null,
   reason text not null,
   archived boolean default false,
+  academic_year text,
+  semester text,
   created_at timestamptz default now()
 );
 
@@ -108,6 +120,8 @@ create table if not exists public.leave_of_absence (
   sex text not null,
   semester_period_covered text not null,
   archived boolean default false,
+  academic_year text,
+  semester text,
   created_at timestamptz default now()
 );
 
@@ -140,6 +154,21 @@ alter table public.gatepass add column if not exists archived boolean default fa
 alter table public.good_moral add column if not exists archived boolean default false;
 alter table public.id_replacement add column if not exists archived boolean default false;
 alter table public.leave_of_absence add column if not exists archived boolean default false;
+
+alter table public.minor_offenses add column if not exists academic_year text;
+alter table public.minor_offenses add column if not exists semester text;
+alter table public.major_offenses add column if not exists academic_year text;
+alter table public.major_offenses add column if not exists semester text;
+alter table public.non_wearing_uniform add column if not exists academic_year text;
+alter table public.non_wearing_uniform add column if not exists semester text;
+alter table public.gatepass add column if not exists academic_year text;
+alter table public.gatepass add column if not exists semester text;
+alter table public.good_moral add column if not exists academic_year text;
+alter table public.good_moral add column if not exists semester text;
+alter table public.id_replacement add column if not exists academic_year text;
+alter table public.id_replacement add column if not exists semester text;
+alter table public.leave_of_absence add column if not exists academic_year text;
+alter table public.leave_of_absence add column if not exists semester text;
 
 -- Organization seed set for required campuses/municipalities
 insert into public.organizations (name, type)
@@ -246,6 +275,111 @@ alter table public.major_offenses add column if not exists date_of_post_counseli
 alter table public.minor_offenses add column if not exists written_reply text;
 alter table public.minor_offenses add column if not exists date_of_hearing date;
 alter table public.minor_offenses add column if not exists date_of_post_counseling date;
+
+update public.minor_offenses
+set
+  academic_year = case
+    when extract(month from coalesce(date_of_complaint, created_at::date)) >= 8 then
+      to_char(coalesce(date_of_complaint, created_at::date), 'YYYY') || '-' || to_char((coalesce(date_of_complaint, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date_of_complaint, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date_of_complaint, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date_of_complaint, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date_of_complaint, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
+
+update public.major_offenses
+set
+  academic_year = case
+    when extract(month from coalesce(date_of_complaint, created_at::date)) >= 8 then
+      to_char(coalesce(date_of_complaint, created_at::date), 'YYYY') || '-' || to_char((coalesce(date_of_complaint, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date_of_complaint, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date_of_complaint, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date_of_complaint, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date_of_complaint, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
+
+update public.non_wearing_uniform
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date)) >= 8 then
+      to_char(coalesce(date, created_at::date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
+
+update public.gatepass
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date)) >= 8 then
+      to_char(coalesce(date, created_at::date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
+
+update public.good_moral
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date)) >= 8 then
+      to_char(coalesce(date, created_at::date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
+
+update public.id_replacement
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date)) >= 8 then
+      to_char(coalesce(date, created_at::date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
+
+update public.leave_of_absence
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date)) >= 8 then
+      to_char(coalesce(date, created_at::date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
 
 -- Rename columns for major and minor offenses (reported_by to complainant, date_of_sanction to date_of_suspension)
 do $$

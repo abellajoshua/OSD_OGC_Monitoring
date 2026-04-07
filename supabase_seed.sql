@@ -487,4 +487,109 @@ where not exists (
   where sr_code = '21-50044' and date = '2026-01-14'
 );
 
+update public.minor_offenses
+set
+  academic_year = case
+    when extract(month from coalesce(date_of_complaint, created_at::date)) >= 8 then
+      to_char(coalesce(date_of_complaint, created_at::date), 'YYYY') || '-' || to_char((coalesce(date_of_complaint, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date_of_complaint, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date_of_complaint, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date_of_complaint, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date_of_complaint, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
+
+update public.major_offenses
+set
+  academic_year = case
+    when extract(month from coalesce(date_of_complaint, created_at::date)) >= 8 then
+      to_char(coalesce(date_of_complaint, created_at::date), 'YYYY') || '-' || to_char((coalesce(date_of_complaint, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date_of_complaint, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date_of_complaint, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date_of_complaint, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date_of_complaint, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
+
+update public.non_wearing_uniform
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date)) >= 8 then
+      to_char(coalesce(date, created_at::date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
+
+update public.gatepass
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date)) >= 8 then
+      to_char(coalesce(date, created_at::date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
+
+update public.good_moral
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date)) >= 8 then
+      to_char(coalesce(date, created_at::date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
+
+update public.id_replacement
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date)) >= 8 then
+      to_char(coalesce(date, created_at::date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
+
+update public.leave_of_absence
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date)) >= 8 then
+      to_char(coalesce(date, created_at::date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date), 'YYYY')
+  end,
+  semester = case
+    when extract(month from coalesce(date, created_at::date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null;
+
 commit;

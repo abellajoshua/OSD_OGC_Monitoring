@@ -3,6 +3,63 @@ import { getSupabase } from "./supabaseClient.js?v=4";
 const HEAD_ROLE = "head";
 let currentOrganizationId = null;
 
+function normalizeSemesterLabel(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "";
+
+  if (raw === "first" || raw === "1st" || raw.includes("first")) return "First Semester";
+  if (raw === "second" || raw === "2nd" || raw.includes("second")) return "Second Semester";
+  if (raw === "summer" || raw.includes("summer")) return "Summer Class";
+  return "";
+}
+
+function getAcademicPeriod() {
+  const year = localStorage.getItem("academicYear") || "2024-2025";
+  const semester = normalizeSemesterLabel(localStorage.getItem("semester")) || "First Semester";
+  return { year, semester };
+}
+
+function getAcademicPeriodRange() {
+  const { year, semester } = getAcademicPeriod();
+  const match = String(year || "").trim().match(/^(\d{4})-(\d{4})$/);
+  if (!match) return null;
+
+  const startYear = Number(match[1]);
+  const endYear = Number(match[2]);
+  if (!Number.isInteger(startYear) || !Number.isInteger(endYear) || endYear !== startYear + 1) {
+    return null;
+  }
+
+  let startDate;
+  let endDate;
+  if (semester === "First Semester") {
+    startDate = new Date(startYear, 7, 1);
+    endDate = new Date(startYear, 11, 31);
+  } else if (semester === "Second Semester") {
+    startDate = new Date(endYear, 0, 1);
+    endDate = new Date(endYear, 4, 31);
+  } else if (semester === "Summer Class") {
+    startDate = new Date(endYear, 5, 1);
+    endDate = new Date(endYear, 6, 31);
+  } else {
+    return null;
+  }
+
+  const toISODate = (date) => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  return {
+    year,
+    semester,
+    startDate: toISODate(startDate),
+    endDate: toISODate(endDate),
+  };
+}
+
 // Check if user is head
 async function checkHeadAccess() {
   const supabase = await getSupabase();
@@ -133,14 +190,31 @@ function escapeHtml(text) {
 async function loadMinorOffenses() {
   try {
     const supabase = await getSupabase();
+    const period = getAcademicPeriodRange();
     console.log("Fetching minor offenses...");
-    
-    const { data, error } = await supabase
+
+    let query = supabase
       .from("minor_offenses")
       .select("*")
       .eq("archived", false)
-      .eq("organization_id", currentOrganizationId)
-      .order("date_of_complaint", { ascending: false });
+      .eq("organization_id", currentOrganizationId);
+
+    if (period) {
+      query = query.eq("academic_year", period.year).eq("semester", period.semester);
+    }
+
+    let { data, error } = await query.order("date_of_complaint", { ascending: false });
+
+    if (error && String(error.message || "").toLowerCase().includes("academic_year")) {
+      ({ data, error } = await supabase
+        .from("minor_offenses")
+        .select("*")
+        .eq("archived", false)
+        .eq("organization_id", currentOrganizationId)
+        .gte("date_of_complaint", period?.startDate || "0001-01-01")
+        .lte("date_of_complaint", period?.endDate || "9999-12-31")
+        .order("date_of_complaint", { ascending: false }));
+    }
 
     console.log("Minor offenses result:", { data, error });
 
@@ -185,14 +259,31 @@ async function loadMinorOffenses() {
 async function loadMajorOffenses() {
   try {
     const supabase = await getSupabase();
+    const period = getAcademicPeriodRange();
     console.log("Fetching major offenses...");
-    
-    const { data, error } = await supabase
+
+    let query = supabase
       .from("major_offenses")
       .select("*")
       .eq("archived", false)
-      .eq("organization_id", currentOrganizationId)
-      .order("date_of_complaint", { ascending: false });
+      .eq("organization_id", currentOrganizationId);
+
+    if (period) {
+      query = query.eq("academic_year", period.year).eq("semester", period.semester);
+    }
+
+    let { data, error } = await query.order("date_of_complaint", { ascending: false });
+
+    if (error && String(error.message || "").toLowerCase().includes("academic_year")) {
+      ({ data, error } = await supabase
+        .from("major_offenses")
+        .select("*")
+        .eq("archived", false)
+        .eq("organization_id", currentOrganizationId)
+        .gte("date_of_complaint", period?.startDate || "0001-01-01")
+        .lte("date_of_complaint", period?.endDate || "9999-12-31")
+        .order("date_of_complaint", { ascending: false }));
+    }
 
     console.log("Major offenses result:", { data, error });
 
@@ -237,12 +328,29 @@ async function loadMajorOffenses() {
 async function loadUniformViolations() {
   try {
     const supabase = await getSupabase();
-    const { data, error } = await supabase
+    const period = getAcademicPeriodRange();
+    let query = supabase
       .from("non_wearing_uniform")
       .select("*")
       .eq("archived", false)
-      .eq("organization_id", currentOrganizationId)
-      .order("date", { ascending: false });
+      .eq("organization_id", currentOrganizationId);
+
+    if (period) {
+      query = query.eq("academic_year", period.year).eq("semester", period.semester);
+    }
+
+    let { data, error } = await query.order("date", { ascending: false });
+
+    if (error && String(error.message || "").toLowerCase().includes("academic_year")) {
+      ({ data, error } = await supabase
+        .from("non_wearing_uniform")
+        .select("*")
+        .eq("archived", false)
+        .eq("organization_id", currentOrganizationId)
+        .gte("date", period?.startDate || "0001-01-01")
+        .lte("date", period?.endDate || "9999-12-31")
+        .order("date", { ascending: false }));
+    }
 
     if (error) throw error;
 
@@ -281,12 +389,29 @@ async function loadUniformViolations() {
 async function loadGatepassRequests() {
   try {
     const supabase = await getSupabase();
-    const { data, error } = await supabase
+    const period = getAcademicPeriodRange();
+    let query = supabase
       .from("gatepass")
       .select("*")
       .eq("archived", false)
-      .eq("organization_id", currentOrganizationId)
-      .order("date", { ascending: false });
+      .eq("organization_id", currentOrganizationId);
+
+    if (period) {
+      query = query.eq("academic_year", period.year).eq("semester", period.semester);
+    }
+
+    let { data, error } = await query.order("date", { ascending: false });
+
+    if (error && String(error.message || "").toLowerCase().includes("academic_year")) {
+      ({ data, error } = await supabase
+        .from("gatepass")
+        .select("*")
+        .eq("archived", false)
+        .eq("organization_id", currentOrganizationId)
+        .gte("date", period?.startDate || "0001-01-01")
+        .lte("date", period?.endDate || "9999-12-31")
+        .order("date", { ascending: false }));
+    }
 
     if (error) throw error;
 
@@ -326,12 +451,29 @@ async function loadGatepassRequests() {
 async function loadGoodMoralRequests() {
   try {
     const supabase = await getSupabase();
-    const { data, error } = await supabase
+    const period = getAcademicPeriodRange();
+    let query = supabase
       .from("good_moral")
       .select("*")
       .eq("archived", false)
-      .eq("organization_id", currentOrganizationId)
-      .order("date", { ascending: false });
+      .eq("organization_id", currentOrganizationId);
+
+    if (period) {
+      query = query.eq("academic_year", period.year).eq("semester", period.semester);
+    }
+
+    let { data, error } = await query.order("date", { ascending: false });
+
+    if (error && String(error.message || "").toLowerCase().includes("academic_year")) {
+      ({ data, error } = await supabase
+        .from("good_moral")
+        .select("*")
+        .eq("archived", false)
+        .eq("organization_id", currentOrganizationId)
+        .gte("date", period?.startDate || "0001-01-01")
+        .lte("date", period?.endDate || "9999-12-31")
+        .order("date", { ascending: false }));
+    }
 
     if (error) throw error;
 
@@ -370,12 +512,29 @@ async function loadGoodMoralRequests() {
 async function loadIdReplacementRequests() {
   try {
     const supabase = await getSupabase();
-    const { data, error } = await supabase
+    const period = getAcademicPeriodRange();
+    let query = supabase
       .from("id_replacement")
       .select("*")
       .eq("archived", false)
-      .eq("organization_id", currentOrganizationId)
-      .order("date", { ascending: false });
+      .eq("organization_id", currentOrganizationId);
+
+    if (period) {
+      query = query.eq("academic_year", period.year).eq("semester", period.semester);
+    }
+
+    let { data, error } = await query.order("date", { ascending: false });
+
+    if (error && String(error.message || "").toLowerCase().includes("academic_year")) {
+      ({ data, error } = await supabase
+        .from("id_replacement")
+        .select("*")
+        .eq("archived", false)
+        .eq("organization_id", currentOrganizationId)
+        .gte("date", period?.startDate || "0001-01-01")
+        .lte("date", period?.endDate || "9999-12-31")
+        .order("date", { ascending: false }));
+    }
 
     if (error) throw error;
 
@@ -415,12 +574,29 @@ async function loadIdReplacementRequests() {
 async function loadLeaveOfAbsenceRequests() {
   try {
     const supabase = await getSupabase();
-    const { data, error } = await supabase
+    const period = getAcademicPeriodRange();
+    let query = supabase
       .from("leave_of_absence")
       .select("*")
       .eq("archived", false)
-      .eq("organization_id", currentOrganizationId)
-      .order("date", { ascending: false });
+      .eq("organization_id", currentOrganizationId);
+
+    if (period) {
+      query = query.eq("academic_year", period.year).eq("semester", period.semester);
+    }
+
+    let { data, error } = await query.order("date", { ascending: false });
+
+    if (error && String(error.message || "").toLowerCase().includes("academic_year")) {
+      ({ data, error } = await supabase
+        .from("leave_of_absence")
+        .select("*")
+        .eq("archived", false)
+        .eq("organization_id", currentOrganizationId)
+        .gte("date", period?.startDate || "0001-01-01")
+        .lte("date", period?.endDate || "9999-12-31")
+        .order("date", { ascending: false }));
+    }
 
     if (error) throw error;
 

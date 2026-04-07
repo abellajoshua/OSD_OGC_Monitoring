@@ -335,35 +335,79 @@ async function fetchTableRows(table, dateColumn) {
   const supabase = await getSupabase();
   const primaryOrderColumn = dateColumn || "id";
   const orgId = await getScopedReadOrganizationId();
-  
-  // Try with archived filter first
-  let query = supabase.from(table).select("*").eq("archived", false);
-  if (orgId) query = query.eq("organization_id", orgId);
-  let { data, error } = await query
-    .order(primaryOrderColumn, { ascending: false })
-    .order("id", { ascending: false });
-  
-  // If archived column doesn't exist, try without it
-  if (error && error.message && error.message.includes("archived")) {
-    query = supabase.from(table).select("*");
-    if (orgId) query = query.eq("organization_id", orgId);
-    const result = await query
+  const period = getAcademicPeriodRange();
+  const attempts = [
+    { useArchived: true, useAcademicColumns: true, useDateRange: false },
+    { useArchived: false, useAcademicColumns: true, useDateRange: false },
+    { useArchived: true, useAcademicColumns: false, useDateRange: true },
+    { useArchived: false, useAcademicColumns: false, useDateRange: true },
+  ];
+
+  let lastError = null;
+
+  for (const attempt of attempts) {
+    let query = supabase.from(table).select("*");
+
+    if (attempt.useArchived) {
+      query = query.eq("archived", false);
+    }
+    if (orgId) {
+      query = query.eq("organization_id", orgId);
+    }
+
+    if (period) {
+      if (attempt.useAcademicColumns) {
+        query = query.eq("academic_year", period.year).eq("semester", period.semester);
+      } else if (attempt.useDateRange && dateColumn) {
+        query = query.gte(dateColumn, period.startDate).lte(dateColumn, period.endDate);
+      }
+    }
+
+    const { data, error } = await query
       .order(primaryOrderColumn, { ascending: false })
       .order("id", { ascending: false });
-    data = result.data;
-    error = result.error;
+
+    if (!error) {
+      return data || [];
+    }
+
+    lastError = error;
+    const message = String(error.message || "").toLowerCase();
+
+    if (attempt.useArchived && !message.includes("archived")) {
+      continue;
+    }
+
+    if (attempt.useAcademicColumns && !(message.includes("academic_year") || message.includes("semester"))) {
+      continue;
+    }
   }
-  
-  if (error) throw error;
-  return data || [];
+
+  if (lastError) throw lastError;
+  return [];
 }
 
 async function createRow(table, payload) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
-  const safePayload = { ...payload, organization_id: orgId };
-  const { error } = await supabase.from(table).insert(safePayload);
+  const period = getAcademicPeriodRange();
+  const safePayload = {
+    ...payload,
+    organization_id: orgId,
+    ...(period ? { academic_year: period.year, semester: period.semester } : {}),
+  };
+
+  let { error } = await supabase.from(table).insert(safePayload);
+
+  if (error) {
+    const message = String(error.message || "").toLowerCase();
+    if (message.includes("academic_year") || message.includes("semester")) {
+      const fallbackPayload = { ...payload, organization_id: orgId };
+      ({ error } = await supabase.from(table).insert(fallbackPayload));
+    }
+  }
+
   if (error) throw error;
 }
 
@@ -371,7 +415,7 @@ async function updateRow(table, id, payload) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
-  const { organization_id, ...safePayload } = payload;
+  const { organization_id, academic_year, semester, ...safePayload } = payload;
   let query = supabase.from(table).update(safePayload).eq("id", id);
   if (orgId) query = query.eq("organization_id", orgId);
   const { error } = await query;
@@ -2459,13 +2503,30 @@ async function loadMajorRecords() {
 // Academic Period Management
 function getAcademicPeriod() {
   const year = localStorage.getItem("academicYear") || "2024-2025";
-  const semester = localStorage.getItem("semester") || "First Semester";
+  const semester = normalizeSemesterLabel(localStorage.getItem("semester")) || "First Semester";
   return { year, semester };
+}
+
+function normalizeSemesterLabel(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "";
+
+  if (raw === "first" || raw === "1st" || raw.includes("first")) {
+    return "First Semester";
+  }
+  if (raw === "second" || raw === "2nd" || raw.includes("second")) {
+    return "Second Semester";
+  }
+  if (raw === "summer" || raw.includes("summer")) {
+    return "Summer Class";
+  }
+
+  return "";
 }
 
 function setAcademicPeriod(year, semester) {
   localStorage.setItem("academicYear", year);
-  localStorage.setItem("semester", semester);
+  localStorage.setItem("semester", normalizeSemesterLabel(semester) || "First Semester");
 }
 
 function formatAcademicYear(input) {
@@ -2493,8 +2554,53 @@ function updateAcademicPeriodDisplay() {
   academicPeriodDisplay.textContent = `${semester} AY ${year}`;
 }
 
+function getAcademicPeriodRange() {
+  const { year, semester } = getAcademicPeriod();
+  const normalizedYear = String(year || "").trim();
+  const normalizedSemester = normalizeSemesterLabel(semester);
+  const match = normalizedYear.match(/^(\d{4})-(\d{4})$/);
+  if (!match || !normalizedSemester) return null;
+
+  const startYear = Number(match[1]);
+  const endYear = Number(match[2]);
+  if (!Number.isInteger(startYear) || !Number.isInteger(endYear) || endYear !== startYear + 1) {
+    return null;
+  }
+
+  let startDate;
+  let endDate;
+
+  if (normalizedSemester === "First Semester") {
+    startDate = new Date(startYear, 7, 1);
+    endDate = new Date(startYear, 11, 31);
+  } else if (normalizedSemester === "Second Semester") {
+    startDate = new Date(endYear, 0, 1);
+    endDate = new Date(endYear, 4, 31);
+  } else if (normalizedSemester === "Summer Class") {
+    startDate = new Date(endYear, 5, 1);
+    endDate = new Date(endYear, 6, 31);
+  } else {
+    return null;
+  }
+
+  const toISODate = (value) => {
+    const yyyy = value.getFullYear();
+    const mm = String(value.getMonth() + 1).padStart(2, "0");
+    const dd = String(value.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  return {
+    year: normalizedYear,
+    semester: normalizedSemester,
+    startDate: toISODate(startDate),
+    endDate: toISODate(endDate),
+  };
+}
+
 function initializeAcademicPeriod() {
   const { year, semester } = getAcademicPeriod();
+  setAcademicPeriod(year, semester);
   
   if (academicYearInput) {
     academicYearInput.value = year;
@@ -2517,21 +2623,23 @@ function initializeAcademicPeriod() {
       updateAcademicPeriodDisplay();
     });
     
-    academicYearInput.addEventListener("blur", (e) => {
+    academicYearInput.addEventListener("blur", async (e) => {
       // Ensure proper format on blur
       const formatted = formatAcademicYear(e.target.value);
       e.target.value = formatted;
       setAcademicPeriod(formatted, getAcademicPeriod().semester);
       updateAcademicPeriodDisplay();
+      await reloadAllDataForCurrentScope();
     });
   }
   
   if (semesterSelect) {
     semesterSelect.value = semester;
-    semesterSelect.addEventListener("change", (e) => {
+    semesterSelect.addEventListener("change", async (e) => {
       const newSemester = e.target.value;
       setAcademicPeriod(getAcademicPeriod().year, newSemester);
       updateAcademicPeriodDisplay();
+      await reloadAllDataForCurrentScope();
     });
   }
   
@@ -2552,8 +2660,13 @@ async function loadAnalyticsSummary() {
     }
 
     const query = new URLSearchParams();
+    const period = getAcademicPeriodRange();
     if (canAccessAllOrganizations() && selectedHeadOrganizationId) {
       query.set("organization_id", String(selectedHeadOrganizationId));
+    }
+    if (period) {
+      query.set("academic_year", period.year);
+      query.set("semester", period.semester);
     }
 
     const response = await fetch(`/api/analytics${query.toString() ? `?${query.toString()}` : ""}`, {
