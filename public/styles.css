@@ -1839,6 +1839,7 @@ h1 {
   border: 2px solid var(--line);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  margin-top: 18px;
 }
 
 .sheet-actions {
@@ -1879,6 +1880,7 @@ tbody td {
 
 .record-form {
   margin-top: 28px;
+  margin-bottom: 20px;
   border: 1px solid rgba(164, 19, 33, 0.12);
   border-radius: 20px;
   padding: 20px;
