@@ -7,8 +7,59 @@ const usersStatus = document.querySelector("#users-status");
 const logoutBtn = document.querySelector("#logout-btn");
 const refreshBtn = document.querySelector("#refresh-btn");
 const organizationSelect = document.querySelector("#new-organization");
+const roleSelect = document.querySelector("#new-role");
 
 let currentUserAccount = null;
+let alangilanOrganizationId = null;
+let headAccountExists = false;
+
+function showCreateError(message) {
+  if (!createStatus) return;
+  createStatus.innerHTML = `
+    <div class="alert alert-danger" style="border: none; border-radius: 8px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 1rem;">
+      <strong>Error:</strong> ${escapeHtml(message)}
+    </div>
+  `;
+}
+
+function updateHeadRoleConstraints() {
+  if (!roleSelect || !organizationSelect) return;
+
+  const headOption = roleSelect.querySelector('option[value="head"]');
+  if (headOption) {
+    headOption.disabled = headAccountExists;
+    headOption.textContent = headAccountExists
+      ? "Head - Already Assigned (Alangilan)"
+      : "Head - View Only (Alangilan Only)";
+  }
+
+  if (headAccountExists && roleSelect.value === "head") {
+    roleSelect.value = "coordinator";
+  }
+
+  const isHeadRole = roleSelect.value === "head";
+  if (isHeadRole) {
+    if (!alangilanOrganizationId) {
+      showCreateError("Head role requires an existing Alangilan organization.");
+      roleSelect.value = "coordinator";
+      organizationSelect.disabled = false;
+      return;
+    }
+    organizationSelect.value = String(alangilanOrganizationId);
+    organizationSelect.setAttribute("disabled", "disabled");
+    organizationSelect.title = "Head accounts are automatically assigned to Alangilan.";
+    return;
+  }
+
+  organizationSelect.title = "";
+  if (currentUserAccount?.organization_id) {
+    organizationSelect.value = String(currentUserAccount.organization_id);
+    organizationSelect.setAttribute("disabled", "disabled");
+    return;
+  }
+
+  organizationSelect.removeAttribute("disabled");
+}
 
 async function getAccessToken() {
   const supabase = await getSupabase();
@@ -65,9 +116,18 @@ async function loadOrganizations() {
     throw error;
   }
 
+  alangilanOrganizationId = null;
+  (data || []).forEach((org) => {
+    if (String(org.name || "").trim().toLowerCase() === "alangilan") {
+      alangilanOrganizationId = Number(org.id);
+    }
+  });
+
   organizationSelect.innerHTML = (data || [])
     .map((org) => `<option value="${org.id}">${escapeHtml(org.name)} (${escapeHtml(org.type)})</option>`)
     .join("");
+
+  updateHeadRoleConstraints();
 }
 
 // Load all user accounts
@@ -118,6 +178,9 @@ async function loadUsers() {
       }
       throw accountsError;
     }
+
+    headAccountExists = (accounts || []).some((account) => account.role === "head");
+    updateHeadRoleConstraints();
 
     if (!accounts || accounts.length === 0) {
       usersTableBody.innerHTML = `
@@ -231,6 +294,19 @@ async function loadUsers() {
 // Create new user account
 async function createUser(email, password, fullName, role, organizationId) {
   try {
+    const normalizedRole = String(role || "").toLowerCase();
+    if (normalizedRole === "head") {
+      if (headAccountExists) {
+        throw new Error("A Head account already exists. Only one Head account is allowed.");
+      }
+      if (!alangilanOrganizationId) {
+        throw new Error("Alangilan organization is required before creating a Head account.");
+      }
+    }
+
+    const finalOrganizationId =
+      normalizedRole === "head" ? Number(alangilanOrganizationId) : Number(organizationId);
+
     const token = await getAccessToken();
 
     // Call the API endpoint to create user without affecting admin session
@@ -240,13 +316,23 @@ async function createUser(email, password, fullName, role, organizationId) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ email, password, fullName, role, organization_id: Number(organizationId) }),
+      body: JSON.stringify({
+        email,
+        password,
+        fullName,
+        role: normalizedRole,
+        organization_id: finalOrganizationId,
+      }),
     });
 
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error || 'Failed to create user');
+      const rawMessage = String(result.error || 'Failed to create user');
+      const normalizedMessage = rawMessage.toLowerCase().includes('invalid api key')
+        ? 'Server admin setup is incomplete. Please configure a valid SUPABASE_SERVICE_ROLE_KEY.'
+        : rawMessage;
+      throw new Error(normalizedMessage);
     }
 
     // Show success message in users status area
@@ -281,6 +367,30 @@ async function createUser(email, password, fullName, role, organizationId) {
   }
 }
 
+async function deleteUserAccountDirect(email) {
+  const supabase = await getSupabase();
+
+  const { data: userAccount, error: lookupError } = await supabase
+    .from("user_accounts")
+    .select("role")
+    .eq("email", email)
+    .single();
+
+  if (lookupError) {
+    throw new Error(lookupError.message || "User account not found.");
+  }
+
+  if (userAccount?.role === "admin") {
+    throw new Error("The single admin account cannot be deleted.");
+  }
+
+  const { error: deleteError } = await supabase.from("user_accounts").delete().eq("email", email);
+
+  if (deleteError) {
+    throw new Error(deleteError.message || "Failed to delete user account.");
+  }
+}
+
 // Delete user
 async function deleteUser(email) {
   try {
@@ -299,7 +409,24 @@ async function deleteUser(email) {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error || 'Failed to delete user');
+      const errorMessage = result.error || 'Failed to delete user';
+      if (errorMessage.toLowerCase().includes("invalid api key")) {
+        await deleteUserAccountDirect(email);
+        usersStatus.innerHTML = `
+          <div class="alert alert-success" style="border: none; border-radius: 8px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 1rem; margin: 0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 0.5rem; vertical-align: middle;">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            <strong>User deleted permanently!</strong> - ${escapeHtml(email)} has been removed successfully.
+          </div>
+        `;
+        await loadUsers();
+        setTimeout(() => {
+          usersStatus.innerHTML = '';
+        }, 5000);
+        return;
+      }
+      throw new Error(errorMessage);
     }
 
     usersStatus.innerHTML = `
@@ -354,6 +481,11 @@ if (createUserForm) {
     const role = formData.get("role");
     const organizationId = formData.get("organization_id");
 
+    if (role === "head" && headAccountExists) {
+      showCreateError("A Head account already exists. Only one Head account is allowed.");
+      return;
+    }
+
     const success = await createUser(email, password, fullName, role, organizationId);
     
     // Close modal on success
@@ -369,6 +501,13 @@ if (createUserForm) {
       createUserForm.reset();
       createStatus.innerHTML = '';
     }
+  });
+}
+
+if (roleSelect) {
+  roleSelect.addEventListener("change", () => {
+    createStatus.innerHTML = "";
+    updateHeadRoleConstraints();
   });
 }
 

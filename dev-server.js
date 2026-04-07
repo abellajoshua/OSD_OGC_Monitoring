@@ -4,6 +4,7 @@ const express = require("express");
 const path = require("path");
 
 const dashboardHandler = require("./api/dashboard");
+const analyticsHandler = require("./api/analytics");
 const configHandler = require("./api/config");
 const minorHandler = require("./api/minor-offenses/index");
 const minorByIdHandler = require("./api/minor-offenses/[id]");
@@ -41,6 +42,7 @@ app.get("/", (_req, res) => {
 
 app.all("/api/config", (req, res) => configHandler(req, res));
 app.all("/api/dashboard", (req, res) => dashboardHandler(req, res));
+app.all("/api/analytics", (req, res) => analyticsHandler(req, res));
 
 app.all("/api/minor-offenses", (req, res) => minorHandler(req, res));
 app.all("/api/minor-offenses/archive", (req, res) => minorArchiveHandler(req, res));

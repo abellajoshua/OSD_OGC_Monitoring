@@ -38,10 +38,116 @@ document.getElementById("logout-btn")?.addEventListener("click", async () => {
 
 // Load archived records on page load
 document.addEventListener("DOMContentLoaded", () => {
-  loadArchivedRecords("minor");
+  enforceArchivePageAccess()
+    .then((allowed) => {
+      if (!allowed) return;
+      loadArchivedRecords("minor");
+    })
+    .catch(() => {
+      window.location.href = "login.html";
+    });
 });
 
 let currentOrganizationId = null;
+let currentUserRole = localStorage.getItem("userRole") || "";
+
+function normalizeSemesterLabel(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "";
+  if (raw === "first" || raw === "1st" || raw.includes("first")) return "First Semester";
+  if (raw === "second" || raw === "2nd" || raw.includes("second")) return "Second Semester";
+  if (raw === "summer" || raw.includes("summer")) return "Summer Class";
+  return "";
+}
+
+function getAcademicPeriod() {
+  const year = localStorage.getItem("academicYear") || "2024-2025";
+  const semester = normalizeSemesterLabel(localStorage.getItem("semester")) || "First Semester";
+  return { year, semester };
+}
+
+function getAcademicPeriodRange() {
+  const { year, semester } = getAcademicPeriod();
+  const match = String(year || "").trim().match(/^(\d{4})-(\d{4})$/);
+  if (!match) return null;
+
+  const startYear = Number(match[1]);
+  const endYear = Number(match[2]);
+  if (!Number.isInteger(startYear) || !Number.isInteger(endYear) || endYear !== startYear + 1) {
+    return null;
+  }
+
+  let startDate;
+  let endDate;
+  if (semester === "First Semester") {
+    startDate = new Date(startYear, 7, 1);
+    endDate = new Date(startYear, 11, 31);
+  } else if (semester === "Second Semester") {
+    startDate = new Date(endYear, 0, 1);
+    endDate = new Date(endYear, 4, 31);
+  } else if (semester === "Summer Class") {
+    startDate = new Date(endYear, 5, 1);
+    endDate = new Date(endYear, 6, 31);
+  } else {
+    return null;
+  }
+
+  const toISODate = (date) => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  return {
+    year,
+    semester,
+    startDate: toISODate(startDate),
+    endDate: toISODate(endDate),
+  };
+}
+
+const ROLE_COORDINATOR = "coordinator";
+
+function canManageArchivedRecords() {
+  return currentUserRole === ROLE_COORDINATOR;
+}
+
+async function enforceArchivePageAccess() {
+  const supabase = await getSupabase();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    window.location.href = "login.html";
+    return false;
+  }
+
+  const { data: account } = await supabase
+    .from("user_accounts")
+    .select("role, organization_id")
+    .eq("user_id", session.user.id)
+    .single();
+
+  currentUserRole = account?.role || currentUserRole;
+  if (currentUserRole) {
+    localStorage.setItem("userRole", currentUserRole);
+  }
+
+  currentOrganizationId = account?.organization_id || null;
+  if (currentOrganizationId) {
+    localStorage.setItem("organizationId", String(currentOrganizationId));
+  }
+
+  if (!canManageArchivedRecords()) {
+    alert("Access denied. Archived records management is limited to coordinators.");
+    window.location.href = "index.html";
+    return false;
+  }
+
+  return true;
+}
 
 async function getCurrentOrganizationId() {
   if (currentOrganizationId) return currentOrganizationId;
@@ -62,16 +168,33 @@ async function getCurrentOrganizationId() {
 }
 
 // Fetch archived rows from a table
-async function fetchArchivedRows(table) {
+async function fetchArchivedRows(table, dateColumn) {
   try {
     const supabase = await getSupabase();
     const organizationId = await getCurrentOrganizationId();
-    const { data, error } = await supabase
+    const period = getAcademicPeriodRange();
+    let query = supabase
       .from(table)
       .select("*")
       .eq("archived", true)
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false });
+      .eq("organization_id", organizationId);
+
+    if (period) {
+      query = query.eq("academic_year", period.year).eq("semester", period.semester);
+    }
+
+    let { data, error } = await query.order("created_at", { ascending: false });
+
+    if (error && String(error.message || "").toLowerCase().includes("academic_year")) {
+      ({ data, error } = await supabase
+        .from(table)
+        .select("*")
+        .eq("archived", true)
+        .eq("organization_id", organizationId)
+        .gte(dateColumn || "created_at", period?.startDate || "0001-01-01")
+        .lte(dateColumn || "created_at", period?.endDate || "9999-12-31")
+        .order("created_at", { ascending: false }));
+    }
 
     if (error) throw error;
     return data || [];
@@ -83,6 +206,10 @@ async function fetchArchivedRows(table) {
 
 // Restore a record (set archived = false)
 async function restoreRow(table, id) {
+  if (!canManageArchivedRecords()) {
+    alert("Read-only access: Head users cannot manage archived records.");
+    return;
+  }
   if (!confirm("Restore this record to active records?")) return;
 
   try {
@@ -111,6 +238,10 @@ async function restoreRow(table, id) {
 
 // Permanently delete a record
 async function permanentlyDeleteRow(table, id) {
+  if (!canManageArchivedRecords()) {
+    alert("Read-only access: Head users cannot manage archived records.");
+    return;
+  }
   if (!confirm("⚠️ PERMANENTLY DELETE this record?\n\nThis action CANNOT be undone!")) {
     return;
   }
@@ -192,7 +323,7 @@ async function loadArchivedRecords(tabName) {
   // Show loading state
   tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">Loading...</td></tr>';
 
-  const rows = await fetchArchivedRows(table);
+  const rows = await fetchArchivedRows(table, tabName === "minor" || tabName === "major" ? "date_of_complaint" : "date");
 
   if (rows.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No archived records found.</td></tr>';

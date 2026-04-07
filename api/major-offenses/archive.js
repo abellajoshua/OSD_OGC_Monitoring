@@ -2,6 +2,8 @@ const {
   getSupabaseClient,
   buildCsv,
   getRequestUserContext,
+  getScopedOrganizationId,
+  applyOrganizationScope,
   getErrorStatus,
 } = require("../_supabase");
 
@@ -12,13 +14,15 @@ module.exports = async (req, res) => {
 
   try {
     const context = await getRequestUserContext(req);
+    const scopedOrganizationId = getScopedOrganizationId(req, context);
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("major_offenses")
       .select("*")
-      .eq("organization_id", context.organizationId)
       .order("date_of_complaint", { ascending: false })
       .order("id", { ascending: false });
+    query = applyOrganizationScope(query, scopedOrganizationId);
+    const { data, error } = await query;
 
     if (error) {
       return res.status(500).json({ error: error.message });

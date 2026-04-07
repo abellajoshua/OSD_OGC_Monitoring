@@ -52,10 +52,38 @@ const kpiUniform = document.querySelector("[data-kpi='uniform']");
 const kpiGatepass = document.querySelector("[data-kpi='gatepass']");
 const kpiGoodmoral = document.querySelector("[data-kpi='goodmoral']");
 const kpiGoodmoralFlagged = document.querySelector("[data-kpi='goodmoral-flagged']");
+const analyticsTotalRecords = document.querySelector("#analytics-total-records");
+const analyticsResolutionRate = document.querySelector("#analytics-resolution-rate");
+const analyticsPendingActions = document.querySelector("#analytics-pending-actions");
+const analyticsRecentShare = document.querySelector("#analytics-recent-share");
+const analyticsGoodMoralFlags = document.querySelector("#analytics-goodmoral-flags");
+const analyticsModulePill = document.querySelector("#analytics-module-pill");
+const analyticsTrendPill = document.querySelector("#analytics-trend-pill");
+const analyticsTrendCard = document.querySelector("#analytics-trend-card");
+const analyticsTrendChange = document.querySelector("#analytics-trend-change");
+const analyticsTrendLabel = document.querySelector("#analytics-trend-label");
+const analyticsModuleChart = document.querySelector("#analytics-module-chart");
+const analyticsTrendChart = document.querySelector("#analytics-trend-chart");
+const analyticsStatusChart = document.querySelector("#analytics-status-chart");
+const analyticsTopOffense = document.querySelector("#analytics-top-offense");
+const analyticsTopOffenseCount = document.querySelector("#analytics-top-offense-count");
+const analyticsBusiestDay = document.querySelector("#analytics-busiest-day");
+const analyticsBusiestDayCount = document.querySelector("#analytics-busiest-day-count");
+const analyticsAttentionModule = document.querySelector("#analytics-attention-module");
+const analyticsAttentionModuleCount = document.querySelector("#analytics-attention-module-count");
+const analyticsOpsNote = document.querySelector("#analytics-ops-note");
+const analyticsRefreshStamp = document.querySelector("#analytics-refresh-stamp");
+const analyticsInsightCards = document.querySelectorAll(".analytics-insight-card[data-insight]");
+const analyticsInsightModal = document.querySelector("#analytics-insight-modal");
+const analyticsInsightModalTitle = document.querySelector("#analytics-insight-modal-title");
+const analyticsInsightModalBody = document.querySelector("#analytics-insight-modal-body");
+let activeInsightContext = null;
 
 const academicYearInput = document.querySelector("#academic-year-input");
 const semesterSelect = document.querySelector("#semester-select");
 const academicPeriodDisplay = document.querySelector("#academic-period-display");
+const headOrgFilterGroup = document.querySelector("#head-org-filter-group");
+const headOrgFilterSelect = document.querySelector("#head-organization-filter");
 
 const minorFilter = document.querySelector("[data-filter-scope='minor']");
 const majorFilter = document.querySelector("[data-filter-scope='major']");
@@ -64,6 +92,20 @@ const gatepassFilter = document.querySelector("[data-filter-scope='gatepass']");
 const goodmoralFilter = document.querySelector("[data-filter-scope='goodmoral']");
 const idreplacementFilter = document.querySelector("[data-filter-scope='idreplacement']");
 const leaveofabsenceFilter = document.querySelector("[data-filter-scope='leaveofabsence']");
+
+const ANALYTICS_MODULES = [
+  { key: "minor", label: "Minor Offense", color: "#ca8a04" },
+  { key: "major", label: "Major Offense", color: "#ec4899" },
+  { key: "uniform", label: "Non-Wearing Uniform", color: "#0891b2" },
+  { key: "gatepass", label: "Gatepass", color: "#0f766e" },
+  { key: "goodmoral", label: "Good Moral", color: "#1d4ed8" },
+  { key: "idreplacement", label: "ID Replacement", color: "#64748b" },
+  { key: "leaveofabsence", label: "Leave of Absence", color: "#059669" },
+];
+
+const ANALYTICS_MODULE_COLOR_MAP = Object.fromEntries(
+  ANALYTICS_MODULES.map((module) => [module.key, module.color])
+);
 
 let minorRecords = [];
 let majorRecords = [];
@@ -74,6 +116,11 @@ let idreplacementRecords = [];
 let leaveofabsenceRecords = [];
 let currentOrganizationId = null;
 let currentUserRole = localStorage.getItem("userRole") || "";
+let selectedHeadOrganizationId = null;
+let headFilterInitialized = false;
+let hasGlobalHeadAccess = false;
+let analyticsSummary = null;
+const ACTIVE_TAB_STORAGE_KEY = "activeTab";
 
 const ROLE_ADMIN = "admin";
 const ROLE_HEAD = "head";
@@ -81,6 +128,14 @@ const ROLE_COORDINATOR = "coordinator";
 
 function canEditRecords() {
   return currentUserRole === ROLE_COORDINATOR;
+}
+
+function isHeadRole() {
+  return currentUserRole === ROLE_HEAD;
+}
+
+function canAccessAllOrganizations() {
+  return isHeadRole() && hasGlobalHeadAccess;
 }
 
 function ensureCoordinatorAccess() {
@@ -123,6 +178,31 @@ function applyReadOnlyMode() {
     });
 }
 
+function applyHeadInterfaceRestrictions() {
+  applyReadOnlyMode();
+
+  document.querySelectorAll(".record-form").forEach((form) => form.remove());
+  document.querySelectorAll("[data-archive]").forEach((button) => button.remove());
+
+  const archivedRecordsNavLink = document.querySelector('a[href="archived-records.html"]');
+  if (archivedRecordsNavLink) {
+    archivedRecordsNavLink.remove();
+  }
+
+  const archiveCenterButton = document.querySelector(".cards article:nth-child(2) .link");
+  if (archiveCenterButton) {
+    const archiveCard = archiveCenterButton.closest("article");
+    if (archiveCard) {
+      archiveCard.remove();
+    }
+  }
+
+  const brandTitle = document.querySelector(".brand-title");
+  if (brandTitle) {
+    brandTitle.textContent = "OSD & OGC Monitoring - Head (View Only)";
+  }
+}
+
 async function getCurrentOrganizationId() {
   if (currentOrganizationId) return currentOrganizationId;
   const cached = localStorage.getItem("organizationId");
@@ -139,11 +219,14 @@ async function getCurrentOrganizationId() {
 
   const { data: account } = await supabase
     .from("user_accounts")
-    .select("role, organization_id")
+    .select("role, organization_id, organizations(name)")
     .eq("user_id", session.user.id)
     .single();
 
-  currentUserRole = account?.role || currentUserRole;
+  currentUserRole = String(account?.role || currentUserRole || "").trim().toLowerCase();
+  hasGlobalHeadAccess =
+    String(account?.role || "").trim().toLowerCase() === ROLE_HEAD &&
+    String(account?.organizations?.name || "").trim().toLowerCase() === "alangilan";
   if (currentUserRole) {
     localStorage.setItem("userRole", currentUserRole);
   }
@@ -153,6 +236,77 @@ async function getCurrentOrganizationId() {
     localStorage.setItem("organizationId", String(currentOrganizationId));
   }
   return currentOrganizationId;
+}
+
+async function getScopedReadOrganizationId() {
+  if (canAccessAllOrganizations()) {
+    return selectedHeadOrganizationId || null;
+  }
+  return getCurrentOrganizationId();
+}
+
+async function initializeHeadOrganizationFilter() {
+  if (!canAccessAllOrganizations() || !headOrgFilterGroup || !headOrgFilterSelect) {
+    if (headOrgFilterGroup) {
+      headOrgFilterGroup.style.display = "none";
+    }
+    return;
+  }
+
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id, name, type")
+    .order("type", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("Failed to load organizations for Head filter:", error);
+    return;
+  }
+
+  const organizations = data || [];
+  if (!organizations.length) return;
+
+  const visibleOrganizations = organizations.filter(
+    (org) => String(org.name || "").trim().toLowerCase() !== "alangilan"
+  );
+
+  headOrgFilterSelect.innerHTML = [
+    '<option value="">All Campuses and Colleges</option>',
+    ...visibleOrganizations.map((org) => `<option value="${org.id}">${org.name} (${org.type})</option>`),
+  ].join("");
+
+  const storedSelectionRaw = localStorage.getItem("headOrganizationFilterId");
+  const storedSelection = Number(storedSelectionRaw || "");
+  if (storedSelectionRaw && !Number.isNaN(storedSelection)) {
+    const exists = visibleOrganizations.some((org) => Number(org.id) === storedSelection);
+    selectedHeadOrganizationId = exists ? storedSelection : null;
+  } else {
+    selectedHeadOrganizationId = null;
+  }
+
+  if (selectedHeadOrganizationId) {
+    localStorage.setItem("headOrganizationFilterId", String(selectedHeadOrganizationId));
+    headOrgFilterSelect.value = String(selectedHeadOrganizationId);
+  } else {
+    localStorage.removeItem("headOrganizationFilterId");
+    headOrgFilterSelect.value = "";
+  }
+  headOrgFilterGroup.style.display = "";
+
+  if (!headFilterInitialized) {
+    headOrgFilterSelect.addEventListener("change", async () => {
+      selectedHeadOrganizationId = Number(headOrgFilterSelect.value) || null;
+      if (selectedHeadOrganizationId) {
+        localStorage.setItem("headOrganizationFilterId", String(selectedHeadOrganizationId));
+      } else {
+        localStorage.removeItem("headOrganizationFilterId");
+      }
+      await reloadAllDataForCurrentScope();
+    });
+    headFilterInitialized = true;
+  }
 }
 
 function buildCsv(headers, rows) {
@@ -180,36 +334,80 @@ function downloadCsv(fileName, csvContent) {
 async function fetchTableRows(table, dateColumn) {
   const supabase = await getSupabase();
   const primaryOrderColumn = dateColumn || "id";
-  const orgId = await getCurrentOrganizationId();
-  
-  // Try with archived filter first
-  let query = supabase.from(table).select("*").eq("archived", false);
-  if (orgId) query = query.eq("organization_id", orgId);
-  let { data, error } = await query
-    .order(primaryOrderColumn, { ascending: false })
-    .order("id", { ascending: false });
-  
-  // If archived column doesn't exist, try without it
-  if (error && error.message && error.message.includes("archived")) {
-    query = supabase.from(table).select("*");
-    if (orgId) query = query.eq("organization_id", orgId);
-    const result = await query
+  const orgId = await getScopedReadOrganizationId();
+  const period = getAcademicPeriodRange();
+  const attempts = [
+    { useArchived: true, useAcademicColumns: true, useDateRange: false },
+    { useArchived: false, useAcademicColumns: true, useDateRange: false },
+    { useArchived: true, useAcademicColumns: false, useDateRange: true },
+    { useArchived: false, useAcademicColumns: false, useDateRange: true },
+  ];
+
+  let lastError = null;
+
+  for (const attempt of attempts) {
+    let query = supabase.from(table).select("*");
+
+    if (attempt.useArchived) {
+      query = query.eq("archived", false);
+    }
+    if (orgId) {
+      query = query.eq("organization_id", orgId);
+    }
+
+    if (period) {
+      if (attempt.useAcademicColumns) {
+        query = query.eq("academic_year", period.year).eq("semester", period.semester);
+      } else if (attempt.useDateRange && dateColumn) {
+        query = query.gte(dateColumn, period.startDate).lte(dateColumn, period.endDate);
+      }
+    }
+
+    const { data, error } = await query
       .order(primaryOrderColumn, { ascending: false })
       .order("id", { ascending: false });
-    data = result.data;
-    error = result.error;
+
+    if (!error) {
+      return data || [];
+    }
+
+    lastError = error;
+    const message = String(error.message || "").toLowerCase();
+
+    if (attempt.useArchived && !message.includes("archived")) {
+      continue;
+    }
+
+    if (attempt.useAcademicColumns && !(message.includes("academic_year") || message.includes("semester"))) {
+      continue;
+    }
   }
-  
-  if (error) throw error;
-  return data || [];
+
+  if (lastError) throw lastError;
+  return [];
 }
 
 async function createRow(table, payload) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
-  const safePayload = { ...payload, organization_id: orgId };
-  const { error } = await supabase.from(table).insert(safePayload);
+  const period = getAcademicPeriodRange();
+  const safePayload = {
+    ...payload,
+    organization_id: orgId,
+    ...(period ? { academic_year: period.year, semester: period.semester } : {}),
+  };
+
+  let { error } = await supabase.from(table).insert(safePayload);
+
+  if (error) {
+    const message = String(error.message || "").toLowerCase();
+    if (message.includes("academic_year") || message.includes("semester")) {
+      const fallbackPayload = { ...payload, organization_id: orgId };
+      ({ error } = await supabase.from(table).insert(fallbackPayload));
+    }
+  }
+
   if (error) throw error;
 }
 
@@ -217,7 +415,7 @@ async function updateRow(table, id, payload) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
-  const { organization_id, ...safePayload } = payload;
+  const { organization_id, academic_year, semester, ...safePayload } = payload;
   let query = supabase.from(table).update(safePayload).eq("id", id);
   if (orgId) query = query.eq("organization_id", orgId);
   const { error } = await query;
@@ -252,13 +450,44 @@ function normalizeDateValue(record) {
   );
 }
 
-function switchTab(targetId) {
+function escapeHtml(value) {
+  const element = document.createElement("div");
+  element.textContent = String(value ?? "");
+  return element.innerHTML;
+}
+
+function hasTab(targetId) {
+  return [...tabs].some((tab) => tab.id === targetId);
+}
+
+function getPreferredTab() {
+  const storedTab = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+  if (storedTab && hasTab(storedTab)) {
+    return storedTab;
+  }
+
+  const currentActiveTab = [...tabs].find((tab) => tab.classList.contains("active"));
+  if (currentActiveTab) {
+    return currentActiveTab.id;
+  }
+
+  return "dashboard";
+}
+
+function switchTab(targetId, options = {}) {
+  const { persist = true } = options;
+  if (!hasTab(targetId)) return;
+
   tabs.forEach((tab) => {
     tab.classList.toggle("active", tab.id === targetId);
   });
   navButtons.forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.tab === targetId);
   });
+
+  if (persist) {
+    localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, targetId);
+  }
   
   // Show/hide back button based on active tab
   const backBtn = document.getElementById("back-to-dashboard-btn");
@@ -276,6 +505,914 @@ function formatDate(value) {
     day: "2-digit",
     year: "numeric",
   });
+}
+
+function isRecordCompleted(moduleKey, record) {
+  if (moduleKey === "minor" || moduleKey === "major") {
+    return Boolean(String(record.sanction || "").trim() && String(record.date_of_suspension || "").trim());
+  }
+
+  return Boolean(String(record.time_out || "").trim());
+}
+
+function getAnalyticsEntries() {
+  return [
+    ...minorRecords.map((record) => ({ moduleKey: "minor", label: "Minor Offense", record })),
+    ...majorRecords.map((record) => ({ moduleKey: "major", label: "Major Offense", record })),
+    ...uniformRecords.map((record) => ({ moduleKey: "uniform", label: "Non-Wearing Uniform", record })),
+    ...gatepassRecords.map((record) => ({ moduleKey: "gatepass", label: "Gatepass", record })),
+    ...goodmoralRecords.map((record) => ({ moduleKey: "goodmoral", label: "Good Moral", record })),
+    ...idreplacementRecords.map((record) => ({ moduleKey: "idreplacement", label: "ID Replacement", record })),
+    ...leaveofabsenceRecords.map((record) => ({ moduleKey: "leaveofabsence", label: "Leave of Absence", record })),
+  ].map((entry) => ({
+    ...entry,
+    date: normalizeDateValue(entry.record),
+    completed: isRecordCompleted(entry.moduleKey, entry.record),
+  }));
+}
+
+function getAnalyticsModuleRows() {
+  return ANALYTICS_MODULES.map((module) => {
+    const records =
+      module.key === "minor"
+        ? minorRecords
+        : module.key === "major"
+          ? majorRecords
+          : module.key === "uniform"
+            ? uniformRecords
+            : module.key === "gatepass"
+              ? gatepassRecords
+              : module.key === "goodmoral"
+                ? goodmoralRecords
+                : module.key === "idreplacement"
+                  ? idreplacementRecords
+                  : leaveofabsenceRecords;
+    const completed = records.filter((record) => isRecordCompleted(module.key, record)).length;
+
+    return {
+      ...module,
+      count: records.length,
+      completed,
+      pending: Math.max(records.length - completed, 0),
+    };
+  });
+}
+
+function getModuleRecords(moduleKey) {
+  if (moduleKey === "minor") return minorRecords;
+  if (moduleKey === "major") return majorRecords;
+  if (moduleKey === "uniform") return uniformRecords;
+  if (moduleKey === "gatepass") return gatepassRecords;
+  if (moduleKey === "goodmoral") return goodmoralRecords;
+  if (moduleKey === "idreplacement") return idreplacementRecords;
+  return leaveofabsenceRecords;
+}
+
+function getModuleTrendStats(records, moduleKey) {
+  const today = new Date();
+  const currentStart = getDaysAgo(today, 6);
+  const currentEnd = new Date(today);
+  currentEnd.setHours(23, 59, 59, 999);
+  const previousStart = getDaysAgo(today, 13);
+  const previousEnd = getDaysAgo(today, 6);
+  const datedRecords = records
+    .map((record) => ({ record, date: moduleKey === "minor" || moduleKey === "major" ? record.date_of_complaint : record.date }))
+    .filter((entry) => toSafeDate(entry.date));
+
+  const currentCount = datedRecords.filter((entry) => {
+    const date = toSafeDate(entry.date);
+    return date && date >= currentStart && date <= currentEnd;
+  }).length;
+
+  const previousCount = datedRecords.filter((entry) => {
+    const date = toSafeDate(entry.date);
+    return date && date >= previousStart && date < previousEnd;
+  }).length;
+
+  let percent = 0;
+  if (!previousCount && currentCount) {
+    percent = 100;
+  } else if (previousCount) {
+    percent = Math.round(((currentCount - previousCount) / previousCount) * 100);
+  }
+  percent = clampPercent(percent);
+
+  const direction = percent > 0 ? "up" : percent < 0 ? "down" : "neutral";
+
+  return {
+    currentCount,
+    previousCount,
+    percent,
+    direction,
+  };
+}
+
+function getDaysAgo(date, dayOffset) {
+  const clone = new Date(date);
+  clone.setHours(0, 0, 0, 0);
+  clone.setDate(clone.getDate() - dayOffset);
+  return clone;
+}
+
+function toSafeDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function clampPercent(value) {
+  const numeric = Number(value) || 0;
+  if (numeric > 100) return 100;
+  if (numeric < -100) return -100;
+  return numeric;
+}
+
+function getModuleColor(moduleKey) {
+  return ANALYTICS_MODULE_COLOR_MAP[moduleKey] || "#64748b";
+}
+
+function hexToRgba(hex, alpha) {
+  const normalized = String(hex || "").replace("#", "").trim();
+  const isShort = normalized.length === 3;
+  const isLong = normalized.length === 6;
+  if (!isShort && !isLong) return `rgba(100, 116, 139, ${alpha})`;
+
+  const parts = isShort
+    ? normalized.split("").map((char) => parseInt(char + char, 16))
+    : [
+        parseInt(normalized.slice(0, 2), 16),
+        parseInt(normalized.slice(2, 4), 16),
+        parseInt(normalized.slice(4, 6), 16),
+      ];
+
+  if (parts.some((value) => Number.isNaN(value))) {
+    return `rgba(100, 116, 139, ${alpha})`;
+  }
+
+  return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha})`;
+}
+
+function buildTrendSeries(entries, dayCount = 14) {
+  const today = new Date();
+  const labels = [];
+  const points = [];
+
+  for (let dayOffset = dayCount - 1; dayOffset >= 0; dayOffset -= 1) {
+    const day = getDaysAgo(today, dayOffset);
+    const nextDay = new Date(day);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    const count = entries.filter((entry) => {
+      const entryDate = toSafeDate(entry.date);
+      return entryDate && entryDate >= day && entryDate < nextDay;
+    }).length;
+
+    labels.push(day.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
+    points.push(count);
+  }
+
+  return { labels, points };
+}
+
+function buildModuleTrendSeries(dayCount = 14) {
+  const today = new Date();
+  const labels = [];
+  const series = ANALYTICS_MODULES.map((module) => ({
+    key: module.key,
+    label: module.label,
+    color: module.color,
+    values: [],
+  }));
+
+  for (let dayOffset = dayCount - 1; dayOffset >= 0; dayOffset -= 1) {
+    const day = getDaysAgo(today, dayOffset);
+    const nextDay = new Date(day);
+    nextDay.setDate(nextDay.getDate() + 1);
+    labels.push(day.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
+
+    series.forEach((moduleSeries) => {
+      const records = getModuleRecords(moduleSeries.key);
+      const count = records.filter((record) => {
+        const rawDate = moduleSeries.key === "minor" || moduleSeries.key === "major" ? record.date_of_complaint : record.date;
+        const recordDate = toSafeDate(rawDate || record.created_at);
+        return recordDate && recordDate >= day && recordDate < nextDay;
+      }).length;
+      moduleSeries.values.push(count);
+    });
+  }
+
+  return {
+    labels,
+    series,
+  };
+}
+
+function countEntriesBetween(entries, startDate, endDate) {
+  return entries.filter((entry) => {
+    const entryDate = toSafeDate(entry.date);
+    return entryDate && entryDate >= startDate && entryDate < endDate;
+  }).length;
+}
+
+function getTopOffense() {
+  const offenseCounts = new Map();
+
+  [...minorRecords, ...majorRecords].forEach((record) => {
+    const offense = String(record.offense || "").trim();
+    if (!offense) return;
+    offenseCounts.set(offense, (offenseCounts.get(offense) || 0) + 1);
+  });
+
+  const topOffense = [...offenseCounts.entries()].sort((left, right) => right[1] - left[1])[0];
+  if (!topOffense) return null;
+
+  return { name: topOffense[0], count: topOffense[1] };
+}
+
+function buildLocalAnalyticsSummary() {
+  const entries = getAnalyticsEntries();
+  const modules = getAnalyticsModuleRows();
+  const totalRecords = entries.length;
+  const completedRecords = entries.filter((entry) => entry.completed).length;
+  const pendingRecords = Math.max(totalRecords - completedRecords, 0);
+  const resolutionRate = totalRecords ? Math.round((completedRecords / totalRecords) * 100) : 0;
+  const topModule = [...modules].sort((left, right) => right.count - left.count)[0] || null;
+  const topOffense = getTopOffense();
+  const trendSeries = buildTrendSeries(entries, 14);
+  const recentStart = getDaysAgo(new Date(), 6);
+  const recentEnd = new Date();
+  recentEnd.setHours(23, 59, 59, 999);
+  const previousStart = getDaysAgo(new Date(), 13);
+  const previousEnd = getDaysAgo(new Date(), 6);
+  const recentCount = countEntriesBetween(entries, recentStart, recentEnd);
+  const previousCount = countEntriesBetween(entries, previousStart, previousEnd);
+  const changePercent = clampPercent(
+    previousCount ? Math.round(((recentCount - previousCount) / previousCount) * 100) : recentCount ? 100 : 0
+  );
+  const goodMoralFlags = goodmoralRecords.filter((record) => record.has_minor_offense).length;
+
+  return {
+    generatedAt: new Date().toISOString(),
+    totals: {
+      totalRecords,
+      completedRecords,
+      pendingRecords,
+      resolutionRate,
+      goodMoralFlags,
+    },
+    modules,
+    status: {
+      completed: completedRecords,
+      pending: pendingRecords,
+    },
+    trend: {
+      labels: trendSeries.labels,
+      values: trendSeries.points,
+      recentCount,
+      previousCount,
+      changePercent,
+    },
+    insights: {
+      topModule: topModule ? { key: topModule.key, label: topModule.label, count: topModule.count } : null,
+      topOffense,
+      recentShare: totalRecords ? Math.round((recentCount / totalRecords) * 100) : 0,
+    },
+  };
+}
+
+function normalizeAnalyticsSummary(data) {
+  const modules = Array.isArray(data?.modules)
+    ? data.modules.map((module) => ({
+        key: String(module.key || ""),
+        label: String(module.label || ""),
+        color: getModuleColor(String(module.key || "")),
+        count: Number(module.count || 0),
+        completed: Number(module.completed || 0),
+        pending: Number(module.pending || 0),
+      }))
+    : [];
+
+  return {
+    generatedAt: data?.generatedAt ? String(data.generatedAt) : new Date().toISOString(),
+    totals: {
+      totalRecords: Number(data?.totals?.totalRecords || 0),
+      completedRecords: Number(data?.totals?.completedRecords || 0),
+      pendingRecords: Number(data?.totals?.pendingRecords || 0),
+      resolutionRate: Number(data?.totals?.resolutionRate || 0),
+      goodMoralFlags: Number(data?.totals?.goodMoralFlags || 0),
+    },
+    modules,
+    status: {
+      completed: Number(data?.status?.completed || data?.totals?.completedRecords || 0),
+      pending: Number(data?.status?.pending || data?.totals?.pendingRecords || 0),
+    },
+    trend: {
+      labels: Array.isArray(data?.trend?.labels) ? data.trend.labels : [],
+      values: Array.isArray(data?.trend?.values) ? data.trend.values.map((value) => Number(value) || 0) : [],
+      recentCount: Number(data?.trend?.recentCount || 0),
+      previousCount: Number(data?.trend?.previousCount || 0),
+      changePercent: clampPercent(data?.trend?.changePercent),
+    },
+    insights: {
+      topModule: data?.insights?.topModule || null,
+      topOffense: data?.insights?.topOffense || null,
+      recentShare: Number(data?.insights?.recentShare || 0),
+    },
+  };
+}
+
+function getAnalyticsSummary() {
+  return analyticsSummary || buildLocalAnalyticsSummary();
+}
+
+function getBusiestDay(trend) {
+  if (!trend?.values?.length || !trend?.labels?.length) return null;
+  let maxIndex = 0;
+  let maxValue = Number(trend.values[0] || 0);
+  trend.values.forEach((value, index) => {
+    const numericValue = Number(value || 0);
+    if (numericValue > maxValue) {
+      maxValue = numericValue;
+      maxIndex = index;
+    }
+  });
+  if (!maxValue) return null;
+  return {
+    label: trend.labels[maxIndex] || "--",
+    count: maxValue,
+  };
+}
+
+function getAttentionModule(modules) {
+  if (!Array.isArray(modules) || !modules.length) return null;
+  const module = [...modules].sort((left, right) => (right.pending || 0) - (left.pending || 0))[0];
+  if (!module || !module.pending) return null;
+  return module;
+}
+
+function getTopOffenseBreakdown(limit = 6) {
+  const offenseCounts = new Map();
+  [...minorRecords, ...majorRecords].forEach((record) => {
+    const offense = String(record.offense || "").trim();
+    if (!offense) return;
+    offenseCounts.set(offense, (offenseCounts.get(offense) || 0) + 1);
+  });
+
+  return [...offenseCounts.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, limit)
+    .map(([name, count]) => ({ name, count }));
+}
+
+function getOffenseRecords(offenseName, limit = 8) {
+  const normalized = String(offenseName || "").trim().toLowerCase();
+  if (!normalized) return [];
+
+  return [
+    ...minorRecords.map((record) => ({ module: "Minor Offense", record })),
+    ...majorRecords.map((record) => ({ module: "Major Offense", record })),
+  ]
+    .map(({ module, record }) => ({
+      module,
+      date: normalizeDateValue(record),
+      name: record.name_of_student || "",
+      srCode: record.sr_code || "",
+      offense: String(record.offense || "").trim(),
+      rawDate: normalizeDateValue(record),
+    }))
+    .filter((row) => String(row.offense || "").trim().toLowerCase() === normalized)
+    .sort((left, right) => {
+      const leftDate = toSafeDate(left.rawDate)?.getTime() || 0;
+      const rightDate = toSafeDate(right.rawDate)?.getTime() || 0;
+      return rightDate - leftDate;
+    })
+    .slice(0, limit);
+}
+
+function getBusiestDays(limit = 6) {
+  const summary = getAnalyticsSummary();
+  const labels = summary?.trend?.labels || [];
+  const values = summary?.trend?.values || [];
+  const rows = labels
+    .map((label, index) => ({ label, count: Number(values[index] || 0), index }))
+    .filter((row) => row.count > 0);
+
+  if (!rows.length) return [];
+
+  const busiestRow = rows.reduce((best, row) => (row.count > best.count ? row : best), rows[0]);
+  const remainingRows = rows
+    .filter((row) => row.index !== busiestRow.index)
+    .sort((left, right) => right.index - left.index);
+
+  return [busiestRow, ...remainingRows].slice(0, limit).map(({ label, count }) => ({ label, count }));
+}
+
+function getInsightModalPayload(insightKey) {
+  const analytics = getAnalyticsSummary();
+  if (insightKey === "top-offense") {
+    const rows = getTopOffenseBreakdown(8);
+    return {
+      title: "Top Offense Details",
+      items: rows,
+    };
+  }
+
+  if (insightKey === "busiest-day") {
+    const rows = getBusiestDays(8);
+    return {
+      title: "Busiest Day Breakdown",
+      items: rows.length
+        ? rows.map((row) => ({ label: row.label, value: `${row.count} records` }))
+        : [{ label: "No activity in selected window", value: "--" }],
+    };
+  }
+
+  if (insightKey === "attention-module") {
+    const rows = [...(analytics.modules || [])]
+      .sort((left, right) => (right.pending || 0) - (left.pending || 0))
+      .map((module) => ({
+        label: module.label,
+        value: `${module.pending} pending / ${module.count} total`,
+      }));
+
+    return {
+      title: "Attention Module Details",
+      items: rows.length ? rows : [{ label: "No modules available", value: "--" }],
+    };
+  }
+
+  const pending = analytics.totals?.pendingRecords || 0;
+  const resolution = analytics.totals?.resolutionRate || 0;
+  const recentShare = analytics.insights?.recentShare || 0;
+  const generatedAt = formatGeneratedAt(analytics.generatedAt);
+  return {
+    title: "Analyst Notes Details",
+    items: [
+      { label: "Pending Records", value: String(pending) },
+      { label: "Resolution Rate", value: `${resolution}%` },
+      { label: "Recent Activity Share", value: `${recentShare}%` },
+      { label: "Last Refresh", value: generatedAt.replace("Updated ", "") },
+    ],
+  };
+}
+
+function openInsightModal(insightKey) {
+  if (!analyticsInsightModal || !analyticsInsightModalTitle || !analyticsInsightModalBody) return;
+  const payload = getInsightModalPayload(insightKey);
+  activeInsightContext = insightKey;
+  analyticsInsightModalTitle.textContent = payload.title;
+  if (insightKey === "top-offense") {
+    const items = Array.isArray(payload.items) && payload.items.length
+      ? payload.items
+      : [{ name: "No offense records yet", count: 0 }];
+
+    const defaultOffense = items[0]?.name || "";
+    const renderTopOffenseView = (selectedOffense) => {
+      const selectedRecords = selectedOffense ? getOffenseRecords(selectedOffense, 10) : [];
+      const selectedCount = items.find((item) => item.name === selectedOffense)?.count || 0;
+      const selectedLabel = selectedOffense || defaultOffense || "Select an offense";
+
+      analyticsInsightModalBody.innerHTML = `
+        <div class="analytics-insight-drilldown">
+          <div class="analytics-insight-drill-list">
+            <div class="analytics-insight-drill-hint">Select an offense to view the matching records below.</div>
+            ${items
+              .map(
+                (item) => `
+                  <button type="button" class="analytics-insight-drill-item ${item.name === selectedOffense ? "is-active" : ""}" data-offense-row="${escapeHtml(item.name)}">
+                    <strong>${escapeHtml(item.name)}</strong>
+                    <span>${item.count} records</span>
+                  </button>
+                `
+              )
+              .join("")}
+          </div>
+          <div class="analytics-insight-records-panel">
+            <div class="analytics-insight-records-head">
+              <div>
+                <strong>${escapeHtml(selectedLabel)}</strong>
+                <span>${selectedCount} total related records</span>
+              </div>
+              <span class="analytics-insight-records-count">Latest first</span>
+            </div>
+            <div class="analytics-insight-records-list">
+              ${selectedRecords.length
+                ? selectedRecords
+                    .map(
+                      (record) => `
+                        <div class="analytics-insight-record-item">
+                          <div>
+                            <strong>${escapeHtml(record.name)}</strong>
+                            <span>${escapeHtml(record.module)} • ${escapeHtml(formatDate(record.date))}</span>
+                            <small>${escapeHtml(record.offense)}</small>
+                          </div>
+                          <small>${escapeHtml(record.srCode)}</small>
+                        </div>
+                      `
+                    )
+                    .join("")
+                : '<div class="analytics-insight-empty-state">Click an offense row to view matching records.</div>'}
+            </div>
+          </div>
+        </div>
+      `;
+    };
+
+    analyticsInsightModalBody.dataset.insightMode = "top-offense";
+    analyticsInsightModalBody.innerHTML = "";
+    renderTopOffenseView(defaultOffense);
+    analyticsInsightModalBody.dataset.selectedOffense = defaultOffense;
+    activeInsightContext = { type: "top-offense", render: renderTopOffenseView };
+  } else {
+    analyticsInsightModalBody.dataset.insightMode = insightKey;
+    analyticsInsightModalBody.innerHTML = payload.items
+      .map(
+        (item) => `
+          <div class="analytics-insight-modal-item">
+            <strong>${escapeHtml(item.label)}</strong>
+            <span>${escapeHtml(item.value)}</span>
+          </div>
+        `
+      )
+      .join("");
+  }
+  analyticsInsightModal.hidden = false;
+}
+
+function closeInsightModal() {
+  if (!analyticsInsightModal) return;
+  analyticsInsightModal.hidden = true;
+  activeInsightContext = null;
+}
+
+function initializeInsightModal() {
+  if (!analyticsInsightCards.length || !analyticsInsightModal) return;
+
+  analyticsInsightCards.forEach((card) => {
+    const insightKey = card.dataset.insight;
+    if (!insightKey) return;
+    card.addEventListener("click", () => openInsightModal(insightKey));
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openInsightModal(insightKey);
+    });
+  });
+
+  analyticsInsightModal.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest("[data-insight-modal-close='true']")) {
+      closeInsightModal();
+      return;
+    }
+
+    if (activeInsightContext && activeInsightContext.type === "top-offense") {
+      const offenseButton = target.closest("[data-offense-row]");
+      if (offenseButton) {
+        const offenseName = offenseButton.getAttribute("data-offense-row") || "";
+        activeInsightContext.render(offenseName);
+      }
+    }
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && analyticsInsightModal && !analyticsInsightModal.hidden) {
+      closeInsightModal();
+    }
+  });
+}
+
+function formatGeneratedAt(value) {
+  if (!value) return "Updated just now";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Updated just now";
+  return `Updated ${date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
+}
+
+function formatTrendChange(changePercent, recentCount, previousCount) {
+  const safeChangePercent = clampPercent(changePercent);
+
+  if (!previousCount && !recentCount) {
+    return {
+      value: "0%",
+      label: "No change vs prior 7 days",
+      direction: "neutral",
+    };
+  }
+
+  if (!previousCount && recentCount) {
+    return {
+      value: "+100%",
+      label: "Increase vs prior 7 days",
+      direction: "up",
+    };
+  }
+
+  const direction = safeChangePercent > 0 ? "up" : safeChangePercent < 0 ? "down" : "neutral";
+  const label = direction === "up" ? "Increase vs prior 7 days" : direction === "down" ? "Decrease vs prior 7 days" : "No change vs prior 7 days";
+
+  return {
+    value: `${safeChangePercent > 0 ? "+" : safeChangePercent < 0 ? "" : ""}${safeChangePercent}%`,
+    label,
+    direction,
+  };
+}
+
+function formatModuleChangeBadge(stats) {
+  if (!stats.previousCount && !stats.currentCount) {
+    return {
+      value: "0%",
+      label: "no activity",
+      direction: "neutral",
+    };
+  }
+
+  if (!stats.previousCount && stats.currentCount) {
+    return {
+      value: "+100%",
+      label: "new activity",
+      direction: "up",
+    };
+  }
+
+  const sign = stats.percent > 0 ? "+" : "";
+  const label = stats.direction === "up" ? "increase" : stats.direction === "down" ? "decrease" : "no change";
+  return {
+    value: `${sign}${stats.percent}%`,
+    label: `${label} vs prior 7 days`,
+    direction: stats.direction,
+  };
+}
+
+function renderAnalyticsBarList(container, rows) {
+  if (!container) return;
+
+  if (!rows.length) {
+    container.innerHTML = '<div class="analytics-chart-empty">No records available yet.</div>';
+    return;
+  }
+
+  const sortedRows = [...rows].sort((left, right) => {
+    if (right.count !== left.count) return right.count - left.count;
+    return left.label.localeCompare(right.label);
+  });
+  const totalCount = sortedRows.reduce((sum, row) => sum + row.count, 0);
+  const maxCount = Math.max(...sortedRows.map((row) => row.count), 1);
+
+  container.innerHTML = `
+    <div class="analytics-module-stack">
+      ${sortedRows
+        .map((row, index) => {
+          const stats = getModuleTrendStats(getModuleRecords(row.key), row.key);
+          const changeBadge = formatModuleChangeBadge(stats);
+          const moduleColor = getModuleColor(row.key);
+          const moduleSoftColor = hexToRgba(moduleColor, 0.12);
+          const moduleBorderColor = hexToRgba(moduleColor, 0.34);
+          const sharePercent = totalCount ? Math.round((row.count / totalCount) * 100) : 0;
+          const completionRate = row.count ? Math.round((row.completed / row.count) * 100) : 0;
+          const widthPercent = Math.max((row.count / maxCount) * 100, 8);
+          return `
+            <section class="analytics-module-tile ${changeBadge.direction}" style="--module-color:${escapeHtml(moduleColor)}; --module-soft-color:${escapeHtml(moduleSoftColor)}; --module-border-color:${escapeHtml(moduleBorderColor)};">
+              <div class="analytics-module-tile-head">
+                <p class="analytics-module-name"><span class="analytics-module-name-dot" style="background:${escapeHtml(moduleColor)};"></span>${index + 1}. ${escapeHtml(row.label)}</p>
+                <div class="analytics-module-badge ${changeBadge.direction}" title="${escapeHtml(changeBadge.label)}">
+                  <strong>${changeBadge.value}</strong>
+                </div>
+              </div>
+              <div class="analytics-module-count">${row.count} <span>records</span></div>
+              <div class="analytics-module-bar" aria-hidden="true">
+                <span style="width:${widthPercent}%;"></span>
+              </div>
+              <div class="analytics-module-meta">
+                <span>${row.pending} pending</span>
+                <span>${completionRate}% done</span>
+                <span>${sharePercent}% share</span>
+              </div>
+            </section>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderAnalyticsTrendChart(container, labels, seriesRows) {
+  if (!container) return;
+
+  const activeSeries = (seriesRows || []).filter(
+    (series) => Array.isArray(series.values) && series.values.some((value) => value > 0)
+  );
+
+  if (!labels.length || !activeSeries.length) {
+    container.innerHTML = '<div class="analytics-chart-empty">No activity recorded in the selected window.</div>';
+    return;
+  }
+
+  const totalsByDay = labels.map((label, index) => {
+    const total = activeSeries.reduce((sum, series) => sum + Number(series.values[index] || 0), 0);
+    return { label, total, index };
+  });
+  const maxValue = Math.max(...totalsByDay.map((item) => item.total), 1);
+  const tickStep = Math.max(Math.ceil(labels.length / 6), 1);
+
+  const barsMarkup = totalsByDay
+    .map((item) => {
+      const detailRows = activeSeries
+        .filter((series) => Number(series.values[item.index] || 0) > 0)
+        .map(
+          (series) => `
+            <div class="analytics-trend-tooltip-row">
+              <span class="analytics-trend-legend-swatch" style="background:${series.color};"></span>
+              <span>${escapeHtml(series.label)}: ${series.values[item.index]} records</span>
+            </div>
+          `
+        );
+      const detailsHtml = detailRows.length
+        ? detailRows.join("")
+        : '<div class="analytics-trend-tooltip-row"><span>No module activity</span></div>';
+      return `
+        <div class="analytics-trend-bar-wrap">
+          <div class="analytics-trend-bar-track">
+            <div class="analytics-trend-bar-fill" style="height:${Math.max((item.total / maxValue) * 100, item.total ? 8 : 0)}%;">
+              <span class="analytics-trend-bar-value">${item.total}</span>
+              <div class="analytics-trend-bar-tooltip">
+                <strong>${escapeHtml(item.label)}: ${item.total} total</strong>
+                <div>${detailsHtml}</div>
+              </div>
+            </div>
+          </div>
+          ${item.index % tickStep === 0 || item.index === totalsByDay.length - 1
+            ? `<span class="analytics-trend-bar-label">${escapeHtml(item.label)}</span>`
+            : '<span class="analytics-trend-bar-label is-ghost">.</span>'}
+        </div>
+      `;
+    })
+    .join("");
+
+  container.innerHTML = `
+    <div class="analytics-trend-wrap">
+      <div class="analytics-trend-bar-chart" role="img" aria-label="Last 14 days activity bar chart">
+        ${barsMarkup}
+      </div>
+      <div class="analytics-trend-legend" aria-label="Trend legend">
+        ${activeSeries
+          .map(
+            (series) => `
+              <div class="analytics-trend-legend-item">
+                <span class="analytics-trend-legend-swatch" style="background:${series.color};"></span>
+                <span>${escapeHtml(series.label)}</span>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderAnalyticsDonutChart(container, segments) {
+  if (!container) return;
+
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+  if (!total) {
+    container.innerHTML = '<div class="analytics-chart-empty">No status data available yet.</div>';
+    return;
+  }
+
+  const size = 280;
+  const radius = 92;
+  const strokeWidth = 28;
+  const circumference = 2 * Math.PI * radius;
+  let accumulated = 0;
+
+  const circles = segments
+    .filter((segment) => segment.value > 0)
+    .map((segment) => {
+      const dashLength = (segment.value / total) * circumference;
+      const circle = `
+        <circle
+          cx="${size / 2}"
+          cy="${size / 2}"
+          r="${radius}"
+          fill="none"
+          stroke="${segment.color}"
+          stroke-width="${strokeWidth}"
+          stroke-linecap="round"
+          stroke-dasharray="${dashLength} ${circumference - dashLength}"
+          stroke-dashoffset="${-accumulated}"
+          transform="rotate(-90 ${size / 2} ${size / 2})"
+        ></circle>
+      `;
+      accumulated += dashLength;
+      return circle;
+    });
+
+  const completedSegment = segments.find((segment) => String(segment.label || "").toLowerCase() === "completed");
+  const completedValue = completedSegment ? completedSegment.value : 0;
+  const completedPercent = total ? Math.round((completedValue / total) * 100) : 0;
+
+  container.innerHTML = `
+    <div class="analytics-donut-wrap">
+      <svg viewBox="0 0 ${size} ${size}" class="analytics-svg analytics-donut-svg" role="img" aria-label="Open versus completed chart">
+        <circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="none" stroke="rgba(15, 23, 42, 0.08)" stroke-width="${strokeWidth}"></circle>
+        ${circles.join("")}
+        <text x="${size / 2}" y="${size / 2 - 14}" class="analytics-donut-value">${total}</text>
+        <text x="${size / 2}" y="${size / 2 + 8}" class="analytics-donut-label">records</text>
+        <text x="${size / 2}" y="${size / 2 + 30}" class="analytics-donut-subvalue">${completedPercent}% completed</text>
+      </svg>
+      <div class="analytics-donut-legend">
+        ${segments
+          .map(
+            (segment) => `
+              <div class="analytics-legend-item">
+                <span class="analytics-legend-swatch" style="background: ${segment.color};"></span>
+                <span>${escapeHtml(segment.label)}</span>
+                <span>${segment.value} (${total ? Math.round((segment.value / total) * 100) : 0}%)</span>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderAnalyticsModule(summary = null) {
+  const analytics = summary || getAnalyticsSummary();
+  const totalRecords = analytics.totals.totalRecords;
+  const completedRecords = analytics.totals.completedRecords;
+  const pendingRecords = analytics.totals.pendingRecords;
+  const resolutionRate = analytics.totals.resolutionRate;
+  const goodMoralFlags = analytics.totals.goodMoralFlags || 0;
+  const recentShare = analytics.insights.recentShare || 0;
+  const backlogRate = totalRecords ? Math.round((pendingRecords / totalRecords) * 100) : 0;
+  const topModule = analytics.insights.topModule;
+  const topOffense = analytics.insights.topOffense;
+  const busiestDay = getBusiestDay(analytics.trend);
+  const attentionModule = getAttentionModule(analytics.modules);
+  const trendChange = formatTrendChange(
+    analytics.trend.changePercent,
+    analytics.trend.recentCount,
+    analytics.trend.previousCount
+  );
+  if (analyticsTotalRecords) analyticsTotalRecords.textContent = String(totalRecords);
+  if (analyticsResolutionRate) analyticsResolutionRate.textContent = `${resolutionRate}%`;
+  if (analyticsPendingActions) analyticsPendingActions.textContent = String(pendingRecords);
+  if (analyticsRecentShare) analyticsRecentShare.textContent = `${recentShare}%`;
+  if (analyticsGoodMoralFlags) analyticsGoodMoralFlags.textContent = String(goodMoralFlags);
+  if (analyticsModulePill) {
+    analyticsModulePill.textContent = topModule ? `Top module: ${topModule.label}` : "Top module: --";
+  }
+  if (analyticsTopOffense) {
+    analyticsTopOffense.textContent = topOffense ? topOffense.name : "No offense data yet";
+  }
+  if (analyticsTopOffenseCount) {
+    analyticsTopOffenseCount.textContent = topOffense ? `${topOffense.count} related records` : "No records yet";
+  }
+  if (analyticsBusiestDay) {
+    analyticsBusiestDay.textContent = busiestDay ? busiestDay.label : "No activity window";
+  }
+  if (analyticsBusiestDayCount) {
+    analyticsBusiestDayCount.textContent = busiestDay ? `${busiestDay.count} records posted` : "No activity yet";
+  }
+  if (analyticsAttentionModule) {
+    analyticsAttentionModule.textContent = attentionModule ? attentionModule.label : "All modules stable";
+  }
+  if (analyticsAttentionModuleCount) {
+    analyticsAttentionModuleCount.textContent = attentionModule
+      ? `${attentionModule.pending} pending records`
+      : "No pending records";
+  }
+  if (analyticsOpsNote) {
+    analyticsOpsNote.textContent = backlogRate >= 50
+      ? "Backlog pressure is high"
+      : backlogRate >= 30
+        ? "Monitor closure velocity"
+        : "Case flow is healthy";
+  }
+  if (analyticsRefreshStamp) {
+    analyticsRefreshStamp.textContent = formatGeneratedAt(analytics.generatedAt);
+  }
+  if (analyticsTrendPill) analyticsTrendPill.textContent = "Last 14 Days";
+  if (analyticsTrendChange) analyticsTrendChange.textContent = trendChange.value;
+  if (analyticsTrendLabel) analyticsTrendLabel.textContent = trendChange.label;
+  if (analyticsTrendCard) {
+    analyticsTrendCard.classList.remove("is-up", "is-down", "is-neutral");
+    analyticsTrendCard.classList.add(`is-${trendChange.direction}`);
+  }
+
+  renderAnalyticsBarList(analyticsModuleChart, analytics.modules);
+  const moduleTrend = buildModuleTrendSeries(14);
+  renderAnalyticsTrendChart(analyticsTrendChart, moduleTrend.labels, moduleTrend.series);
+  renderAnalyticsDonutChart(analyticsStatusChart, [
+    { label: "Completed", value: completedRecords, color: "#0f766e" },
+    { label: "Pending", value: pendingRecords, color: "#a41321" },
+  ]);
 }
 
 function formatDashboardDetail(item) {
@@ -345,11 +1482,11 @@ function renderDashboardActivity() {
   items.forEach((item) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${formatDate(item.date)}</td>
-      <td>${item.type}</td>
-      <td>${item.name}</td>
-      <td>${item.srCode}</td>
-      <td>${formatDashboardDetail(item)}</td>
+      <td>${escapeHtml(formatDate(item.date))}</td>
+      <td>${escapeHtml(item.type)}</td>
+      <td>${escapeHtml(item.name)}</td>
+      <td>${escapeHtml(item.srCode)}</td>
+      <td>${escapeHtml(formatDashboardDetail(item))}</td>
     `;
     dashboardActivityBody.appendChild(row);
   });
@@ -365,6 +1502,7 @@ function updateDashboardCounters() {
     kpiGoodmoralFlagged.textContent = goodmoralRecords.filter((row) => row.has_minor_offense).length;
   }
   renderDashboardActivity();
+  renderAnalyticsModule();
   loadDashboard();
 }
 
@@ -1365,13 +2503,30 @@ async function loadMajorRecords() {
 // Academic Period Management
 function getAcademicPeriod() {
   const year = localStorage.getItem("academicYear") || "2024-2025";
-  const semester = localStorage.getItem("semester") || "First Semester";
+  const semester = normalizeSemesterLabel(localStorage.getItem("semester")) || "First Semester";
   return { year, semester };
+}
+
+function normalizeSemesterLabel(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "";
+
+  if (raw === "first" || raw === "1st" || raw.includes("first")) {
+    return "First Semester";
+  }
+  if (raw === "second" || raw === "2nd" || raw.includes("second")) {
+    return "Second Semester";
+  }
+  if (raw === "summer" || raw.includes("summer")) {
+    return "Summer Class";
+  }
+
+  return "";
 }
 
 function setAcademicPeriod(year, semester) {
   localStorage.setItem("academicYear", year);
-  localStorage.setItem("semester", semester);
+  localStorage.setItem("semester", normalizeSemesterLabel(semester) || "First Semester");
 }
 
 function formatAcademicYear(input) {
@@ -1399,8 +2554,53 @@ function updateAcademicPeriodDisplay() {
   academicPeriodDisplay.textContent = `${semester} AY ${year}`;
 }
 
+function getAcademicPeriodRange() {
+  const { year, semester } = getAcademicPeriod();
+  const normalizedYear = String(year || "").trim();
+  const normalizedSemester = normalizeSemesterLabel(semester);
+  const match = normalizedYear.match(/^(\d{4})-(\d{4})$/);
+  if (!match || !normalizedSemester) return null;
+
+  const startYear = Number(match[1]);
+  const endYear = Number(match[2]);
+  if (!Number.isInteger(startYear) || !Number.isInteger(endYear) || endYear !== startYear + 1) {
+    return null;
+  }
+
+  let startDate;
+  let endDate;
+
+  if (normalizedSemester === "First Semester") {
+    startDate = new Date(startYear, 7, 1);
+    endDate = new Date(startYear, 11, 31);
+  } else if (normalizedSemester === "Second Semester") {
+    startDate = new Date(endYear, 0, 1);
+    endDate = new Date(endYear, 4, 31);
+  } else if (normalizedSemester === "Summer Class") {
+    startDate = new Date(endYear, 5, 1);
+    endDate = new Date(endYear, 6, 31);
+  } else {
+    return null;
+  }
+
+  const toISODate = (value) => {
+    const yyyy = value.getFullYear();
+    const mm = String(value.getMonth() + 1).padStart(2, "0");
+    const dd = String(value.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  return {
+    year: normalizedYear,
+    semester: normalizedSemester,
+    startDate: toISODate(startDate),
+    endDate: toISODate(endDate),
+  };
+}
+
 function initializeAcademicPeriod() {
   const { year, semester } = getAcademicPeriod();
+  setAcademicPeriod(year, semester);
   
   if (academicYearInput) {
     academicYearInput.value = year;
@@ -1423,25 +2623,72 @@ function initializeAcademicPeriod() {
       updateAcademicPeriodDisplay();
     });
     
-    academicYearInput.addEventListener("blur", (e) => {
+    academicYearInput.addEventListener("blur", async (e) => {
       // Ensure proper format on blur
       const formatted = formatAcademicYear(e.target.value);
       e.target.value = formatted;
       setAcademicPeriod(formatted, getAcademicPeriod().semester);
       updateAcademicPeriodDisplay();
+      await reloadAllDataForCurrentScope();
     });
   }
   
   if (semesterSelect) {
     semesterSelect.value = semester;
-    semesterSelect.addEventListener("change", (e) => {
+    semesterSelect.addEventListener("change", async (e) => {
       const newSemester = e.target.value;
       setAcademicPeriod(getAcademicPeriod().year, newSemester);
       updateAcademicPeriodDisplay();
+      await reloadAllDataForCurrentScope();
     });
   }
   
   updateAcademicPeriodDisplay();
+}
+
+async function loadAnalyticsSummary() {
+  try {
+    const supabase = await getSupabase();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      analyticsSummary = null;
+      renderAnalyticsModule();
+      return null;
+    }
+
+    const query = new URLSearchParams();
+    const period = getAcademicPeriodRange();
+    if (canAccessAllOrganizations() && selectedHeadOrganizationId) {
+      query.set("organization_id", String(selectedHeadOrganizationId));
+    }
+    if (period) {
+      query.set("academic_year", period.year);
+      query.set("semester", period.semester);
+    }
+
+    const response = await fetch(`/api/analytics${query.toString() ? `?${query.toString()}` : ""}`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Analytics request failed (${response.status})`);
+    }
+
+    const data = await response.json();
+    analyticsSummary = normalizeAnalyticsSummary(data);
+    renderAnalyticsModule(analyticsSummary);
+    return analyticsSummary;
+  } catch (error) {
+    analyticsSummary = null;
+    renderAnalyticsModule();
+    return null;
+  }
 }
 
 async function loadDashboard() {
@@ -1532,6 +2779,18 @@ async function loadLeaveofabsenceRecords() {
   }
 }
 
+async function reloadAllDataForCurrentScope() {
+  await loadRecords();
+  await loadMajorRecords();
+  await loadUniformRecords();
+  await loadGatepassRecords();
+  await loadGoodmoralRecords();
+  await loadIdreplacementRecords();
+  await loadLeaveofabsenceRecords();
+  await loadAnalyticsSummary();
+  await loadDashboard();
+}
+
 navButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const targetTab = button.dataset.tab;
@@ -1583,10 +2842,12 @@ if (archiveButton) {
 
 if (reportButton) {
   reportButton.addEventListener("click", () => {
-    switchTab("minor");
-    openPrintView();
+    switchTab("analytics");
   });
 }
+
+switchTab(getPreferredTab(), { persist: false });
+initializeInsightModal();
 
 
 if (recordForm) {
@@ -1819,14 +3080,7 @@ document.querySelectorAll("[data-archive]").forEach((button) => {
   });
 });
 
-loadRecords();
-loadMajorRecords();
-loadUniformRecords();
-loadGatepassRecords();
-loadGoodmoralRecords();
-loadIdreplacementRecords();
-loadLeaveofabsenceRecords();
-loadDashboard();
+reloadAllDataForCurrentScope();
 updateDashboardCounters();
 initializeAcademicPeriod();
 
@@ -1947,14 +3201,18 @@ attachCancelEdit(leaveofabsenceForm);
   try {
     const { data: userAccount } = await supabase
       .from("user_accounts")
-      .select("role, organization_id")
+      .select("role, organization_id, organizations(name)")
       .eq("user_id", session.user.id)
       .single();
 
     if (userAccount?.role) {
-      currentUserRole = userAccount.role;
-      localStorage.setItem("userRole", userAccount.role);
+      currentUserRole = String(userAccount.role || "").trim().toLowerCase();
+      localStorage.setItem("userRole", currentUserRole);
     }
+
+    hasGlobalHeadAccess =
+      String(userAccount?.role || "").trim().toLowerCase() === ROLE_HEAD &&
+      String(userAccount?.organizations?.name || "").trim().toLowerCase() === "alangilan";
     
     if (userAccount && userAccount.organization_id) {
       localStorage.setItem("organizationId", String(userAccount.organization_id));
@@ -1968,7 +3226,9 @@ attachCancelEdit(leaveofabsenceForm);
     }
 
     if (userAccount && userAccount.role === ROLE_HEAD) {
-      applyReadOnlyMode();
+      applyHeadInterfaceRestrictions();
+      await initializeHeadOrganizationFilter();
+      await reloadAllDataForCurrentScope();
     }
   } catch (error) {
     // user_accounts table doesn't exist or RLS blocking - ignore and continue

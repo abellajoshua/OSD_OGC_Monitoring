@@ -2,6 +2,8 @@ const {
   getSupabaseClient,
   getPayload,
   getRequestUserContext,
+  getScopedOrganizationId,
+  applyOrganizationScope,
   ensureRole,
   getErrorStatus,
 } = require("../_supabase");
@@ -21,14 +23,16 @@ module.exports = async (req, res) => {
   try {
     const context = await getRequestUserContext(req);
     const supabase = getSupabaseClient();
+    const scopedOrganizationId = getScopedOrganizationId(req, context);
 
     if (req.method === "GET") {
-      const { data, error } = await supabase
+      let query = supabase
         .from("leave_of_absence")
         .select("*")
-        .eq("organization_id", context.organizationId)
         .order("date", { ascending: false })
         .order("id", { ascending: false });
+      query = applyOrganizationScope(query, scopedOrganizationId);
+      const { data, error } = await query;
       if (error) return res.status(500).json({ error: error.message });
       return res.status(200).json(data || []);
     }
