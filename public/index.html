@@ -13,6 +13,13 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div class="global-loading-overlay" id="global-loading-overlay" hidden aria-live="polite" aria-busy="true">
+      <div class="global-loading-card">
+        <span class="global-loading-spinner" aria-hidden="true"></span>
+        <span>Loading records...</span>
+      </div>
+    </div>
+
     <div class="ambient">
       <div class="orb orb-1"></div>
       <div class="orb orb-2"></div>
@@ -60,6 +67,10 @@
         </div>
         <div class="academic-period-display" id="academic-period-display">
           First Semester AY 2024-2025
+        </div>
+        <div class="academic-period-loading" id="academic-period-loading" hidden aria-live="polite">
+          <span class="academic-period-spinner" aria-hidden="true"></span>
+          Loading records...
         </div>
       </div>
       <button class="back-btn" id="back-to-dashboard-btn" style="display: none;" aria-label="Back to Dashboard">
@@ -244,9 +255,9 @@
               <div class="analytics-card-head">
                 <div>
                   <p class="analytics-kicker">Trend</p>
-                  <h3>Last 14 Days Activity</h3>
+                  <h3>Selected Period Activity</h3>
                 </div>
-                <span class="analytics-pill" id="analytics-trend-pill">Last 14 Days</span>
+                <span class="analytics-pill" id="analytics-trend-pill">Selected Academic Period</span>
               </div>
               <div class="chart-slot chart-slot-line" id="analytics-trend-chart"></div>
             </article>
