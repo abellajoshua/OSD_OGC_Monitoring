@@ -205,18 +205,12 @@ module.exports = async (req, res) => {
     const resolutionRate = totalRecords ? Math.round((completedRecords / totalRecords) * 100) : 0;
     const topModule = [...moduleRows].sort((left, right) => right.count - left.count)[0] || null;
 
-    const offenseCounts = new Map();
     const minorAndMajorCodes = new Set();
 
     moduleRows
       .filter((module) => module.key === "minor" || module.key === "major")
       .forEach((module) => {
         module.rows.forEach((record) => {
-          const offense = String(record.offense || "").trim();
-          if (offense) {
-            offenseCounts.set(offense, (offenseCounts.get(offense) || 0) + 1);
-          }
-
           const srCode = String(record.sr_code || "").trim().toLowerCase();
           if (srCode) {
             minorAndMajorCodes.add(srCode);
@@ -224,8 +218,14 @@ module.exports = async (req, res) => {
         });
       });
 
-    const topOffenseEntry = [...offenseCounts.entries()].sort((left, right) => right[1] - left[1])[0] || null;
-    const topOffense = topOffenseEntry ? { name: topOffenseEntry[0], count: topOffenseEntry[1] } : null;
+    const topCategory = [...moduleRows]
+      .sort((left, right) => {
+        if (right.count !== left.count) return right.count - left.count;
+        return String(left.label || "").localeCompare(String(right.label || ""));
+      })[0] || null;
+    const topOffense = topCategory && topCategory.count
+      ? { name: topCategory.label, count: topCategory.count }
+      : null;
 
     const goodMoralFlags = moduleRows.find((module) => module.key === "goodmoral")?.rows.filter((record) => {
       return minorAndMajorCodes.has(String(record.sr_code || "").trim().toLowerCase());

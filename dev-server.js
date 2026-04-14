@@ -34,7 +34,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+app.use((req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
+});
+app.use(express.static(path.join(__dirname, "public"), { etag: false, lastModified: false }));
 
 app.get("/", (_req, res) => {
   res.redirect("/login.html");
