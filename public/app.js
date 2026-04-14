@@ -82,6 +82,8 @@ let activeInsightContext = null;
 const academicYearInput = document.querySelector("#academic-year-input");
 const semesterSelect = document.querySelector("#semester-select");
 const academicPeriodDisplay = document.querySelector("#academic-period-display");
+const academicPeriodLoading = document.querySelector("#academic-period-loading");
+const globalLoadingOverlay = document.querySelector("#global-loading-overlay");
 const headOrgFilterGroup = document.querySelector("#head-org-filter-group");
 const headOrgFilterSelect = document.querySelector("#head-organization-filter");
 
@@ -120,6 +122,7 @@ let selectedHeadOrganizationId = null;
 let headFilterInitialized = false;
 let hasGlobalHeadAccess = false;
 let analyticsSummary = null;
+let isAcademicPeriodLoading = false;
 const ACTIVE_TAB_STORAGE_KEY = "activeTab";
 
 const ROLE_ADMIN = "admin";
@@ -331,11 +334,11 @@ function downloadCsv(fileName, csvContent) {
   URL.revokeObjectURL(url);
 }
 
-async function fetchTableRows(table, dateColumn) {
+async function fetchTableRows(table, dateColumn, queryContext = null) {
   const supabase = await getSupabase();
   const primaryOrderColumn = dateColumn || "id";
-  const orgId = await getScopedReadOrganizationId();
-  const period = getAcademicPeriodRange();
+  const orgId = queryContext?.orgId !== undefined ? queryContext.orgId : await getScopedReadOrganizationId();
+  const period = queryContext?.period ?? getAcademicPeriodRange();
   const attempts = [
     { useArchived: true, useAcademicColumns: true, useDateRange: false },
     { useArchived: false, useAcademicColumns: true, useDateRange: false },
@@ -569,25 +572,28 @@ function getModuleRecords(moduleKey) {
 }
 
 function getModuleTrendStats(records, moduleKey) {
-  const today = new Date();
-  const currentStart = getDaysAgo(today, 6);
-  const currentEnd = new Date(today);
-  currentEnd.setHours(23, 59, 59, 999);
-  const previousStart = getDaysAgo(today, 13);
-  const previousEnd = getDaysAgo(today, 6);
+  const period = getAcademicPeriodRange();
+  const buckets = getMonthlyTrendBuckets(period);
   const datedRecords = records
     .map((record) => ({ record, date: moduleKey === "minor" || moduleKey === "major" ? record.date_of_complaint : record.date }))
     .filter((entry) => toSafeDate(entry.date));
 
-  const currentCount = datedRecords.filter((entry) => {
-    const date = toSafeDate(entry.date);
-    return date && date >= currentStart && date <= currentEnd;
-  }).length;
+  const currentBucket = buckets[buckets.length - 1] || null;
+  const previousBucket = buckets[buckets.length - 2] || null;
 
-  const previousCount = datedRecords.filter((entry) => {
-    const date = toSafeDate(entry.date);
-    return date && date >= previousStart && date < previousEnd;
-  }).length;
+  const currentCount = currentBucket
+    ? datedRecords.filter((entry) => {
+        const date = toSafeDate(entry.date);
+        return date && date.getMonth() === currentBucket.monthIndex;
+      }).length
+    : 0;
+
+  const previousCount = previousBucket
+    ? datedRecords.filter((entry) => {
+        const date = toSafeDate(entry.date);
+        return date && date.getMonth() === previousBucket.monthIndex;
+      }).length
+    : 0;
 
   let percent = 0;
   if (!previousCount && currentCount) {
@@ -612,6 +618,15 @@ function getDaysAgo(date, dayOffset) {
   clone.setHours(0, 0, 0, 0);
   clone.setDate(clone.getDate() - dayOffset);
   return clone;
+}
+
+function getMonthlyTrendBuckets(period) {
+  if (!period?.year || !period?.semester) return [];
+  const labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return labels.map((label, monthIndex) => ({
+    monthIndex,
+    label,
+  }));
 }
 
 function toSafeDate(value) {
@@ -651,31 +666,29 @@ function hexToRgba(hex, alpha) {
   return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha})`;
 }
 
-function buildTrendSeries(entries, dayCount = 14) {
-  const today = new Date();
-  const labels = [];
-  const points = [];
-
-  for (let dayOffset = dayCount - 1; dayOffset >= 0; dayOffset -= 1) {
-    const day = getDaysAgo(today, dayOffset);
-    const nextDay = new Date(day);
-    nextDay.setDate(nextDay.getDate() + 1);
-
-    const count = entries.filter((entry) => {
-      const entryDate = toSafeDate(entry.date);
-      return entryDate && entryDate >= day && entryDate < nextDay;
-    }).length;
-
-    labels.push(day.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
-    points.push(count);
+function buildTrendSeries(entries, period = getAcademicPeriodRange()) {
+  const buckets = getMonthlyTrendBuckets(period);
+  if (!buckets.length) {
+    return { labels: [], points: [] };
   }
 
+  const labels = buckets.map((bucket) => bucket.label);
+  const points = buckets.map((bucket) =>
+    entries.filter((entry) => {
+      const entryDate = toSafeDate(entry.date);
+      return entryDate && entryDate.getMonth() === bucket.monthIndex;
+    }).length
+  );
   return { labels, points };
 }
 
-function buildModuleTrendSeries(dayCount = 14) {
-  const today = new Date();
-  const labels = [];
+function buildModuleTrendSeries(period = getAcademicPeriodRange()) {
+  const buckets = getMonthlyTrendBuckets(period);
+  if (!buckets.length) {
+    return { labels: [], series: [] };
+  }
+
+  const labels = buckets.map((bucket) => bucket.label);
   const series = ANALYTICS_MODULES.map((module) => ({
     key: module.key,
     label: module.label,
@@ -683,18 +696,13 @@ function buildModuleTrendSeries(dayCount = 14) {
     values: [],
   }));
 
-  for (let dayOffset = dayCount - 1; dayOffset >= 0; dayOffset -= 1) {
-    const day = getDaysAgo(today, dayOffset);
-    const nextDay = new Date(day);
-    nextDay.setDate(nextDay.getDate() + 1);
-    labels.push(day.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
-
+  for (const bucket of buckets) {
     series.forEach((moduleSeries) => {
       const records = getModuleRecords(moduleSeries.key);
       const count = records.filter((record) => {
         const rawDate = moduleSeries.key === "minor" || moduleSeries.key === "major" ? record.date_of_complaint : record.date;
         const recordDate = toSafeDate(rawDate || record.created_at);
-        return recordDate && recordDate >= day && recordDate < nextDay;
+        return recordDate && recordDate.getMonth() === bucket.monthIndex;
       }).length;
       moduleSeries.values.push(count);
     });
@@ -704,13 +712,6 @@ function buildModuleTrendSeries(dayCount = 14) {
     labels,
     series,
   };
-}
-
-function countEntriesBetween(entries, startDate, endDate) {
-  return entries.filter((entry) => {
-    const entryDate = toSafeDate(entry.date);
-    return entryDate && entryDate >= startDate && entryDate < endDate;
-  }).length;
 }
 
 function getTopOffense() {
@@ -731,20 +732,16 @@ function getTopOffense() {
 function buildLocalAnalyticsSummary() {
   const entries = getAnalyticsEntries();
   const modules = getAnalyticsModuleRows();
+  const period = getAcademicPeriodRange();
   const totalRecords = entries.length;
   const completedRecords = entries.filter((entry) => entry.completed).length;
   const pendingRecords = Math.max(totalRecords - completedRecords, 0);
   const resolutionRate = totalRecords ? Math.round((completedRecords / totalRecords) * 100) : 0;
   const topModule = [...modules].sort((left, right) => right.count - left.count)[0] || null;
   const topOffense = getTopOffense();
-  const trendSeries = buildTrendSeries(entries, 14);
-  const recentStart = getDaysAgo(new Date(), 6);
-  const recentEnd = new Date();
-  recentEnd.setHours(23, 59, 59, 999);
-  const previousStart = getDaysAgo(new Date(), 13);
-  const previousEnd = getDaysAgo(new Date(), 6);
-  const recentCount = countEntriesBetween(entries, recentStart, recentEnd);
-  const previousCount = countEntriesBetween(entries, previousStart, previousEnd);
+  const trendSeries = buildTrendSeries(entries, period);
+  const recentCount = trendSeries.points.length ? Number(trendSeries.points[trendSeries.points.length - 1] || 0) : 0;
+  const previousCount = trendSeries.points.length > 1 ? Number(trendSeries.points[trendSeries.points.length - 2] || 0) : 0;
   const changePercent = clampPercent(
     previousCount ? Math.round(((recentCount - previousCount) / previousCount) * 100) : recentCount ? 100 : 0
   );
@@ -922,7 +919,7 @@ function getInsightModalPayload(insightKey) {
       title: "Busiest Day Breakdown",
       items: rows.length
         ? rows.map((row) => ({ label: row.label, value: `${row.count} records` }))
-        : [{ label: "No activity in selected window", value: "--" }],
+        : [{ label: "No activity in selected semester and academic year", value: "--" }],
     };
   }
 
@@ -1100,7 +1097,7 @@ function formatTrendChange(changePercent, recentCount, previousCount) {
   if (!previousCount && !recentCount) {
     return {
       value: "0%",
-      label: "No change vs prior 7 days",
+      label: "No change vs prior month",
       direction: "neutral",
     };
   }
@@ -1108,13 +1105,13 @@ function formatTrendChange(changePercent, recentCount, previousCount) {
   if (!previousCount && recentCount) {
     return {
       value: "+100%",
-      label: "Increase vs prior 7 days",
+      label: "Increase vs prior month",
       direction: "up",
     };
   }
 
   const direction = safeChangePercent > 0 ? "up" : safeChangePercent < 0 ? "down" : "neutral";
-  const label = direction === "up" ? "Increase vs prior 7 days" : direction === "down" ? "Decrease vs prior 7 days" : "No change vs prior 7 days";
+  const label = direction === "up" ? "Increase vs prior month" : direction === "down" ? "Decrease vs prior month" : "No change vs prior month";
 
   return {
     value: `${safeChangePercent > 0 ? "+" : safeChangePercent < 0 ? "" : ""}${safeChangePercent}%`,
@@ -1144,7 +1141,7 @@ function formatModuleChangeBadge(stats) {
   const label = stats.direction === "up" ? "increase" : stats.direction === "down" ? "decrease" : "no change";
   return {
     value: `${sign}${stats.percent}%`,
-    label: `${label} vs prior 7 days`,
+    label: `${label} vs prior month`,
     direction: stats.direction,
   };
 }
@@ -1209,7 +1206,7 @@ function renderAnalyticsTrendChart(container, labels, seriesRows) {
   );
 
   if (!labels.length || !activeSeries.length) {
-    container.innerHTML = '<div class="analytics-chart-empty">No activity recorded in the selected window.</div>';
+    container.innerHTML = '<div class="analytics-chart-empty">No activity recorded for Jan-Dec in the selected semester and academic year.</div>';
     return;
   }
 
@@ -1256,7 +1253,7 @@ function renderAnalyticsTrendChart(container, labels, seriesRows) {
 
   container.innerHTML = `
     <div class="analytics-trend-wrap">
-      <div class="analytics-trend-bar-chart" role="img" aria-label="Last 14 days activity bar chart">
+      <div class="analytics-trend-bar-chart" style="--trend-columns:${Math.max(totalsByDay.length, 1)};" role="img" aria-label="Selected semester activity bar chart">
         ${barsMarkup}
       </div>
       <div class="analytics-trend-legend" aria-label="Trend legend">
@@ -1344,6 +1341,8 @@ function renderAnalyticsDonutChart(container, segments) {
 
 function renderAnalyticsModule(summary = null) {
   const analytics = summary || getAnalyticsSummary();
+  const activePeriod = getAcademicPeriodRange();
+  const trendTitle = activePeriod ? `${activePeriod.semester} AY ${activePeriod.year}` : "Selected Academic Period";
   const totalRecords = analytics.totals.totalRecords;
   const completedRecords = analytics.totals.completedRecords;
   const pendingRecords = analytics.totals.pendingRecords;
@@ -1398,7 +1397,7 @@ function renderAnalyticsModule(summary = null) {
   if (analyticsRefreshStamp) {
     analyticsRefreshStamp.textContent = formatGeneratedAt(analytics.generatedAt);
   }
-  if (analyticsTrendPill) analyticsTrendPill.textContent = "Last 14 Days";
+  if (analyticsTrendPill) analyticsTrendPill.textContent = trendTitle;
   if (analyticsTrendChange) analyticsTrendChange.textContent = trendChange.value;
   if (analyticsTrendLabel) analyticsTrendLabel.textContent = trendChange.label;
   if (analyticsTrendCard) {
@@ -1407,7 +1406,7 @@ function renderAnalyticsModule(summary = null) {
   }
 
   renderAnalyticsBarList(analyticsModuleChart, analytics.modules);
-  const moduleTrend = buildModuleTrendSeries(14);
+  const moduleTrend = buildModuleTrendSeries(activePeriod);
   renderAnalyticsTrendChart(analyticsTrendChart, moduleTrend.labels, moduleTrend.series);
   renderAnalyticsDonutChart(analyticsStatusChart, [
     { label: "Completed", value: completedRecords, color: "#0f766e" },
@@ -2554,6 +2553,20 @@ function updateAcademicPeriodDisplay() {
   academicPeriodDisplay.textContent = `${semester} AY ${year}`;
 }
 
+function setAcademicPeriodLoading(isLoading) {
+  isAcademicPeriodLoading = Boolean(isLoading);
+  if (academicPeriodLoading) {
+    academicPeriodLoading.hidden = !isAcademicPeriodLoading;
+  }
+  if (globalLoadingOverlay) {
+    globalLoadingOverlay.hidden = !isAcademicPeriodLoading;
+  }
+
+  [academicYearInput, semesterSelect].filter(Boolean).forEach((field) => {
+    field.disabled = isAcademicPeriodLoading;
+  });
+}
+
 function getAcademicPeriodRange() {
   const { year, semester } = getAcademicPeriod();
   const normalizedYear = String(year || "").trim();
@@ -2780,15 +2793,60 @@ async function loadLeaveofabsenceRecords() {
 }
 
 async function reloadAllDataForCurrentScope() {
-  await loadRecords();
-  await loadMajorRecords();
-  await loadUniformRecords();
-  await loadGatepassRecords();
-  await loadGoodmoralRecords();
-  await loadIdreplacementRecords();
-  await loadLeaveofabsenceRecords();
-  await loadAnalyticsSummary();
-  await loadDashboard();
+  setAcademicPeriodLoading(true);
+  try {
+    const [orgId, period] = await Promise.all([
+      getScopedReadOrganizationId(),
+      Promise.resolve(getAcademicPeriodRange()),
+    ]);
+
+    const queryContext = { orgId, period };
+    const [
+      minorResult,
+      majorResult,
+      uniformResult,
+      gatepassResult,
+      goodmoralResult,
+      idreplacementResult,
+      leaveofabsenceResult,
+      analyticsResult,
+    ] = await Promise.allSettled([
+      fetchTableRows(TABLES.minor, "date_of_complaint", queryContext),
+      fetchTableRows(TABLES.major, "date_of_complaint", queryContext),
+      fetchTableRows(TABLES.uniform, "date", queryContext),
+      fetchTableRows(TABLES.gatepass, "date", queryContext),
+      fetchTableRows(TABLES.goodmoral, "date", queryContext),
+      fetchTableRows(TABLES.idreplacement, "date", queryContext),
+      fetchTableRows(TABLES.leaveofabsence, "date", queryContext),
+      loadAnalyticsSummary(),
+    ]);
+
+    minorRecords = minorResult.status === "fulfilled" ? (minorResult.value || []) : [];
+    majorRecords = majorResult.status === "fulfilled" ? (majorResult.value || []) : [];
+    uniformRecords = uniformResult.status === "fulfilled" ? (uniformResult.value || []) : [];
+    gatepassRecords = gatepassResult.status === "fulfilled" ? (gatepassResult.value || []) : [];
+    goodmoralRecords = goodmoralResult.status === "fulfilled" ? (goodmoralResult.value || []) : [];
+    idreplacementRecords = idreplacementResult.status === "fulfilled" ? (idreplacementResult.value || []) : [];
+    leaveofabsenceRecords = leaveofabsenceResult.status === "fulfilled" ? (leaveofabsenceResult.value || []) : [];
+
+    flagGoodMoralFromMinor();
+    applyMinorFilters();
+    applyMajorFilters();
+    applyUniformFilters();
+    applyGatepassFilters();
+    applyGoodmoralFilters();
+    applyIdreplacementFilters();
+    applyLeaveofabsenceFilters();
+    updateDashboardCounters();
+    await loadDashboard();
+
+    if (analyticsResult.status === "rejected") {
+      analyticsSummary = null;
+      renderAnalyticsModule();
+    }
+  } finally {
+    setAcademicPeriodLoading(false);
+  }
 }
 
 navButtons.forEach((button) => {

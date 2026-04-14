@@ -28,18 +28,6 @@ function clampPercent(value) {
   return numeric;
 }
 
-function startOfDay(date) {
-  const clone = new Date(date);
-  clone.setHours(0, 0, 0, 0);
-  return clone;
-}
-
-function shiftDays(date, days) {
-  const clone = new Date(date);
-  clone.setDate(clone.getDate() + days);
-  return clone;
-}
-
 function toISODate(date) {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
@@ -171,8 +159,19 @@ async function fetchModuleRows(supabase, module, organizationId, academicPeriod)
   return [];
 }
 
-function countEntriesBetween(entries, startDate, endDate) {
-  return entries.filter((entry) => entry.date && entry.date >= startDate && entry.date < endDate).length;
+function buildMonthSeries(entries) {
+  const labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const values = Array.from({ length: 12 }, () => 0);
+
+  entries.forEach((entry) => {
+    if (!entry?.date) return;
+    const monthIndex = entry.date.getMonth();
+    if (monthIndex >= 0 && monthIndex <= 11) {
+      values[monthIndex] += 1;
+    }
+  });
+
+  return { labels, values };
 }
 
 module.exports = async (req, res) => {
@@ -241,22 +240,10 @@ module.exports = async (req, res) => {
         .filter((entry) => entry.date)
     );
 
-    const today = startOfDay(new Date());
-    const labels = [];
-    const values = [];
+    const { labels, values } = buildMonthSeries(entries);
 
-    for (let dayOffset = 13; dayOffset >= 0; dayOffset -= 1) {
-      const startDate = shiftDays(today, -dayOffset);
-      const endDate = shiftDays(startDate, 1);
-      labels.push(startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
-      values.push(countEntriesBetween(entries, startDate, endDate));
-    }
-
-    const recentStart = shiftDays(today, -6);
-    const previousStart = shiftDays(today, -13);
-    const previousEnd = shiftDays(today, -6);
-    const recentCount = countEntriesBetween(entries, recentStart, shiftDays(today, 1));
-    const previousCount = countEntriesBetween(entries, previousStart, previousEnd);
+    const recentCount = values.length ? Number(values[values.length - 1] || 0) : 0;
+    const previousCount = values.length > 1 ? Number(values[values.length - 2] || 0) : 0;
     const changePercent = clampPercent(previousCount
       ? Math.round(((recentCount - previousCount) / previousCount) * 100)
       : recentCount
@@ -288,6 +275,7 @@ module.exports = async (req, res) => {
         recentCount,
         previousCount,
         changePercent,
+        unit: "month",
       },
       insights: {
         topModule: topModule ? { key: topModule.key, label: topModule.label, count: topModule.count } : null,
