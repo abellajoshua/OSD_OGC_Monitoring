@@ -715,18 +715,15 @@ function buildModuleTrendSeries(period = getAcademicPeriodRange()) {
 }
 
 function getTopOffense() {
-  const offenseCounts = new Map();
+  const topCategory = ANALYTICS_MODULES
+    .map((module) => ({ name: module.label, count: getModuleRecords(module.key).length }))
+    .sort((left, right) => {
+      if (right.count !== left.count) return right.count - left.count;
+      return left.name.localeCompare(right.name);
+    })[0];
 
-  [...minorRecords, ...majorRecords].forEach((record) => {
-    const offense = String(record.offense || "").trim();
-    if (!offense) return;
-    offenseCounts.set(offense, (offenseCounts.get(offense) || 0) + 1);
-  });
-
-  const topOffense = [...offenseCounts.entries()].sort((left, right) => right[1] - left[1])[0];
-  if (!topOffense) return null;
-
-  return { name: topOffense[0], count: topOffense[1] };
+  if (!topCategory || !topCategory.count) return null;
+  return topCategory;
 }
 
 function buildLocalAnalyticsSummary() {
@@ -847,36 +844,45 @@ function getAttentionModule(modules) {
 }
 
 function getTopOffenseBreakdown(limit = 6) {
-  const offenseCounts = new Map();
-  [...minorRecords, ...majorRecords].forEach((record) => {
-    const offense = String(record.offense || "").trim();
-    if (!offense) return;
-    offenseCounts.set(offense, (offenseCounts.get(offense) || 0) + 1);
-  });
+  const rows = ANALYTICS_MODULES.map((module) => ({
+    key: module.key,
+    name: module.label,
+    count: getModuleRecords(module.key).length,
+  }))
+    .sort((left, right) => {
+      if (right.count !== left.count) return right.count - left.count;
+      return left.name.localeCompare(right.name);
+    })
+    .slice(0, limit);
 
-  return [...offenseCounts.entries()]
-    .sort((left, right) => right[1] - left[1])
-    .slice(0, limit)
-    .map(([name, count]) => ({ name, count }));
+  return rows;
 }
 
-function getOffenseRecords(offenseName, limit = 8) {
-  const normalized = String(offenseName || "").trim().toLowerCase();
-  if (!normalized) return [];
+function getCategoryRecords(categoryKey, limit = 10) {
+  const module = ANALYTICS_MODULES.find((item) => item.key === categoryKey);
+  if (!module) return [];
 
-  return [
-    ...minorRecords.map((record) => ({ module: "Minor Offense", record })),
-    ...majorRecords.map((record) => ({ module: "Major Offense", record })),
-  ]
-    .map(({ module, record }) => ({
-      module,
-      date: normalizeDateValue(record),
-      name: record.name_of_student || "",
-      srCode: record.sr_code || "",
-      offense: String(record.offense || "").trim(),
-      rawDate: normalizeDateValue(record),
-    }))
-    .filter((row) => String(row.offense || "").trim().toLowerCase() === normalized)
+  return getModuleRecords(module.key)
+    .map((record) => {
+      const detail =
+        module.key === "minor" || module.key === "major"
+          ? String(record.offense || "").trim()
+          : module.key === "goodmoral"
+            ? String(record.purpose || "").trim()
+            : module.key === "leaveofabsence"
+              ? String(record.semester_period_covered || "").trim()
+              : String(record.reason || "").trim();
+
+      return {
+        categoryKey: module.key,
+        module: module.label,
+        date: normalizeDateValue(record),
+        name: record.name_of_student || record.name || "",
+        srCode: record.sr_code || "",
+        detail,
+        rawDate: normalizeDateValue(record),
+      };
+    })
     .sort((left, right) => {
       const leftDate = toSafeDate(left.rawDate)?.getTime() || 0;
       const rightDate = toSafeDate(right.rawDate)?.getTime() || 0;
@@ -923,20 +929,6 @@ function getInsightModalPayload(insightKey) {
     };
   }
 
-  if (insightKey === "attention-module") {
-    const rows = [...(analytics.modules || [])]
-      .sort((left, right) => (right.pending || 0) - (left.pending || 0))
-      .map((module) => ({
-        label: module.label,
-        value: `${module.pending} pending / ${module.count} total`,
-      }));
-
-    return {
-      title: "Attention Module Details",
-      items: rows.length ? rows : [{ label: "No modules available", value: "--" }],
-    };
-  }
-
   const pending = analytics.totals?.pendingRecords || 0;
   const resolution = analytics.totals?.resolutionRate || 0;
   const recentShare = analytics.insights?.recentShare || 0;
@@ -960,22 +952,23 @@ function openInsightModal(insightKey) {
   if (insightKey === "top-offense") {
     const items = Array.isArray(payload.items) && payload.items.length
       ? payload.items
-      : [{ name: "No offense records yet", count: 0 }];
+      : ANALYTICS_MODULES.map((module) => ({ key: module.key, name: module.label, count: 0 }));
 
-    const defaultOffense = items[0]?.name || "";
-    const renderTopOffenseView = (selectedOffense) => {
-      const selectedRecords = selectedOffense ? getOffenseRecords(selectedOffense, 10) : [];
-      const selectedCount = items.find((item) => item.name === selectedOffense)?.count || 0;
-      const selectedLabel = selectedOffense || defaultOffense || "Select an offense";
+    const defaultCategoryKey = items[0]?.key || ANALYTICS_MODULES[0]?.key || "";
+    const renderTopOffenseView = (selectedCategoryKey) => {
+      const selectedCategory = items.find((item) => item.key === selectedCategoryKey) || null;
+      const selectedRecords = selectedCategoryKey ? getCategoryRecords(selectedCategoryKey, 10) : [];
+      const selectedCount = selectedCategory?.count || 0;
+      const selectedLabel = selectedCategory?.name || "Select a category";
 
       analyticsInsightModalBody.innerHTML = `
         <div class="analytics-insight-drilldown">
           <div class="analytics-insight-drill-list">
-            <div class="analytics-insight-drill-hint">Select an offense to view the matching records below.</div>
+            <div class="analytics-insight-drill-hint">Select a category to view the matching records below.</div>
             ${items
               .map(
                 (item) => `
-                  <button type="button" class="analytics-insight-drill-item ${item.name === selectedOffense ? "is-active" : ""}" data-offense-row="${escapeHtml(item.name)}">
+                  <button type="button" class="analytics-insight-drill-item ${item.key === selectedCategoryKey ? "is-active" : ""}" data-offense-row="${escapeHtml(item.key)}">
                     <strong>${escapeHtml(item.name)}</strong>
                     <span>${item.count} records</span>
                   </button>
@@ -987,7 +980,7 @@ function openInsightModal(insightKey) {
             <div class="analytics-insight-records-head">
               <div>
                 <strong>${escapeHtml(selectedLabel)}</strong>
-                <span>${selectedCount} total related records</span>
+                <span>${selectedCount} total records</span>
               </div>
               <span class="analytics-insight-records-count">Latest first</span>
             </div>
@@ -1000,14 +993,14 @@ function openInsightModal(insightKey) {
                           <div>
                             <strong>${escapeHtml(record.name)}</strong>
                             <span>${escapeHtml(record.module)} • ${escapeHtml(formatDate(record.date))}</span>
-                            <small>${escapeHtml(record.offense)}</small>
+                            <small>${escapeHtml(record.detail || "No additional detail")}</small>
                           </div>
                           <small>${escapeHtml(record.srCode)}</small>
                         </div>
                       `
                     )
                     .join("")
-                : '<div class="analytics-insight-empty-state">Click an offense row to view matching records.</div>'}
+                : '<div class="analytics-insight-empty-state">No records found for this category.</div>'}
             </div>
           </div>
         </div>
@@ -1016,8 +1009,8 @@ function openInsightModal(insightKey) {
 
     analyticsInsightModalBody.dataset.insightMode = "top-offense";
     analyticsInsightModalBody.innerHTML = "";
-    renderTopOffenseView(defaultOffense);
-    analyticsInsightModalBody.dataset.selectedOffense = defaultOffense;
+    renderTopOffenseView(defaultCategoryKey);
+    analyticsInsightModalBody.dataset.selectedOffense = defaultCategoryKey;
     activeInsightContext = { type: "top-offense", render: renderTopOffenseView };
   } else {
     analyticsInsightModalBody.dataset.insightMode = insightKey;
