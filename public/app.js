@@ -77,7 +77,14 @@ const analyticsInsightCards = document.querySelectorAll(".analytics-insight-card
 const analyticsInsightModal = document.querySelector("#analytics-insight-modal");
 const analyticsInsightModalTitle = document.querySelector("#analytics-insight-modal-title");
 const analyticsInsightModalBody = document.querySelector("#analytics-insight-modal-body");
+const goodmoralOffenseModal = document.querySelector("#goodmoral-offense-modal");
+const goodmoralOffenseModalTitle = document.querySelector("#goodmoral-offense-modal-title");
+const goodmoralOffenseModalSubtitle = document.querySelector("#goodmoral-offense-modal-subtitle");
+const goodmoralOffenseModalBody = document.querySelector("#goodmoral-offense-modal-body");
+const goodmoralOffenseModalActions = document.querySelector("#goodmoral-offense-modal-actions");
+const goodmoralOffenseConfirmBtn = document.querySelector("#goodmoral-offense-confirm-btn");
 let activeInsightContext = null;
+let pendingGoodmoralSubmission = null;
 
 const academicYearInput = document.querySelector("#academic-year-input");
 const semesterSelect = document.querySelector("#semester-select");
@@ -1509,6 +1516,191 @@ function flagGoodMoralFromMinor() {
   }));
 }
 
+function normalizeGoodMoralStudentKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getGoodMoralOffenseMatches(srCode) {
+  const normalizedSrCode = normalizeGoodMoralStudentKey(srCode);
+  const sortNewestFirst = (left, right) => {
+    const leftDate = new Date(left.date_of_complaint || left.date || 0).getTime();
+    const rightDate = new Date(right.date_of_complaint || right.date || 0).getTime();
+    return rightDate - leftDate;
+  };
+
+  const minorMatches = minorRecords
+    .filter((record) => normalizeGoodMoralStudentKey(record.sr_code) === normalizedSrCode)
+    .sort(sortNewestFirst);
+  const majorMatches = majorRecords
+    .filter((record) => normalizeGoodMoralStudentKey(record.sr_code) === normalizedSrCode)
+    .sort(sortNewestFirst);
+
+  return {
+    srCode: normalizedSrCode,
+    minorMatches,
+    majorMatches,
+    minorCount: minorMatches.length,
+    majorCount: majorMatches.length,
+    totalCount: minorMatches.length + majorMatches.length,
+  };
+}
+
+function buildGoodMoralOffenseBadges(record) {
+  const summary = getGoodMoralOffenseMatches(record.sr_code);
+  const studentLabel = escapeHtml(record.name || record.name_of_student || "Student");
+  const srCodeLabel = escapeHtml(record.sr_code || "");
+  const badges = [];
+
+  if (summary.minorCount > 0) {
+    badges.push(`
+      <button type="button" class="tag tag-alert goodmoral-offense-tag" data-goodmoral-offense-view="minor" data-goodmoral-offense-id="${escapeHtml(String(record.id || ""))}" aria-label="View ${summary.minorCount} minor offense record${summary.minorCount === 1 ? "" : "s"} for ${studentLabel} ${srCodeLabel}">
+        ${summary.minorCount} Minor Offense${summary.minorCount === 1 ? "" : "s"}
+      </button>
+    `);
+  }
+
+  if (summary.majorCount > 0) {
+    badges.push(`
+      <button type="button" class="tag tag-alert goodmoral-offense-tag" data-goodmoral-offense-view="major" data-goodmoral-offense-id="${escapeHtml(String(record.id || ""))}" aria-label="View ${summary.majorCount} major offense record${summary.majorCount === 1 ? "" : "s"} for ${studentLabel} ${srCodeLabel}">
+        ${summary.majorCount} Major Offense${summary.majorCount === 1 ? "" : "s"}
+      </button>
+    `);
+  }
+
+  return badges.join(" ");
+}
+
+function buildGoodMoralOffenseRecordCard(record, offenseLabel) {
+  const dateValue = formatDate(record.date_of_complaint || record.date || record.created_at);
+  const detail = [record.offense, record.sanction].filter((value) => String(value || "").trim()).join(" • ");
+  return `
+    <div class="analytics-insight-record-item">
+      <div>
+        <strong>${escapeHtml(record.name_of_student || record.name || "Unnamed Student")}</strong>
+        <span>${escapeHtml(offenseLabel)} • ${escapeHtml(dateValue)}</span>
+        <small>${escapeHtml(detail || "No offense details provided")}</small>
+      </div>
+      <small>${escapeHtml(record.sr_code || "")}</small>
+    </div>
+  `;
+}
+
+function closeGoodMoralOffenseModal() {
+  if (!goodmoralOffenseModal) return;
+  goodmoralOffenseModal.hidden = true;
+  pendingGoodmoralSubmission = null;
+  goodmoralOffenseModalBody.innerHTML = "";
+  goodmoralOffenseModalSubtitle.textContent = "";
+  if (goodmoralOffenseModalActions) {
+    goodmoralOffenseModalActions.hidden = false;
+  }
+}
+
+function openGoodMoralOffenseModal({ record, mode, offenseType, confirmText }) {
+  if (!goodmoralOffenseModal || !goodmoralOffenseModalTitle || !goodmoralOffenseModalBody || !record) return;
+
+  const summary = getGoodMoralOffenseMatches(record.sr_code);
+  const studentName = record.name || record.name_of_student || "Student";
+  const srCode = record.sr_code || "";
+  const offenseLabel = offenseType === "minor" ? "Minor Offenses" : offenseType === "major" ? "Major Offenses" : "Offense Records";
+
+  goodmoralOffenseModal.hidden = false;
+  goodmoralOffenseModalTitle.textContent = mode === "confirm" ? "Are you sure?" : offenseLabel;
+  goodmoralOffenseModalSubtitle.textContent = `${studentName}${srCode ? ` • ${srCode}` : ""}`;
+
+  if (mode === "confirm") {
+    const minorSection = summary.minorCount
+      ? `
+        <div class="goodmoral-offense-section">
+          <div class="goodmoral-offense-section-header">
+            <span class="goodmoral-offense-badge goodmoral-offense-badge-minor">${summary.minorCount}</span>
+            <h4>Minor Offense${summary.minorCount === 1 ? "" : "s"}</h4>
+          </div>
+          <div class="goodmoral-offense-section-records">
+            ${summary.minorMatches.map((item) => buildGoodMoralOffenseRecordCard(item, "Minor Offense")).join("")}
+          </div>
+        </div>
+      `
+      : `
+        <div class="goodmoral-offense-section">
+          <div class="goodmoral-offense-section-empty">
+            <span class="goodmoral-offense-empty-icon">—</span>
+            <span class="goodmoral-offense-empty-text">No Minor Offenses</span>
+          </div>
+        </div>
+      `;
+
+    const majorSection = summary.majorCount
+      ? `
+        <div class="goodmoral-offense-section">
+          <div class="goodmoral-offense-section-header">
+            <span class="goodmoral-offense-badge goodmoral-offense-badge-major">${summary.majorCount}</span>
+            <h4>Major Offense${summary.majorCount === 1 ? "" : "s"}</h4>
+          </div>
+          <div class="goodmoral-offense-section-records">
+            ${summary.majorMatches.map((item) => buildGoodMoralOffenseRecordCard(item, "Major Offense")).join("")}
+          </div>
+        </div>
+      `
+      : `
+        <div class="goodmoral-offense-section">
+          <div class="goodmoral-offense-section-empty">
+            <span class="goodmoral-offense-empty-icon">—</span>
+            <span class="goodmoral-offense-empty-text">No Major Offenses</span>
+          </div>
+        </div>
+      `;
+
+    goodmoralOffenseModalBody.innerHTML = `
+      ${minorSection}
+      ${majorSection}
+    `;
+    if (goodmoralOffenseModalActions) {
+      goodmoralOffenseModalActions.hidden = false;
+    }
+    if (goodmoralOffenseConfirmBtn) {
+      goodmoralOffenseConfirmBtn.textContent = confirmText || "Save Record";
+    }
+    return;
+  }
+
+  const filteredRecords = offenseType === "major" ? summary.majorMatches : summary.minorMatches;
+  const filteredLabel = offenseType === "major" ? "Major Offense" : "Minor Offense";
+  const badgeClass = offenseType === "major" ? "goodmoral-offense-badge-major" : "goodmoral-offense-badge-minor";
+  
+  goodmoralOffenseModalBody.innerHTML = `
+    <div class="goodmoral-offense-section">
+      <div class="goodmoral-offense-section-header">
+        <span class="goodmoral-offense-badge ${badgeClass}">${filteredRecords.length}</span>
+        <h4>${filteredLabel}${filteredRecords.length === 1 ? "" : "s"}</h4>
+      </div>
+      <div class="goodmoral-offense-section-records">
+        ${filteredRecords.length
+          ? filteredRecords.map((item) => buildGoodMoralOffenseRecordCard(item, filteredLabel)).join("")
+          : `<div class="goodmoral-offense-section-empty"><span class="goodmoral-offense-empty-icon">—</span><span class="goodmoral-offense-empty-text">No matching ${filteredLabel.toLowerCase()} records</span></div>`}
+      </div>
+    </div>
+  `;
+
+  if (goodmoralOffenseModalActions) {
+    goodmoralOffenseModalActions.hidden = true;
+  }
+}
+
+async function saveGoodMoralRecord(payload, editId) {
+  try {
+    if (editId) await updateRow(TABLES.goodmoral, editId, payload);
+    else await createRow(TABLES.goodmoral, payload);
+
+    setFormEditState(goodmoralForm, false);
+    goodmoralStatus.textContent = editId ? "Record updated." : "Record saved.";
+    await loadGoodmoralRecords();
+    await loadDashboard();
+  } catch (error) {
+    goodmoralStatus.textContent = error.message || "Something went wrong. Please try again.";
+  }
+}
+
 function openPrintView() {
   const table = document.querySelector("#minor .table-wrap table");
 
@@ -2159,16 +2351,14 @@ function renderGoodmoralRows(records) {
   }
 
   records.forEach((record, index) => {
-    const tag = record.has_minor_offense
-      ? `<span class="tag tag-alert">Minor Offense</span>`
-      : "";
+    const offenseBadges = buildGoodMoralOffenseBadges(record);
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${index + 1}</td>
       <td>${formatDate(record.date)}</td>
       <td>${record.time_in || ""}</td>
       <td>${record.time_out || ""}</td>
-      <td>${record.name || ""} ${tag}</td>
+      <td>${record.name || ""}${offenseBadges ? `<span class="goodmoral-offense-tags">${offenseBadges}</span>` : ""}</td>
       <td>${record.sr_code || ""}</td>
       <td>${record.course || ""}</td>
       <td>${record.sex === "M" ? "✔" : ""}</td>
@@ -2177,6 +2367,23 @@ function renderGoodmoralRows(records) {
       <td>${renderRecordActions(record.id)}</td>
     `;
     goodmoralTableBody.appendChild(row);
+  });
+}
+
+if (goodmoralTableBody) {
+  goodmoralTableBody.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const offenseButton = target.closest("[data-goodmoral-offense-view]");
+    if (!offenseButton) return;
+
+    const recordId = offenseButton.getAttribute("data-goodmoral-offense-id") || "";
+    const offenseType = offenseButton.getAttribute("data-goodmoral-offense-view") || "minor";
+    const record = goodmoralRecords.find((row) => String(row.id) === recordId) || null;
+    if (!record) return;
+
+    openGoodMoralOffenseModal({ record, mode: "view", offenseType });
   });
 }
 
@@ -3002,21 +3209,51 @@ if (goodmoralForm) {
       goodmoralStatus.textContent = "Read-only access: Head can view and export only.";
       return;
     }
-    goodmoralStatus.textContent = "Saving record...";
     const formData = new FormData(goodmoralForm);
     const payload = Object.fromEntries(formData.entries());
     const editId = goodmoralForm.dataset.editId;
+    const offenseSummary = getGoodMoralOffenseMatches(payload.sr_code);
 
-    try {
-      if (editId) await updateRow(TABLES.goodmoral, editId, payload);
-      else await createRow(TABLES.goodmoral, payload);
+    if (offenseSummary.totalCount > 0) {
+      pendingGoodmoralSubmission = { payload, editId };
+      goodmoralStatus.textContent = "Existing offense records found. Review the popup before saving.";
+      openGoodMoralOffenseModal({
+        record: payload,
+        mode: "confirm",
+        confirmText: editId ? "Confirm Update" : "Save Record",
+      });
+      return;
+    }
 
-      setFormEditState(goodmoralForm, false);
-      goodmoralStatus.textContent = editId ? "Record updated." : "Record saved.";
-      await loadGoodmoralRecords();
-      await loadDashboard();
-    } catch (error) {
-      goodmoralStatus.textContent = error.message || "Something went wrong. Please try again.";
+    goodmoralStatus.textContent = "Saving record...";
+    await saveGoodMoralRecord(payload, editId);
+  });
+}
+
+if (goodmoralOffenseConfirmBtn) {
+  goodmoralOffenseConfirmBtn.addEventListener("click", async () => {
+    if (!pendingGoodmoralSubmission) return;
+    const { payload, editId } = pendingGoodmoralSubmission;
+    pendingGoodmoralSubmission = null;
+    closeGoodMoralOffenseModal();
+    goodmoralStatus.textContent = "Saving record...";
+    await saveGoodMoralRecord(payload, editId);
+  });
+}
+
+if (goodmoralOffenseModal) {
+  goodmoralOffenseModal.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest("[data-goodmoral-offense-close='true']")) {
+      closeGoodMoralOffenseModal();
+      return;
+    }
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && goodmoralOffenseModal && !goodmoralOffenseModal.hidden) {
+      closeGoodMoralOffenseModal();
     }
   });
 }
