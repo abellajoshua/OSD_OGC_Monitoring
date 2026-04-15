@@ -44,7 +44,7 @@ const exportLeaveofabsenceButton = document.querySelector("#export-leaveofabsenc
 const dashboardActivityBody = document.querySelector("#dashboard-activity-body");
 const statActive = document.querySelector("[data-stat='active']");
 const statPending = document.querySelector("[data-stat='pending']");
-const statResolved = document.querySelector("[data-stat='resolved']");
+const statResolveCases = document.querySelector("[data-stat='resolvecases']");
 const statFollowups = document.querySelector("[data-stat='followups']");
 const kpiMinor = document.querySelector("[data-kpi='minor']");
 const kpiMajor = document.querySelector("[data-kpi='major']");
@@ -2704,23 +2704,13 @@ async function loadDashboard() {
     (item) => !String(item.sanction || "").trim() || !item.date_of_sanction
   ).length;
 
-  const start = new Date();
-  start.setDate(start.getDate() - 6);
-  const startMs = start.setHours(0, 0, 0, 0);
-  const nowMs = new Date().setHours(23, 59, 59, 999);
-  const resolvedThisWeek = [...minorRecords, ...majorRecords].filter((item) => {
-    if (!item.date_of_sanction) return false;
-    const value = new Date(item.date_of_sanction).getTime();
-    return !Number.isNaN(value) && value >= startMs && value <= nowMs;
-  }).length;
-
   const followUpsDue = [...uniformRecords, ...gatepassRecords, ...goodmoralRecords].filter(
     (item) => !String(item.time_out || "").trim()
   ).length;
 
   if (statActive) statActive.textContent = activeCases;
   if (statPending) statPending.textContent = pendingSanctions;
-  if (statResolved) statResolved.textContent = resolvedThisWeek;
+  if (statResolveCases) statResolveCases.textContent = activeCases - pendingSanctions;
   if (statFollowups) statFollowups.textContent = followUpsDue;
 }
 
