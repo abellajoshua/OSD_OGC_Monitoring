@@ -156,21 +156,15 @@ function parseOrganizationId(value) {
 function canAccessAllOrganizations(context) {
   if (!context) return false;
   const role = String(context.role || "").trim().toLowerCase();
-  const organizationName = String(context.organizationName || "").trim().toLowerCase();
-  return role === "head" && organizationName === "alangilan";
+  return role === "head";
 }
 
 function getScopedOrganizationId(req, context) {
   if (!context || !context.role) return null;
 
-  // Only Alangilan Head can monitor all orgs and optionally narrow down via query filter.
+  // Head can monitor all organizations and may optionally narrow down via query filter.
   if (canAccessAllOrganizations(context)) {
     return parseOrganizationId(req?.query?.organization_id);
-  }
-
-  // Non-exempt heads are restricted to their own organization.
-  if (context.role === "head") {
-    return context.organizationId;
   }
 
   // Coordinator is always restricted to own organization.

@@ -65,6 +65,9 @@ const analyticsTrendLabel = document.querySelector("#analytics-trend-label");
 const analyticsModuleChart = document.querySelector("#analytics-module-chart");
 const analyticsTrendChart = document.querySelector("#analytics-trend-chart");
 const analyticsStatusChart = document.querySelector("#analytics-status-chart");
+const analyticsStatusKicker = document.querySelector("#analytics-status-kicker");
+const analyticsStatusTitle = document.querySelector("#analytics-status-title");
+const analyticsStatusPill = document.querySelector("#analytics-status-pill");
 const analyticsTopOffense = document.querySelector("#analytics-top-offense");
 const analyticsTopOffenseCount = document.querySelector("#analytics-top-offense-count");
 const analyticsBusiestDay = document.querySelector("#analytics-busiest-day");
@@ -128,6 +131,7 @@ let currentUserRole = localStorage.getItem("userRole") || "";
 let selectedHeadOrganizationId = null;
 let headFilterInitialized = false;
 let hasGlobalHeadAccess = false;
+let organizationDirectory = new Map();
 let analyticsSummary = null;
 let isAcademicPeriodLoading = false;
 const ACTIVE_TAB_STORAGE_KEY = "activeTab";
@@ -247,9 +251,7 @@ async function getCurrentOrganizationId() {
     .single();
 
   currentUserRole = String(account?.role || currentUserRole || "").trim().toLowerCase();
-  hasGlobalHeadAccess =
-    String(account?.role || "").trim().toLowerCase() === ROLE_HEAD &&
-    String(account?.organizations?.name || "").trim().toLowerCase() === "alangilan";
+  hasGlobalHeadAccess = String(account?.role || "").trim().toLowerCase() === ROLE_HEAD;
   if (currentUserRole) {
     localStorage.setItem("userRole", currentUserRole);
   }
@@ -291,8 +293,15 @@ async function initializeHeadOrganizationFilter() {
   const organizations = data || [];
   if (!organizations.length) return;
 
-  const visibleOrganizations = organizations.filter(
-    (org) => String(org.name || "").trim().toLowerCase() !== "alangilan"
+  const visibleOrganizations = organizations;
+  organizationDirectory = new Map(
+    visibleOrganizations.map((org) => [
+      Number(org.id),
+      {
+        name: String(org.name || "").trim(),
+        type: String(org.type || "").trim().toLowerCase(),
+      },
+    ])
   );
 
   headOrgFilterSelect.innerHTML = [
@@ -360,10 +369,8 @@ async function fetchTableRows(table, dateColumn, queryContext = null) {
   const orgId = queryContext?.orgId !== undefined ? queryContext.orgId : await getScopedReadOrganizationId();
   const period = queryContext?.period ?? getAcademicPeriodRange();
   const attempts = [
-    { useArchived: true, useAcademicColumns: true, useDateRange: false },
-    { useArchived: false, useAcademicColumns: true, useDateRange: false },
-    { useArchived: true, useAcademicColumns: false, useDateRange: true },
-    { useArchived: false, useAcademicColumns: false, useDateRange: true },
+    { useArchived: true },
+    { useArchived: false },
   ];
 
   let lastError = null;
@@ -378,12 +385,8 @@ async function fetchTableRows(table, dateColumn, queryContext = null) {
       query = query.eq("organization_id", orgId);
     }
 
-    if (period) {
-      if (attempt.useAcademicColumns) {
-        query = query.eq("academic_year", period.year).eq("semester", period.semester);
-      } else if (attempt.useDateRange && dateColumn) {
-        query = query.gte(dateColumn, period.startDate).lte(dateColumn, period.endDate);
-      }
+    if (period && dateColumn) {
+      query = query.gte(dateColumn, period.startDate).lte(dateColumn, period.endDate);
     }
 
     const { data, error } = await query
@@ -398,10 +401,6 @@ async function fetchTableRows(table, dateColumn, queryContext = null) {
     const message = String(error.message || "").toLowerCase();
 
     if (attempt.useArchived && !message.includes("archived")) {
-      continue;
-    }
-
-    if (attempt.useAcademicColumns && !(message.includes("academic_year") || message.includes("semester"))) {
       continue;
     }
   }
@@ -789,6 +788,7 @@ function buildLocalAnalyticsSummary() {
       goodMoralFlags,
     },
     modules,
+    campus: buildLocalCampusBreakdown(),
     status: {
       completed: completedRecords,
       pending: pendingRecords,
@@ -808,6 +808,87 @@ function buildLocalAnalyticsSummary() {
   };
 }
 
+function buildLocalCampusBreakdown() {
+  const grouped = new Map();
+
+  ANALYTICS_MODULES.forEach((module) => {
+    const moduleRecords = getModuleRecords(module.key);
+    moduleRecords.forEach((record) => {
+      const orgId = Number(record?.organization_id || 0);
+      if (!orgId) return;
+
+      const current = grouped.get(orgId) || 0;
+      grouped.set(orgId, current + 1);
+    });
+  });
+
+  const rows = Array.from(organizationDirectory.entries()).map(([organizationId, meta]) => ({
+    organizationId,
+    name: meta?.name || `Organization ${organizationId}`,
+    type: meta?.type || "organization",
+    count: grouped.get(organizationId) || 0,
+  }));
+
+  if (!rows.length) {
+    return Array.from(grouped.entries())
+      .map(([organizationId, count]) => ({
+        organizationId: Number(organizationId),
+        name: `Organization ${organizationId}`,
+        type: "organization",
+        count,
+      }))
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return String(a.name).localeCompare(String(b.name));
+      });
+  }
+
+  return rows.sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return String(a.name).localeCompare(String(b.name));
+  });
+}
+
+function mergeCampusBreakdown(campusRows) {
+  const countsById = new Map();
+
+  (Array.isArray(campusRows) ? campusRows : []).forEach((row) => {
+    const organizationId = Number(row?.organizationId || row?.organization_id || 0);
+    if (!organizationId) return;
+    countsById.set(organizationId, Number(row?.count || 0));
+  });
+
+  const directoryRows = Array.from(organizationDirectory.entries()).map(([organizationId, meta]) => ({
+    organizationId,
+    name: meta?.name || `Organization ${organizationId}`,
+    type: meta?.type || "organization",
+    count: countsById.get(organizationId) || 0,
+  }));
+
+  if (directoryRows.length) {
+    return directoryRows.sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return String(a.name).localeCompare(String(b.name));
+    });
+  }
+
+  return Array.from(countsById.entries())
+    .map(([organizationId, count]) => ({
+      organizationId,
+      name: `Organization ${organizationId}`,
+      type: "organization",
+      count,
+    }))
+    .sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return String(a.name).localeCompare(String(b.name));
+    });
+}
+
+function hasAnyPositiveCampusCount(rows) {
+  return Array.isArray(rows) && rows.some((row) => Number(row?.count || 0) > 0);
+}
+
 function normalizeAnalyticsSummary(data) {
   const modules = Array.isArray(data?.modules)
     ? data.modules.map((module) => ({
@@ -820,6 +901,17 @@ function normalizeAnalyticsSummary(data) {
       }))
     : [];
 
+  const campus = Array.isArray(data?.campus)
+    ? data.campus
+        .map((item) => ({
+          organizationId: Number(item.organizationId || 0),
+          name: String(item.name || "").trim(),
+          type: String(item.type || "").trim().toLowerCase(),
+          count: Number(item.count || 0),
+        }))
+        .filter((item) => item.name)
+    : [];
+
   return {
     generatedAt: data?.generatedAt ? String(data.generatedAt) : new Date().toISOString(),
     totals: {
@@ -830,6 +922,7 @@ function normalizeAnalyticsSummary(data) {
       goodMoralFlags: Number(data?.totals?.goodMoralFlags || 0),
     },
     modules,
+    campus,
     status: {
       completed: Number(data?.status?.completed || data?.totals?.completedRecords || 0),
       pending: Number(data?.status?.pending || data?.totals?.pendingRecords || 0),
@@ -1367,6 +1460,172 @@ function renderAnalyticsDonutChart(container, segments) {
   `;
 }
 
+function renderAnalyticsCampusChart(container, campusData) {
+  if (!container) return;
+
+  const buildLegendRows = (rows, getColor) => rows
+    .map((campus) => {
+      const typeLabel = campus.type === "campus" ? "Campus" : campus.type === "college" ? "College" : "Org";
+      const rowColor = typeof getColor === "function" ? getColor(campus) : "#cbd5e1";
+      return `
+        <div class="analytics-campus-row ${Number(campus.count || 0) === 0 ? "is-zero" : ""}">
+          <span class="analytics-campus-swatch" style="background:${rowColor};"></span>
+          <span class="analytics-campus-name">${escapeHtml(campus.name || "")}</span>
+          <span class="analytics-campus-count">${Number(campus.count || 0)}</span>
+          <span class="analytics-campus-type">${typeLabel}</span>
+        </div>
+      `;
+    })
+    .join("");
+
+  if (!campusData || !campusData.length) {
+    container.innerHTML = `
+      <div class="analytics-campus-wrap analytics-donut-wrap no-graph">
+        <div class="analytics-campus-list">
+          <div class="analytics-chart-empty" style="min-height:auto; padding:12px 14px;">No campus data available yet.</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const total = campusData.reduce((sum, campus) => sum + campus.count, 0);
+  if (!total) {
+    const zeroLegend = buildLegendRows(campusData);
+
+    container.innerHTML = `
+      <div class="analytics-campus-wrap analytics-donut-wrap no-graph">
+        <div class="analytics-campus-list">${zeroLegend}</div>
+      </div>
+    `;
+    return;
+  }
+
+  const size = 280;
+  const radius = 92;
+  const strokeWidth = 28;
+  const circumference = 2 * Math.PI * radius;
+  let accumulated = 0;
+
+  const fixedOrgColors = {
+    alangilan: "#a41321",
+    mabini: "#0f766e",
+    balayan: "#1d4ed8",
+    lobo: "#0891b2",
+    cics: "#ec4899",
+    coe: "#f59e0b",
+    cet: "#64748b",
+    cafad: "#059669",
+  };
+
+  const fallbackPalette = [
+    "#a41321", "#ec4899", "#0891b2", "#0f766e", "#1d4ed8", "#64748b", "#059669", "#f59e0b",
+  ];
+
+  const hashString = (text) => {
+    let hash = 0;
+    const normalized = String(text || "");
+    for (let i = 0; i < normalized.length; i += 1) {
+      hash = (hash << 5) - hash + normalized.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash);
+  };
+
+  const getOrganizationColor = (campus) => {
+    const nameKey = String(campus.name || "").trim().toLowerCase();
+    if (nameKey && fixedOrgColors[nameKey]) {
+      return fixedOrgColors[nameKey];
+    }
+    const key = campus.organizationId || nameKey || campus.name || "organization";
+    return fallbackPalette[hashString(key) % fallbackPalette.length];
+  };
+
+  const circles = campusData
+    .filter((campus) => campus.count > 0)
+    .map((campus) => {
+      const dashLength = (campus.count / total) * circumference;
+      const color = getOrganizationColor(campus);
+      const percent = total ? Math.round((campus.count / total) * 100) : 0;
+      const typeLabel = campus.type === "campus"
+        ? "Campus"
+        : campus.type === "college"
+          ? "College"
+          : "Organization";
+      const tooltip = `${campus.name}: ${campus.count} (${percent}%)`;
+      const circle = `
+        <circle
+          cx="${size / 2}"
+          cy="${size / 2}"
+          r="${radius}"
+          fill="none"
+          stroke="${color}"
+          stroke-width="${strokeWidth}"
+          stroke-linecap="round"
+          stroke-dasharray="${dashLength} ${circumference - dashLength}"
+          stroke-dashoffset="${-accumulated}"
+          transform="rotate(-90 ${size / 2} ${size / 2})"
+          data-campus-name="${escapeHtml(campus.name)}"
+          data-campus-type="${escapeHtml(typeLabel)}"
+          data-campus-count="${campus.count}"
+          data-campus-percent="${percent}"
+        >
+        </circle>
+      `;
+      accumulated += dashLength;
+      return { circle, color, typeLabel, tooltip, ...campus };
+    });
+
+  const legendsMarkup = buildLegendRows(campusData, getOrganizationColor);
+
+  container.innerHTML = `
+    <div class="analytics-campus-wrap analytics-donut-wrap">
+      <div class="analytics-campus-chart-shell">
+        <svg viewBox="0 0 ${size} ${size}" class="analytics-svg analytics-donut-svg" role="img" aria-label="Campus distribution chart">
+          <circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="none" stroke="rgba(15, 23, 42, 0.08)" stroke-width="${strokeWidth}"></circle>
+          ${circles.map((c) => c.circle).join("")}
+          <text x="${size / 2}" y="${size / 2 - 14}" class="analytics-donut-value">${total}</text>
+          <text x="${size / 2}" y="${size / 2 + 8}" class="analytics-donut-label">records</text>
+        </svg>
+        <div class="analytics-campus-tooltip" aria-hidden="true"></div>
+      </div>
+      <div class="analytics-campus-list">
+        ${legendsMarkup}
+      </div>
+    </div>
+  `;
+
+  const tooltip = container.querySelector(".analytics-campus-tooltip");
+  const chartShell = container.querySelector(".analytics-campus-chart-shell");
+  const svg = container.querySelector(".analytics-donut-svg");
+  const showTooltip = (event, circle) => {
+    if (!tooltip || !circle || !chartShell) return;
+    const name = circle.getAttribute("data-campus-name") || "";
+    const type = circle.getAttribute("data-campus-type") || "";
+    const count = circle.getAttribute("data-campus-count") || "0";
+    const percent = circle.getAttribute("data-campus-percent") || "0";
+    tooltip.innerHTML = `<strong>${escapeHtml(name)}</strong><span>${escapeHtml(type)} · ${count} · ${percent}%</span>`;
+    tooltip.classList.add("is-visible");
+    const rect = chartShell.getBoundingClientRect();
+    const x = Math.min(Math.max(event.clientX - rect.left + 14, 12), rect.width - 180);
+    const y = Math.min(Math.max(event.clientY - rect.top + 14, 12), rect.height - 64);
+    tooltip.style.left = `${x}px`;
+    tooltip.style.top = `${y}px`;
+  };
+
+  const hideTooltip = () => {
+    if (tooltip) {
+      tooltip.classList.remove("is-visible");
+    }
+  };
+
+  svg?.querySelectorAll("circle[data-campus-name]").forEach((circle) => {
+    circle.addEventListener("pointerenter", (event) => showTooltip(event, circle));
+    circle.addEventListener("pointermove", (event) => showTooltip(event, circle));
+    circle.addEventListener("pointerleave", hideTooltip);
+  });
+}
+
 function renderAnalyticsModule(summary = null) {
   const analytics = summary || getAnalyticsSummary();
   const activePeriod = getAcademicPeriodRange();
@@ -1436,10 +1695,36 @@ function renderAnalyticsModule(summary = null) {
   renderAnalyticsBarList(analyticsModuleChart, analytics.modules);
   const moduleTrend = buildModuleTrendSeries(activePeriod);
   renderAnalyticsTrendChart(analyticsTrendChart, moduleTrend.labels, moduleTrend.series);
-  renderAnalyticsDonutChart(analyticsStatusChart, [
-    { label: "Completed", value: completedRecords, color: "#0f766e" },
-    { label: "Pending", value: pendingRecords, color: "#a41321" },
-  ]);
+
+  // Head in All Campuses mode sees the status card as campus/college distribution.
+  const remoteOrLocalCampus = Array.isArray(analytics.campus) ? analytics.campus : buildLocalCampusBreakdown();
+  let campusData = mergeCampusBreakdown(remoteOrLocalCampus);
+
+  // Defensive fallback: if grouped campus counts are all zero but records exist, rebuild from loaded rows.
+  if (!hasAnyPositiveCampusCount(campusData) && totalRecords > 0) {
+    campusData = mergeCampusBreakdown(buildLocalCampusBreakdown());
+  }
+  const showCampusBreakdown = canAccessAllOrganizations() && !selectedHeadOrganizationId;
+
+  if (showCampusBreakdown) {
+    const groupedSummary = campusData.map((item) => ({ name: item.name, count: item.count }));
+    console.debug("[Analytics][All Campus] totalRecords:", totalRecords, "groupedCampus:", groupedSummary);
+  }
+
+  if (showCampusBreakdown) {
+    if (analyticsStatusKicker) analyticsStatusKicker.textContent = "Records Distribution";
+    if (analyticsStatusTitle) analyticsStatusTitle.textContent = "By Campus & College";
+    if (analyticsStatusPill) analyticsStatusPill.textContent = "Organization breakdown";
+    renderAnalyticsCampusChart(analyticsStatusChart, campusData);
+  } else {
+    if (analyticsStatusKicker) analyticsStatusKicker.textContent = "Process Health";
+    if (analyticsStatusTitle) analyticsStatusTitle.textContent = "Open vs Completed";
+    if (analyticsStatusPill) analyticsStatusPill.textContent = "Case status";
+    renderAnalyticsDonutChart(analyticsStatusChart, [
+      { label: "Completed", value: completedRecords, color: "#0f766e" },
+      { label: "Pending", value: pendingRecords, color: "#a41321" },
+    ]);
+  }
 }
 
 function formatDashboardDetail(item) {
@@ -3533,8 +3818,7 @@ attachCancelEdit(leaveofabsenceForm);
     }
 
     hasGlobalHeadAccess =
-      String(userAccount?.role || "").trim().toLowerCase() === ROLE_HEAD &&
-      String(userAccount?.organizations?.name || "").trim().toLowerCase() === "alangilan";
+      String(userAccount?.role || "").trim().toLowerCase() === ROLE_HEAD;
     
     if (userAccount && userAccount.organization_id) {
       localStorage.setItem("organizationId", String(userAccount.organization_id));

@@ -110,13 +110,12 @@ async function fetchModuleRows(supabase, module, organizationId, academicPeriod)
     module.key === "minor" || module.key === "major" ? "sanction" : "sr_code",
     module.key === "minor" || module.key === "major" ? "date_of_suspension" : "",
     "sr_code",
+    "organization_id",
   ].filter(Boolean).join(",");
 
   const attempts = [
-    { useArchived: true, useAcademicColumns: true, useDateRange: false },
-    { useArchived: false, useAcademicColumns: true, useDateRange: false },
-    { useArchived: true, useAcademicColumns: false, useDateRange: true },
-    { useArchived: false, useAcademicColumns: false, useDateRange: true },
+    { useArchived: true },
+    { useArchived: false },
   ];
 
   let lastError = null;
@@ -130,11 +129,7 @@ async function fetchModuleRows(supabase, module, organizationId, academicPeriod)
     }
 
     if (academicPeriod) {
-      if (attempt.useAcademicColumns) {
-        query = query.eq("academic_year", academicPeriod.year).eq("semester", academicPeriod.semester);
-      } else if (attempt.useDateRange) {
-        query = query.gte(module.dateColumn, academicPeriod.startDate).lte(module.dateColumn, academicPeriod.endDate);
-      }
+      query = query.gte(module.dateColumn, academicPeriod.startDate).lte(module.dateColumn, academicPeriod.endDate);
     }
 
     const { data, error } = await query;
@@ -149,14 +144,49 @@ async function fetchModuleRows(supabase, module, organizationId, academicPeriod)
     if (attempt.useArchived && !message.includes("archived")) {
       continue;
     }
-
-    if (attempt.useAcademicColumns && !(message.includes("academic_year") || message.includes("semester"))) {
-      continue;
-    }
   }
 
   if (lastError) throw lastError;
   return [];
+}
+
+async function buildCampusBreakdown(supabase, moduleRows, scopedOrganizationId) {
+  const campusMap = new Map();
+  
+  // Count all fetched records per organization.
+  moduleRows.forEach((module) => {
+    module.rows.forEach((record) => {
+      const orgId = record.organization_id;
+      if (orgId && !campusMap.has(orgId)) {
+        campusMap.set(orgId, { count: 0, orgId });
+      }
+      if (orgId) {
+        campusMap.get(orgId).count += 1;
+      }
+    });
+  });
+
+  // If no records, return empty
+  if (campusMap.size === 0) {
+    return [];
+  }
+
+  // Fetch organization details
+  const orgIds = Array.from(campusMap.keys());
+  const { data: organizations } = await supabase
+    .from("organizations")
+    .select("id, name, type")
+    .in("id", orgIds);
+
+  // Map organization details to breakdown
+  const breakdown = (organizations || []).map((org) => ({
+    organizationId: org.id,
+    name: org.name,
+    type: org.type,
+    count: campusMap.get(org.id)?.count || 0,
+  }));
+
+  return breakdown.sort((a, b) => b.count - a.count);
 }
 
 function buildMonthSeries(entries) {
@@ -250,6 +280,8 @@ module.exports = async (req, res) => {
         ? 100
         : 0);
 
+    const campusBreakdown = await buildCampusBreakdown(supabase, moduleRows, scopedOrganizationId);
+
     return res.status(200).json({
       generatedAt: new Date().toISOString(),
       scope: {
@@ -265,6 +297,7 @@ module.exports = async (req, res) => {
         goodMoralFlags,
       },
       modules: moduleRows.map(({ rows, ...module }) => module),
+      campus: campusBreakdown,
       status: {
         completed: completedRecords,
         pending: pendingRecords,
