@@ -173,6 +173,7 @@ function renderMajorRecordActions(recordId) {
 
   return `
     <button class="btn-edit" type="button" data-action="edit" data-id="${recordId}">Edit</button>
+    <button class="btn-delete" type="button" data-action="archive" data-id="${recordId}">Archive</button>
     <button class="btn-delete" type="button" data-action="dismiss" data-id="${recordId}">Case Dismissal</button>
   `;
 }
