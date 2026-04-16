@@ -40,6 +40,7 @@ create table if not exists public.major_offenses (
   date_of_suspension date not null,
   date_of_post_counseling date,
   archived boolean default false,
+  status text default 'active' check (status in ('active', 'dismissed')),
   academic_year text,
   semester text,
   created_at timestamptz default now()
@@ -149,6 +150,7 @@ create table if not exists public.user_accounts (
 -- Add archived column to existing tables (if they don't have it)
 alter table public.minor_offenses add column if not exists archived boolean default false;
 alter table public.major_offenses add column if not exists archived boolean default false;
+alter table public.major_offenses add column if not exists status text default 'active';
 alter table public.non_wearing_uniform add column if not exists archived boolean default false;
 alter table public.gatepass add column if not exists archived boolean default false;
 alter table public.good_moral add column if not exists archived boolean default false;
@@ -226,6 +228,16 @@ where organization_id is null;
 update public.major_offenses
 set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
 where organization_id is null;
+
+update public.major_offenses
+set status = case when archived then 'dismissed' else coalesce(status, 'active') end
+where status is null
+   or status not in ('active', 'dismissed');
+
+alter table public.major_offenses drop constraint if exists major_offenses_status_check;
+alter table public.major_offenses
+  add constraint major_offenses_status_check
+  check (status in ('active', 'dismissed'));
 
 update public.non_wearing_uniform
 set organization_id = (select id from public.organizations where name = 'CICS' limit 1)

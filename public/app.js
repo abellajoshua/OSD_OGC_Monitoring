@@ -135,6 +135,7 @@ const ACTIVE_TAB_STORAGE_KEY = "activeTab";
 const ROLE_ADMIN = "admin";
 const ROLE_HEAD = "head";
 const ROLE_COORDINATOR = "coordinator";
+const CASE_DISMISSAL_PAGE = "case-dismissal.html";
 
 function canEditRecords() {
   return currentUserRole === ROLE_COORDINATOR;
@@ -162,6 +163,17 @@ function renderRecordActions(recordId) {
   return `
     <button class="btn-edit" type="button" data-action="edit" data-id="${recordId}">Edit</button>
     <button class="btn-delete" type="button" data-action="archive" data-id="${recordId}">Archive</button>
+  `;
+}
+
+function renderMajorRecordActions(recordId) {
+  if (!canEditRecords()) {
+    return `<span class="text-muted">Read Only</span>`;
+  }
+
+  return `
+    <button class="btn-edit" type="button" data-action="edit" data-id="${recordId}">Edit</button>
+    <button class="btn-delete" type="button" data-action="dismiss" data-id="${recordId}">Case Dismissal</button>
   `;
 }
 
@@ -442,6 +454,16 @@ async function archiveRow(table, id) {
   if (error) throw error;
 }
 
+async function dismissMajorRow(id) {
+  ensureCoordinatorAccess();
+  const supabase = await getSupabase();
+  const orgId = await getCurrentOrganizationId();
+  let query = supabase.from(TABLES.major).update({ archived: true, status: "dismissed" }).eq("id", id);
+  if (orgId) query = query.eq("organization_id", orgId);
+  const { error } = await query;
+  if (error) throw error;
+}
+
 async function deleteRow(table, id) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
@@ -471,6 +493,11 @@ function hasTab(targetId) {
 }
 
 function getPreferredTab() {
+  const hashTab = String(window.location.hash || "").replace(/^#/, "");
+  if (hashTab && hasTab(hashTab)) {
+    return hashTab;
+  }
+
   const storedTab = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
   if (storedTab && hasTab(storedTab)) {
     return storedTab;
@@ -2279,7 +2306,7 @@ function renderMajorRows(records) {
       <td>${record.sanction || ""}</td>
       <td>${formatDate(record.date_of_suspension)}</td>
       <td>${formatDate(record.date_of_post_counseling)}</td>
-      <td>${renderRecordActions(record.id)}</td>
+      <td>${renderMajorRecordActions(record.id)}</td>
     `;
     majorTableBody.appendChild(row);
   });
@@ -2630,8 +2657,9 @@ function attachRowActions({ tableElement, tableName, getRecords, form, fields, r
   tableElement.addEventListener("click", async (event) => {
     const editButton = event.target.closest("[data-action='edit']");
     const archiveButton = event.target.closest("[data-action='archive']");
+    const dismissButton = event.target.closest("[data-action='dismiss']");
 
-    if ((editButton || archiveButton) && !canEditRecords()) {
+    if ((editButton || archiveButton || dismissButton) && !canEditRecords()) {
       alert("Read-only access: Head can view and export records only.");
       return;
     }
@@ -2662,6 +2690,21 @@ function attachRowActions({ tableElement, tableName, getRecords, form, fields, r
     } catch (error) {
       alert(error.message || "Unable to archive record.");
     }
+    }
+
+    if (dismissButton) {
+      const id = dismissButton.dataset.id;
+      if (!id) return;
+      const confirmed = window.confirm("Are you sure you want to move this case to dismissal?");
+      if (!confirmed) return;
+
+      try {
+        await dismissMajorRow(id);
+        sessionStorage.setItem("caseDismissalNotice", "Case moved to dismissal successfully.");
+        window.location.href = CASE_DISMISSAL_PAGE;
+      } catch (error) {
+        alert(error.message || "Unable to move case to dismissal.");
+      }
     }
   });
 }

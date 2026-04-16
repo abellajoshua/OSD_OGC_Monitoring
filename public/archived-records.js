@@ -360,8 +360,8 @@ function renderMinorRows(rows, tbody) {
       <td>${r.offense || ""}</td>
       <td>${r.sanction || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
@@ -384,8 +384,8 @@ function renderMajorRows(rows, tbody) {
       <td>${r.offense || ""}</td>
       <td>${r.sanction || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
@@ -408,8 +408,8 @@ function renderUniformRows(rows, tbody) {
       <td>${r.course || ""}</td>
       <td>${r.reason || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
@@ -432,8 +432,8 @@ function renderGatepassRows(rows, tbody) {
       <td>${r.course || ""}</td>
       <td>${r.reason || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
@@ -456,8 +456,8 @@ function renderGoodmoralRows(rows, tbody) {
       <td>${r.course || ""}</td>
       <td>${r.purpose || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
@@ -480,8 +480,8 @@ function renderIdReplacementRows(rows, tbody) {
       <td>${r.course || ""}</td>
       <td>${r.reason || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
@@ -504,8 +504,8 @@ function renderLeaveOfAbsenceRows(rows, tbody) {
       <td>${r.course || ""}</td>
       <td>${r.semester_period_covered || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
