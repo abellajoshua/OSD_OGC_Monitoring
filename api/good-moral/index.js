@@ -4,6 +4,10 @@ const {
   getRequestUserContext,
   getScopedOrganizationId,
   applyOrganizationScope,
+  applyAcademicPeriodScope,
+  applyActiveRecordsScope,
+  logApiFlow,
+  getAcademicPeriodFromPayload,
   ensureRole,
   getErrorStatus,
 } = require("../_supabase");
@@ -23,11 +27,15 @@ module.exports = async (req, res) => {
         .order("date", { ascending: false })
         .order("id", { ascending: false });
       goodMoralQuery = applyOrganizationScope(goodMoralQuery, scopedOrganizationId);
+      goodMoralQuery = applyAcademicPeriodScope(goodMoralQuery, req.query);
+      goodMoralQuery = applyActiveRecordsScope(goodMoralQuery);
       const { data: goodMoral, error: goodError } = await goodMoralQuery;
       if (goodError) return res.status(500).json({ error: goodError.message });
 
       let minorQuery = supabase.from("minor_offenses").select("sr_code");
       minorQuery = applyOrganizationScope(minorQuery, scopedOrganizationId);
+      minorQuery = applyAcademicPeriodScope(minorQuery, req.query);
+      minorQuery = applyActiveRecordsScope(minorQuery);
       const { data: minorData, error: minorError } = await minorQuery;
       if (minorError) return res.status(500).json({ error: minorError.message });
 
@@ -36,6 +44,13 @@ module.exports = async (req, res) => {
         ...record,
         has_minor_offense: codeSet.has(String(record.sr_code || "").trim()) ? 1 : 0,
       }));
+
+      logApiFlow("good_moral.GET", {
+        organizationId: scopedOrganizationId || null,
+        academicYear: String(req?.query?.academic_year || "").trim() || null,
+        semester: String(req?.query?.semester || "").trim() || null,
+        rowCount: enriched.length,
+      });
 
       return res.status(200).json(enriched);
     }
@@ -47,13 +62,35 @@ module.exports = async (req, res) => {
       if (missing.length) return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
 
       const { organization_id, ...safePayload } = payload;
+      const academicPeriod = getAcademicPeriodFromPayload(safePayload);
+      if (!academicPeriod) {
+        return res.status(400).json({ error: "Missing or invalid academic_year/semester." });
+      }
+
+      logApiFlow("good_moral.POST.payload", {
+        organizationId: context.organizationId,
+        payload: safePayload,
+      });
+
       const { data, error } = await supabase
         .from("good_moral")
-        .insert({ ...safePayload, organization_id: context.organizationId })
-        .select("id")
+        .insert({
+          ...safePayload,
+          academic_year: academicPeriod.academicYear,
+          semester: academicPeriod.semester,
+          organization_id: context.organizationId,
+          archived: false,
+        })
+        .select("*")
         .single();
       if (error) return res.status(500).json({ error: error.message });
-      return res.status(201).json({ id: data.id });
+
+      logApiFlow("good_moral.POST.inserted", {
+        id: data?.id || null,
+        organizationId: data?.organization_id || context.organizationId,
+      });
+
+      return res.status(201).json({ id: data.id, record: data });
     }
 
     return res.status(405).json({ error: "Method not allowed." });

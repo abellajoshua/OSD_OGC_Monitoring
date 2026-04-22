@@ -130,6 +130,7 @@ let goodmoralRecords = [];
 let idreplacementRecords = [];
 let leaveofabsenceRecords = [];
 let currentOrganizationId = null;
+let currentUserId = null;
 let currentUserRole = localStorage.getItem("userRole") || "";
 let selectedHeadOrganizationId = null;
 let headFilterInitialized = false;
@@ -143,6 +144,10 @@ const ROLE_ADMIN = "admin";
 const ROLE_HEAD = "head";
 const ROLE_COORDINATOR = "coordinator";
 const CASE_DISMISSAL_PAGE = "case-dismissal.html";
+
+function logDataFlow(step, details = {}) {
+  console.log(`[DataFlow] ${step}`, details);
+}
 
 function canEditRecords() {
   return currentUserRole === ROLE_COORDINATOR;
@@ -234,18 +239,15 @@ function applyHeadInterfaceRestrictions() {
 }
 
 async function getCurrentOrganizationId() {
-  if (currentOrganizationId) return currentOrganizationId;
-  const cached = localStorage.getItem("organizationId");
-  if (cached) {
-    currentOrganizationId = Number(cached);
-    return currentOrganizationId;
-  }
-
   const supabase = await getSupabase();
   const {
     data: { session },
   } = await supabase.auth.getSession();
   if (!session) return null;
+
+  if (currentOrganizationId && currentUserId === session.user.id) {
+    return currentOrganizationId;
+  }
 
   const { data: account } = await supabase
     .from("user_accounts")
@@ -259,10 +261,20 @@ async function getCurrentOrganizationId() {
     localStorage.setItem("userRole", currentUserRole);
   }
 
+  currentUserId = session.user.id;
   currentOrganizationId = account?.organization_id || null;
   if (currentOrganizationId) {
     localStorage.setItem("organizationId", String(currentOrganizationId));
+  } else {
+    localStorage.removeItem("organizationId");
   }
+
+  logDataFlow("Resolved user context", {
+    userId: currentUserId,
+    role: currentUserRole,
+    organizationId: currentOrganizationId,
+  });
+
   return currentOrganizationId;
 }
 
@@ -371,41 +383,56 @@ async function fetchTableRows(table, dateColumn, queryContext = null) {
   const primaryOrderColumn = dateColumn || "id";
   const orgId = queryContext?.orgId !== undefined ? queryContext.orgId : await getScopedReadOrganizationId();
   const period = queryContext?.period ?? getAcademicPeriodRange();
-  const attempts = [
-    { useArchived: true },
-    { useArchived: false },
-  ];
-
-  let lastError = null;
-
-  for (const attempt of attempts) {
+  const runQuery = async ({ useArchivedFilter, periodMode }) => {
     let query = supabase.from(table).select("*");
 
-    if (attempt.useArchived) {
-      query = query.eq("archived", false);
+    if (useArchivedFilter) {
+      query = query.or("archived.is.null,archived.eq.false");
     }
+
     if (orgId) {
       query = query.eq("organization_id", orgId);
     }
 
-    if (period && dateColumn) {
-      query = query.gte(dateColumn, period.startDate).lte(dateColumn, period.endDate);
+    if (period && periodMode === "metadata") {
+      const semesterCandidates = getSemesterFilterCandidates(period.semester);
+      query = query.eq("academic_year", period.year);
+      if (semesterCandidates.length) {
+        query = query.in("semester", semesterCandidates);
+      }
     }
 
-    const { data, error } = await query
-      .order(primaryOrderColumn, { ascending: false })
-      .order("id", { ascending: false });
+    return query.order(primaryOrderColumn, { ascending: false }).order("id", { ascending: false });
+  };
 
+  const attempts = [];
+  const preferredPeriodMode = period ? "metadata" : "none";
+  attempts.push({ useArchivedFilter: true, periodMode: preferredPeriodMode });
+  attempts.push({ useArchivedFilter: false, periodMode: preferredPeriodMode });
+
+  let lastError = null;
+
+  for (const attempt of attempts) {
+    const { data, error } = await runQuery(attempt);
     if (!error) {
-      return data || [];
+      const rows = data || [];
+      logDataFlow("Fetch rows success", {
+        table,
+        rowCount: rows.length,
+        organizationId: orgId || null,
+        period: period || null,
+        attempt,
+      });
+      console.log("Fetched Data:", rows);
+      return rows;
     }
 
     lastError = error;
-    const message = String(error.message || "").toLowerCase();
-
-    if (attempt.useArchived && !message.includes("archived")) {
-      continue;
-    }
+    logDataFlow("Fetch rows attempt failed", {
+      table,
+      attempt,
+      message: error.message,
+    });
   }
 
   if (lastError) throw lastError;
@@ -416,24 +443,42 @@ async function createRow(table, payload) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
+  if (!orgId) {
+    throw new Error("Unable to determine organization for current account.");
+  }
   const period = getAcademicPeriodRange();
   const safePayload = {
     ...payload,
     organization_id: orgId,
+    archived: false,
     ...(period ? { academic_year: period.year, semester: period.semester } : {}),
   };
 
-  let { error } = await supabase.from(table).insert(safePayload);
+  logDataFlow("Create row payload", {
+    table,
+    organizationId: orgId,
+    payload: safePayload,
+  });
+
+  let { data, error } = await supabase.from(table).insert(safePayload).select("*").single();
 
   if (error) {
     const message = String(error.message || "").toLowerCase();
     if (message.includes("academic_year") || message.includes("semester")) {
-      const fallbackPayload = { ...payload, organization_id: orgId };
-      ({ error } = await supabase.from(table).insert(fallbackPayload));
+      const fallbackPayload = { ...payload, organization_id: orgId, archived: false };
+      ({ data, error } = await supabase.from(table).insert(fallbackPayload).select("*").single());
     }
   }
 
   if (error) throw error;
+
+  logDataFlow("Create row result", {
+    table,
+    insertedId: data?.id || null,
+    organizationId: data?.organization_id || orgId,
+  });
+
+  return data || null;
 }
 
 async function updateRow(table, id, payload) {
@@ -1130,6 +1175,23 @@ function getAnalyticsSummary() {
   return analyticsSummary || buildLocalAnalyticsSummary();
 }
 
+function shouldPreferLocalAnalytics(remoteSummary, localSummary) {
+  const remoteTotal = Number(remoteSummary?.totals?.totalRecords || 0);
+  const localTotal = Number(localSummary?.totals?.totalRecords || 0);
+  if (localTotal > 0 && remoteTotal === 0) {
+    return true;
+  }
+
+  const remoteModuleTotal = Array.isArray(remoteSummary?.modules)
+    ? remoteSummary.modules.reduce((sum, module) => sum + Number(module?.count || 0), 0)
+    : 0;
+  const localModuleTotal = Array.isArray(localSummary?.modules)
+    ? localSummary.modules.reduce((sum, module) => sum + Number(module?.count || 0), 0)
+    : 0;
+
+  return localModuleTotal > 0 && remoteModuleTotal === 0;
+}
+
 function getBusiestDay(trend) {
   if (!trend?.values?.length || !trend?.labels?.length) return null;
   let maxIndex = 0;
@@ -1811,7 +1873,9 @@ function renderAnalyticsCampusChart(container, campusData) {
 }
 
 function renderAnalyticsModule(summary = null) {
-  const analytics = summary || getAnalyticsSummary();
+  const remoteSummary = summary || getAnalyticsSummary();
+  const localSummary = buildLocalAnalyticsSummary();
+  const analytics = shouldPreferLocalAnalytics(remoteSummary, localSummary) ? localSummary : remoteSummary;
   const activePeriod = getAcademicPeriodRange();
   const trendTitle = activePeriod ? `${activePeriod.semester} AY ${activePeriod.year}` : "Selected Academic Period";
   const totalRecords = analytics.totals.totalRecords;
@@ -3290,6 +3354,16 @@ function normalizeSemesterLabel(value) {
   return "";
 }
 
+function getSemesterFilterCandidates(value) {
+  const normalized = normalizeSemesterLabel(value);
+  if (!normalized) return [];
+
+  const variants = [normalized];
+  if (normalized === "First Semester") variants.push("1st Semester");
+  if (normalized === "Second Semester") variants.push("2nd Semester");
+  return Array.from(new Set(variants));
+}
+
 function setAcademicPeriod(year, semester) {
   localStorage.setItem("academicYear", year);
   localStorage.setItem("semester", normalizeSemesterLabel(semester) || "First Semester");
@@ -3441,6 +3515,8 @@ async function loadAnalyticsSummary() {
 
     const query = new URLSearchParams();
     const period = getAcademicPeriodRange();
+    console.log("Selected Year:", period?.year || null);
+    console.log("Selected Semester:", period?.semester || null);
     if (canAccessAllOrganizations() && selectedHeadOrganizationId) {
       query.set("organization_id", String(selectedHeadOrganizationId));
     }
@@ -3557,6 +3633,9 @@ async function reloadAllDataForCurrentScope() {
       Promise.resolve(getAcademicPeriodRange()),
     ]);
 
+    console.log("Selected Year:", period?.year || null);
+    console.log("Selected Semester:", period?.semester || null);
+
     const queryContext = { orgId, period };
     const [
       minorResult,
@@ -3566,7 +3645,6 @@ async function reloadAllDataForCurrentScope() {
       goodmoralResult,
       idreplacementResult,
       leaveofabsenceResult,
-      analyticsResult,
     ] = await Promise.allSettled([
       fetchTableRows(TABLES.minor, "date_of_complaint", queryContext),
       fetchTableRows(TABLES.major, "date_of_complaint", queryContext),
@@ -3575,7 +3653,6 @@ async function reloadAllDataForCurrentScope() {
       fetchTableRows(TABLES.goodmoral, "date", queryContext),
       fetchTableRows(TABLES.idreplacement, "date", queryContext),
       fetchTableRows(TABLES.leaveofabsence, "date", queryContext),
-      loadAnalyticsSummary(),
     ]);
 
     minorRecords = minorResult.status === "fulfilled" ? (minorResult.value || []) : [];
@@ -3597,7 +3674,9 @@ async function reloadAllDataForCurrentScope() {
     updateDashboardCounters();
     await loadDashboard();
 
-    if (analyticsResult.status === "rejected") {
+    try {
+      await loadAnalyticsSummary();
+    } catch {
       analyticsSummary = null;
       renderAnalyticsModule();
     }
@@ -3925,7 +4004,6 @@ document.querySelectorAll("[data-archive]").forEach((button) => {
   });
 });
 
-reloadAllDataForCurrentScope();
 updateDashboardCounters();
 initializeAcademicPeriod();
 
@@ -4061,6 +4139,7 @@ attachCancelEdit(leaveofabsenceForm);
     if (userAccount && userAccount.organization_id) {
       localStorage.setItem("organizationId", String(userAccount.organization_id));
       currentOrganizationId = userAccount.organization_id;
+      currentUserId = session.user.id;
     }
 
     if (userAccount && userAccount.role === ROLE_ADMIN) {
@@ -4072,10 +4151,12 @@ attachCancelEdit(leaveofabsenceForm);
     if (userAccount && userAccount.role === ROLE_HEAD) {
       applyHeadInterfaceRestrictions();
       await initializeHeadOrganizationFilter();
-      await reloadAllDataForCurrentScope();
     }
+
+    await reloadAllDataForCurrentScope();
   } catch (error) {
     // user_accounts table doesn't exist or RLS blocking - ignore and continue
     console.log("Could not check user role, continuing anyway");
+    await reloadAllDataForCurrentScope();
   }
 })();

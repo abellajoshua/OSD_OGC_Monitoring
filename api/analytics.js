@@ -3,6 +3,8 @@ const {
   getRequestUserContext,
   getScopedOrganizationId,
   applyOrganizationScope,
+  applyAcademicPeriodScope,
+  applyActiveRecordsScope,
   getErrorStatus,
 } = require("./_supabase");
 
@@ -125,11 +127,14 @@ async function fetchModuleRows(supabase, module, organizationId, academicPeriod)
     query = applyOrganizationScope(query, organizationId);
 
     if (attempt.useArchived) {
-      query = query.eq("archived", false);
+      query = applyActiveRecordsScope(query);
     }
 
     if (academicPeriod) {
-      query = query.gte(module.dateColumn, academicPeriod.startDate).lte(module.dateColumn, academicPeriod.endDate);
+      query = applyAcademicPeriodScope(query, {
+        academic_year: academicPeriod.year,
+        semester: academicPeriod.semester,
+      });
     }
 
     const { data, error } = await query;
