@@ -189,6 +189,123 @@ async function buildCampusBreakdown(supabase, moduleRows, scopedOrganizationId) 
   return breakdown.sort((a, b) => b.count - a.count);
 }
 
+async function fetchOrganizationsByType(supabase, type, scopedOrganizationId) {
+  let query = supabase.from("organizations").select("id, name, type").eq("type", type);
+  if (scopedOrganizationId) {
+    query = query.eq("id", scopedOrganizationId);
+  }
+
+  const { data, error } = await query.order("name", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function fetchOrganizationsByTypes(supabase, types, scopedOrganizationId) {
+  let query = supabase.from("organizations").select("id, name, type").in("type", types);
+  if (scopedOrganizationId) {
+    query = query.eq("id", scopedOrganizationId);
+  }
+
+  const { data, error } = await query.order("name", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+function normalizeOffenseKey(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function buildOffenseMapByOrganization(moduleRows) {
+  const offenseMapByOrg = new Map();
+
+  moduleRows
+    .filter((module) => module.key === "minor" || module.key === "major")
+    .forEach((module) => {
+      module.rows.forEach((record) => {
+        const orgId = Number(record.organization_id || 0);
+        const offenseText = String(record.offense || "").trim();
+        const offenseKey = normalizeOffenseKey(offenseText);
+        if (!orgId || !offenseKey) return;
+
+        if (!offenseMapByOrg.has(orgId)) {
+          offenseMapByOrg.set(orgId, new Map());
+        }
+
+        const orgMap = offenseMapByOrg.get(orgId);
+        const current = orgMap.get(offenseKey) || { offense: offenseText, count: 0 };
+        orgMap.set(offenseKey, {
+          offense: current.offense || offenseText,
+          count: current.count + 1,
+        });
+      });
+    });
+
+  return offenseMapByOrg;
+}
+
+function mergeOffenseMaps(targetMap, sourceMap) {
+  sourceMap.forEach((offenseMap, orgId) => {
+    if (!targetMap.has(orgId)) {
+      targetMap.set(orgId, new Map());
+    }
+
+    const targetOrgMap = targetMap.get(orgId);
+    offenseMap.forEach((entry, offenseKey) => {
+      const current = targetOrgMap.get(offenseKey) || { offense: entry.offense, count: 0 };
+      targetOrgMap.set(offenseKey, {
+        offense: current.offense || entry.offense,
+        count: Number(current.count || 0) + Number(entry.count || 0),
+      });
+    });
+  });
+
+  return targetMap;
+}
+
+function buildTopOffenseSummary(organization, offenseMapByOrg, fallbackOffenseMap) {
+  const orgId = Number(organization.id || 0);
+  const name = String(organization.name || "").trim();
+  const type = String(organization.type || "").trim().toLowerCase();
+  const useFallback = type === "campus" && name.toLowerCase() === "alangilan";
+  const orgMap = useFallback ? fallbackOffenseMap : offenseMapByOrg.get(orgId);
+
+  if (!orgMap || !orgMap.size) {
+    return {
+      organizationId: orgId,
+      name,
+      type,
+      topOffense: null,
+      topOffenseCount: 0,
+      totalOffenseRecords: 0,
+    };
+  }
+
+  const entries = Array.from(orgMap.values());
+  const totalOffenseRecords = entries.reduce((sum, item) => sum + Number(item.count || 0), 0);
+  const top = entries.sort((left, right) => {
+    if (Number(right.count || 0) !== Number(left.count || 0)) {
+      return Number(right.count || 0) - Number(left.count || 0);
+    }
+    return String(left.offense || "").localeCompare(String(right.offense || ""));
+  })[0];
+
+  return {
+    organizationId: orgId,
+    name,
+    type,
+    topOffense: String(top?.offense || "").trim() || null,
+    topOffenseCount: Number(top?.count || 0),
+    totalOffenseRecords,
+  };
+}
+
+function buildTopOffenseByOrganization(organizations, offenseMapByOrg, fallbackOffenseMap) {
+  return organizations.map((organization) => buildTopOffenseSummary(organization, offenseMapByOrg, fallbackOffenseMap));
+}
+
 function buildMonthSeries(entries) {
   const labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const values = Array.from({ length: 12 }, () => 0);
@@ -281,6 +398,27 @@ module.exports = async (req, res) => {
         : 0);
 
     const campusBreakdown = await buildCampusBreakdown(supabase, moduleRows, scopedOrganizationId);
+    const campuses = await fetchOrganizationsByType(supabase, "campus", scopedOrganizationId);
+    const colleges = await fetchOrganizationsByType(supabase, "college", scopedOrganizationId);
+    const offenseMapByOrg = buildOffenseMapByOrganization(moduleRows);
+
+    const collegeAggregateMap = new Map();
+    colleges.forEach((college) => {
+      const orgId = Number(college.id || 0);
+      const orgMap = offenseMapByOrg.get(orgId);
+      if (!orgMap) return;
+
+      orgMap.forEach((entry, offenseKey) => {
+        const current = collegeAggregateMap.get(offenseKey) || { offense: entry.offense, count: 0 };
+        collegeAggregateMap.set(offenseKey, {
+          offense: current.offense || entry.offense,
+          count: Number(current.count || 0) + Number(entry.count || 0),
+        });
+      });
+    });
+
+    const campusTopOffense = buildTopOffenseByOrganization(campuses, offenseMapByOrg, collegeAggregateMap);
+    const collegeTopOffense = buildTopOffenseByOrganization(colleges, offenseMapByOrg);
 
     return res.status(200).json({
       generatedAt: new Date().toISOString(),
@@ -298,6 +436,8 @@ module.exports = async (req, res) => {
       },
       modules: moduleRows.map(({ rows, ...module }) => module),
       campus: campusBreakdown,
+      campusTopOffense,
+      collegeTopOffense,
       status: {
         completed: completedRecords,
         pending: pendingRecords,

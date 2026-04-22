@@ -68,6 +68,9 @@ const analyticsStatusChart = document.querySelector("#analytics-status-chart");
 const analyticsStatusKicker = document.querySelector("#analytics-status-kicker");
 const analyticsStatusTitle = document.querySelector("#analytics-status-title");
 const analyticsStatusPill = document.querySelector("#analytics-status-pill");
+const analyticsCollegeTopOffenseCard = document.querySelector("#analytics-college-topoffense-card");
+const analyticsCampusTopOffenseList = document.querySelector("#analytics-campus-topoffense-list");
+const analyticsCollegeTopOffenseList = document.querySelector("#analytics-college-topoffense-list");
 const analyticsTopOffense = document.querySelector("#analytics-top-offense");
 const analyticsTopOffenseCount = document.querySelector("#analytics-top-offense-count");
 const analyticsBusiestDay = document.querySelector("#analytics-busiest-day");
@@ -849,6 +852,109 @@ function buildLocalCampusBreakdown() {
   });
 }
 
+function buildLocalOffenseMapByOrganization() {
+  const offenseMapByOrg = new Map();
+
+  ["minor", "major"].forEach((moduleKey) => {
+    getModuleRecords(moduleKey).forEach((record) => {
+      const orgId = Number(record?.organization_id || 0);
+      const offenseText = String(record?.offense || "").trim();
+      const offenseKey = offenseText.toLowerCase().replace(/\s+/g, " ");
+      if (!orgId || !offenseKey) return;
+
+      if (!offenseMapByOrg.has(orgId)) {
+        offenseMapByOrg.set(orgId, new Map());
+      }
+
+      const orgMap = offenseMapByOrg.get(orgId);
+      const current = orgMap.get(offenseKey) || { offense: offenseText, count: 0 };
+      orgMap.set(offenseKey, { offense: current.offense || offenseText, count: current.count + 1 });
+    });
+  });
+
+  return offenseMapByOrg;
+}
+
+function buildTopOffenseRow(organizationId, meta, orgMap, typeOverride) {
+  const name = meta?.name || `Organization ${organizationId}`;
+  const type = typeOverride || String(meta?.type || "organization").trim().toLowerCase() || "organization";
+
+  if (!orgMap || !orgMap.size) {
+    return {
+      organizationId,
+      name,
+      type,
+      topOffense: null,
+      topOffenseCount: 0,
+      totalOffenseRecords: 0,
+    };
+  }
+
+  const entries = Array.from(orgMap.values());
+  const totalOffenseRecords = entries.reduce((sum, item) => sum + Number(item.count || 0), 0);
+  const top = entries.sort((left, right) => {
+    if (Number(right.count || 0) !== Number(left.count || 0)) {
+      return Number(right.count || 0) - Number(left.count || 0);
+    }
+    return String(left.offense || "").localeCompare(String(right.offense || ""));
+  })[0];
+
+  return {
+    organizationId,
+    name,
+    type,
+    topOffense: String(top?.offense || "").trim() || null,
+    topOffenseCount: Number(top?.count || 0),
+    totalOffenseRecords,
+  };
+}
+
+function buildLocalCampusTopOffenseByOrganization() {
+  const offenseMapByOrg = buildLocalOffenseMapByOrganization();
+  const collegeAggregate = new Map();
+
+  Array.from(organizationDirectory.entries()).forEach(([organizationId, meta]) => {
+    if (String(meta?.type || "").trim().toLowerCase() !== "college") return;
+    const orgMap = offenseMapByOrg.get(organizationId);
+    if (!orgMap) return;
+
+    orgMap.forEach((entry, offenseKey) => {
+      const current = collegeAggregate.get(offenseKey) || { offense: entry.offense, count: 0 };
+      collegeAggregate.set(offenseKey, {
+        offense: current.offense || entry.offense,
+        count: Number(current.count || 0) + Number(entry.count || 0),
+      });
+    });
+  });
+
+  return Array.from(organizationDirectory.entries())
+    .filter(([, meta]) => String(meta?.type || "").trim().toLowerCase() === "campus")
+    .map(([organizationId, meta]) => {
+      const orgMap = String(meta?.name || "").trim().toLowerCase() === "alangilan"
+        ? collegeAggregate
+        : offenseMapByOrg.get(organizationId);
+
+      return buildTopOffenseRow(organizationId, meta, orgMap, "campus");
+    })
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+function getCampusDisplayOrder(name) {
+  const normalized = String(name || "").trim().toLowerCase();
+  const order = ["alangilan", "balayan", "lobo", "mabini"];
+  const index = order.indexOf(normalized);
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+}
+
+function buildLocalCollegeTopOffenseByOrganization() {
+  const offenseMapByOrg = buildLocalOffenseMapByOrganization();
+
+  return Array.from(organizationDirectory.entries())
+    .filter(([, meta]) => String(meta?.type || "").trim().toLowerCase() === "college")
+    .map(([organizationId, meta]) => buildTopOffenseRow(organizationId, meta, offenseMapByOrg.get(organizationId), "college"))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
 function mergeCampusBreakdown(campusRows) {
   const countsById = new Map();
 
@@ -912,6 +1018,28 @@ function normalizeAnalyticsSummary(data) {
         .filter((item) => item.name)
     : [];
 
+  const campusTopOffense = Array.isArray(data?.campusTopOffense)
+    ? data.campusTopOffense.map((item) => ({
+        organizationId: Number(item.organizationId || 0),
+        name: String(item.name || "").trim(),
+        type: String(item.type || "").trim().toLowerCase(),
+        topOffense: item.topOffense ? String(item.topOffense).trim() : null,
+        topOffenseCount: Number(item.topOffenseCount || 0),
+        totalOffenseRecords: Number(item.totalOffenseRecords || 0),
+      }))
+    : [];
+
+  const collegeTopOffense = Array.isArray(data?.collegeTopOffense)
+    ? data.collegeTopOffense.map((item) => ({
+        organizationId: Number(item.organizationId || 0),
+        name: String(item.name || "").trim(),
+        type: String(item.type || "").trim().toLowerCase(),
+        topOffense: item.topOffense ? String(item.topOffense).trim() : null,
+        topOffenseCount: Number(item.topOffenseCount || 0),
+        totalOffenseRecords: Number(item.totalOffenseRecords || 0),
+      }))
+    : [];
+
   return {
     generatedAt: data?.generatedAt ? String(data.generatedAt) : new Date().toISOString(),
     totals: {
@@ -923,6 +1051,8 @@ function normalizeAnalyticsSummary(data) {
     },
     modules,
     campus,
+    campusTopOffense,
+    collegeTopOffense,
     status: {
       completed: Number(data?.status?.completed || data?.totals?.completedRecords || 0),
       pending: Number(data?.status?.pending || data?.totals?.pendingRecords || 0),
@@ -1724,6 +1854,60 @@ function renderAnalyticsModule(summary = null) {
       { label: "Completed", value: completedRecords, color: "#0f766e" },
       { label: "Pending", value: pendingRecords, color: "#a41321" },
     ]);
+  }
+
+  if (analyticsCollegeTopOffenseCard && analyticsCollegeTopOffenseList) {
+    const campusRows = Array.isArray(analytics.campusTopOffense) && analytics.campusTopOffense.length
+      ? analytics.campusTopOffense
+      : buildLocalCampusTopOffenseByOrganization();
+    const collegeRows = Array.isArray(analytics.collegeTopOffense) && analytics.collegeTopOffense.length
+      ? analytics.collegeTopOffense
+      : buildLocalCollegeTopOffenseByOrganization();
+
+    if (showCampusBreakdown && (campusRows.length || collegeRows.length)) {
+      analyticsCollegeTopOffenseCard.hidden = false;
+      if (analyticsCampusTopOffenseList) {
+        analyticsCampusTopOffenseList.innerHTML = campusRows
+          .sort((a, b) => {
+            const orderDiff = getCampusDisplayOrder(a.name) - getCampusDisplayOrder(b.name);
+            if (orderDiff !== 0) return orderDiff;
+            return String(a.name || "").localeCompare(String(b.name || ""));
+          })
+          .map((row) => `
+            <div class="analytics-college-offense-row">
+              <div class="analytics-college-offense-org">
+                <strong>${escapeHtml(row.name || "--")}</strong>
+                <span>${escapeHtml(String(row.type || "campus").toUpperCase())}</span>
+              </div>
+              <div class="analytics-college-offense-main">
+                <span class="analytics-college-offense-name">${escapeHtml(row.topOffense || "No offense record yet")}</span>
+                <span class="analytics-college-offense-meta">${row.topOffenseCount || 0} count</span>
+              </div>
+            </div>
+          `)
+          .join("");
+      }
+
+      analyticsCollegeTopOffenseList.innerHTML = collegeRows
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+        .map((row) => `
+          <div class="analytics-college-offense-row">
+            <div class="analytics-college-offense-org">
+              <strong>${escapeHtml(row.name || "--")}</strong>
+              <span>${escapeHtml(String(row.type || "college").toUpperCase())}</span>
+            </div>
+            <div class="analytics-college-offense-main">
+              <span class="analytics-college-offense-name">${escapeHtml(row.topOffense || "No offense record yet")}</span>
+              <span class="analytics-college-offense-meta">${row.topOffenseCount || 0} count</span>
+            </div>
+          </div>
+        `)
+        .join("");
+    } else {
+      analyticsCollegeTopOffenseCard.hidden = true;
+      if (analyticsCampusTopOffenseList) analyticsCampusTopOffenseList.innerHTML = "";
+      analyticsCollegeTopOffenseList.innerHTML = "";
+    }
   }
 }
 

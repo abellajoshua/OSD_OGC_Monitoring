@@ -1007,6 +1007,78 @@ h1 {
   font-size: 18px;
 }
 
+.analytics-college-offense-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.analytics-org-topoffense-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.analytics-org-topoffense-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.analytics-org-topoffense-panel-head h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.analytics-college-offense-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 10px 12px;
+}
+
+.analytics-college-offense-org {
+  display: grid;
+  gap: 2px;
+}
+
+.analytics-college-offense-org strong {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.analytics-college-offense-org span {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.analytics-college-offense-main {
+  display: grid;
+  justify-items: end;
+  text-align: right;
+  gap: 3px;
+}
+
+.analytics-college-offense-name {
+  font-size: 12px;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.analytics-college-offense-meta {
+  font-size: 11px;
+  color: #475569;
+}
+
 .analytics-top-offense-card {
   display: grid;
   gap: 8px;
@@ -1021,6 +1093,12 @@ h1 {
   font-size: 28px;
   line-height: 1.05;
   color: var(--ink);
+}
+
+@media (max-width: 920px) {
+  .analytics-org-topoffense-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .analytics-top-offense-count {
@@ -1540,6 +1618,10 @@ h1 {
 
   .analytics-insights-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analytics-college-offense-list {
+    grid-template-columns: 1fr;
   }
 }
 
