@@ -440,8 +440,17 @@ async function updateRow(table, id, payload) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
-  const { organization_id, academic_year, semester, ...safePayload } = payload;
-  let query = supabase.from(table).update(safePayload).eq("id", id);
+  const { organization_id, ...restPayload } = payload;
+  
+  // Get current academic period to preserve if not in payload
+  const period = getAcademicPeriodRange();
+  const updatePayload = {
+    ...restPayload,
+    ...(period && !restPayload.academic_year ? { academic_year: period.year } : {}),
+    ...(period && !restPayload.semester ? { semester: period.semester } : {}),
+  };
+  
+  let query = supabase.from(table).update(updatePayload).eq("id", id);
   if (orgId) query = query.eq("organization_id", orgId);
   const { error } = await query;
   if (error) throw error;
@@ -451,9 +460,31 @@ async function archiveRow(table, id) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
-  let query = supabase.from(table).update({ archived: true }).eq("id", id);
-  if (orgId) query = query.eq("organization_id", orgId);
-  const { error } = await query;
+  
+  // First, fetch the current record to get its metadata
+  let fetchQuery = supabase.from(table).select("academic_year, semester").eq("id", id);
+  if (orgId) fetchQuery = fetchQuery.eq("organization_id", orgId);
+  
+  const { data: existingRecords, error: fetchError } = await fetchQuery;
+  
+  if (fetchError) throw fetchError;
+  if (!existingRecords || existingRecords.length === 0) {
+    throw new Error("Record not found for archiving.");
+  }
+  
+  const existingRecord = existingRecords[0];
+  
+  // Now update with archived: true and preserve metadata
+  const updatePayload = {
+    archived: true,
+    academic_year: existingRecord.academic_year,
+    semester: existingRecord.semester,
+  };
+  
+  let updateQuery = supabase.from(table).update(updatePayload).eq("id", id);
+  if (orgId) updateQuery = updateQuery.eq("organization_id", orgId);
+  
+  const { error } = await updateQuery;
   if (error) throw error;
 }
 
@@ -461,9 +492,32 @@ async function dismissMajorRow(id) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
-  let query = supabase.from(TABLES.major).update({ archived: true, status: "dismissed" }).eq("id", id);
-  if (orgId) query = query.eq("organization_id", orgId);
-  const { error } = await query;
+  
+  // First, fetch the current record to get its metadata
+  let fetchQuery = supabase.from(TABLES.major).select("academic_year, semester").eq("id", id);
+  if (orgId) fetchQuery = fetchQuery.eq("organization_id", orgId);
+  
+  const { data: existingRecords, error: fetchError } = await fetchQuery;
+  
+  if (fetchError) throw fetchError;
+  if (!existingRecords || existingRecords.length === 0) {
+    throw new Error("Record not found for dismissal.");
+  }
+  
+  const existingRecord = existingRecords[0];
+  
+  // Update with dismissal status and preserve metadata
+  const updatePayload = {
+    archived: true,
+    status: "dismissed",
+    academic_year: existingRecord.academic_year,
+    semester: existingRecord.semester,
+  };
+  
+  let updateQuery = supabase.from(TABLES.major).update(updatePayload).eq("id", id);
+  if (orgId) updateQuery = updateQuery.eq("organization_id", orgId);
+  
+  const { error } = await updateQuery;
   if (error) throw error;
 }
 

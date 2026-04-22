@@ -172,29 +172,16 @@ async function fetchArchivedRows(table, dateColumn) {
   try {
     const supabase = await getSupabase();
     const organizationId = await getCurrentOrganizationId();
-    const period = getAcademicPeriodRange();
+    
+    // Fetch all archived records regardless of academic period
+    // Archived records should be available for restore regardless of current period
     let query = supabase
       .from(table)
       .select("*")
       .eq("archived", true)
       .eq("organization_id", organizationId);
 
-    if (period) {
-      query = query.eq("academic_year", period.year).eq("semester", period.semester);
-    }
-
     let { data, error } = await query.order("created_at", { ascending: false });
-
-    if (error && String(error.message || "").toLowerCase().includes("academic_year")) {
-      ({ data, error } = await supabase
-        .from(table)
-        .select("*")
-        .eq("archived", true)
-        .eq("organization_id", organizationId)
-        .gte(dateColumn || "created_at", period?.startDate || "0001-01-01")
-        .lte(dateColumn || "created_at", period?.endDate || "9999-12-31")
-        .order("created_at", { ascending: false }));
-    }
 
     if (error) throw error;
     return data || [];

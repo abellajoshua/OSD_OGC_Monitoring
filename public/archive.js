@@ -18,6 +18,8 @@ const TABLE_MAP = {
       "offense",
       "sanction",
       "date_of_sanction",
+      "academic_year",
+      "semester",
       "created_at",
     ],
   },
@@ -34,6 +36,8 @@ const TABLE_MAP = {
       "course",
       "sex",
       "reason",
+      "academic_year",
+      "semester",
       "created_at",
     ],
   },
@@ -50,6 +54,8 @@ const TABLE_MAP = {
       "course",
       "sex",
       "reason",
+      "academic_year",
+      "semester",
       "created_at",
     ],
   },
@@ -66,6 +72,8 @@ const TABLE_MAP = {
       "course",
       "sex",
       "purpose",
+      "academic_year",
+      "semester",
       "created_at",
     ],
   },
@@ -121,6 +129,7 @@ async function exportArchive(type) {
       .from(config.table)
       .select("*")
       .eq("organization_id", organizationId)
+      .eq("archived", true)
       .order("id", { ascending: false });
 
     if (error) throw error;
