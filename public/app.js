@@ -2287,7 +2287,7 @@ async function saveGoodMoralRecord(payload, editId) {
   }
 }
 
-function openPrintView() {
+async function openPrintView() {
   const table = document.querySelector("#minor .table-wrap table");
 
   if (!table) return;
@@ -2297,7 +2297,7 @@ function openPrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -2326,7 +2326,7 @@ function openPrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -2344,12 +2344,9 @@ function openPrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
-function openMajorPrintView() {
+async function openMajorPrintView() {
   const table = document.querySelector("#major .table-wrap table");
   const title = document.querySelector("#major .log-title");
 
@@ -2360,7 +2357,7 @@ function openMajorPrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -2389,7 +2386,7 @@ function openMajorPrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -2404,12 +2401,9 @@ function openMajorPrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
-function openUniformPrintView() {
+async function openUniformPrintView() {
   const table = document.querySelector("#uniform .table-wrap table");
   const title = document.querySelector("#uniform .log-title");
 
@@ -2420,7 +2414,7 @@ function openUniformPrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -2449,7 +2443,7 @@ function openUniformPrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -2464,12 +2458,9 @@ function openUniformPrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
-function openGatepassPrintView() {
+async function openGatepassPrintView() {
   const table = document.querySelector("#gatepass .table-wrap table");
   const title = document.querySelector("#gatepass .log-title");
 
@@ -2480,7 +2471,7 @@ function openGatepassPrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -2509,7 +2500,7 @@ function openGatepassPrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -2524,12 +2515,9 @@ function openGatepassPrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
-function openGoodmoralPrintView() {
+async function openGoodmoralPrintView() {
   const table = document.querySelector("#goodmoral .table-wrap table");
   const title = document.querySelector("#goodmoral .log-title");
 
@@ -2540,7 +2528,7 @@ function openGoodmoralPrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -2569,7 +2557,7 @@ function openGoodmoralPrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -2584,12 +2572,9 @@ function openGoodmoralPrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
-function openIdreplacementPrintView() {
+async function openIdreplacementPrintView() {
   const table = document.querySelector("#idreplacement .table-wrap table");
   const title = document.querySelector("#idreplacement .log-title");
 
@@ -2600,7 +2585,7 @@ function openIdreplacementPrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -2629,7 +2614,7 @@ function openIdreplacementPrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -2644,12 +2629,9 @@ function openIdreplacementPrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
-function openLeaveofabsencePrintView() {
+async function openLeaveofabsencePrintView() {
   const table = document.querySelector("#leaveofabsence .table-wrap table");
   const title = document.querySelector("#leaveofabsence .log-title");
 
@@ -2660,7 +2642,7 @@ function openLeaveofabsencePrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -2689,7 +2671,7 @@ function openLeaveofabsencePrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -2704,9 +2686,6 @@ function openLeaveofabsencePrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
 const archiveConfig = {
@@ -3421,6 +3400,57 @@ function getAcademicPeriodRange() {
     startDate: toISODate(startDate),
     endDate: toISODate(endDate),
   };
+}
+
+function getAssetUrl(path) {
+  return new URL(path, window.location.href).href;
+}
+
+function waitForPrintImages(printWindow) {
+  const images = Array.from(printWindow.document.images || []);
+
+  if (images.length === 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let remaining = images.length;
+    let resolved = false;
+
+    const finish = () => {
+      if (resolved) return;
+      resolved = true;
+      resolve();
+    };
+
+    const markDone = () => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        finish();
+      }
+    };
+
+    images.forEach((image) => {
+      if (image.complete) {
+        markDone();
+        return;
+      }
+
+      image.addEventListener("load", markDone, { once: true });
+      image.addEventListener("error", markDone, { once: true });
+    });
+
+    setTimeout(finish, 1500);
+  });
+}
+
+async function writePrintDocument(printWindow, html) {
+  printWindow.document.open();
+  printWindow.document.write(html);
+  printWindow.document.close();
+  await waitForPrintImages(printWindow);
+  printWindow.focus();
+  printWindow.print();
 }
 
 function initializeAcademicPeriod() {
