@@ -269,6 +269,10 @@ function applyDismissalInterfaceByRole() {
       ? "OSD & OGC Monitoring - Head (View Only)"
       : "OSD & OGC Monitoring - Coordinator";
   }
+
+  if (role === "head") {
+    document.querySelectorAll('a[href="archived-records.html"]').forEach((link) => link.remove());
+  }
 }
 
 async function requireDismissalAccess() {
