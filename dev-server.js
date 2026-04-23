@@ -6,6 +6,8 @@ const path = require("path");
 const dashboardHandler = require("./api/dashboard");
 const analyticsHandler = require("./api/analytics");
 const configHandler = require("./api/config");
+const archiveHandler = require("./api/archive");
+const caseDismissalHandler = require("./api/case-dismissal");
 const minorHandler = require("./api/minor-offenses/index");
 const minorByIdHandler = require("./api/minor-offenses/[id]");
 const minorArchiveHandler = require("./api/minor-offenses/archive");
@@ -40,6 +42,11 @@ app.use((req, res, next) => {
   res.setHeader("Expires", "0");
   next();
 });
+
+app.get("/favicon.ico", (_req, res) => {
+  res.status(204).end();
+});
+
 app.use(express.static(path.join(__dirname, "public"), { etag: false, lastModified: false }));
 
 app.get("/", (_req, res) => {
@@ -49,6 +56,8 @@ app.get("/", (_req, res) => {
 app.all("/api/config", (req, res) => configHandler(req, res));
 app.all("/api/dashboard", (req, res) => dashboardHandler(req, res));
 app.all("/api/analytics", (req, res) => analyticsHandler(req, res));
+app.all("/api/archive", (req, res) => archiveHandler(req, res));
+app.all("/api/case-dismissal", (req, res) => caseDismissalHandler(req, res));
 
 app.all("/api/minor-offenses", (req, res) => minorHandler(req, res));
 app.all("/api/minor-offenses/archive", (req, res) => minorArchiveHandler(req, res));

@@ -18,6 +18,12 @@ const MODULES = [
   { key: "leaveofabsence", label: "Leave of Absence", table: "leave_of_absence", dateColumn: "date", color: "#059669" },
 ];
 
+const TOP_OFFENSE_LABELS = {
+  minor: "Minor Offense",
+  major: "Major Offense",
+  uniform: "Non-Wearing Violation",
+};
+
 function normalizeDate(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -227,13 +233,17 @@ function buildOffenseMapByOrganization(moduleRows) {
   const offenseMapByOrg = new Map();
 
   moduleRows
-    .filter((module) => module.key === "minor" || module.key === "major")
+    .filter((module) => module.key === "minor" || module.key === "major" || module.key === "uniform")
     .forEach((module) => {
+      const categoryLabel = TOP_OFFENSE_LABELS[module.key];
+      if (!categoryLabel) return;
+
       module.rows.forEach((record) => {
         const orgId = Number(record.organization_id || 0);
-        const offenseText = String(record.offense || "").trim();
-        const offenseKey = normalizeOffenseKey(offenseText);
-        if (!orgId || !offenseKey) return;
+        if (!orgId) return;
+
+        const offenseKey = module.key;
+        const offenseText = categoryLabel;
 
         if (!offenseMapByOrg.has(orgId)) {
           offenseMapByOrg.set(orgId, new Map());
@@ -370,13 +380,15 @@ module.exports = async (req, res) => {
         });
       });
 
-    const topCategory = [...moduleRows]
+    const topCategory = moduleRows
+      .filter((module) => module.key === "minor" || module.key === "major" || module.key === "uniform")
       .sort((left, right) => {
         if (right.count !== left.count) return right.count - left.count;
         return String(left.label || "").localeCompare(String(right.label || ""));
       })[0] || null;
+    const topCategoryLabel = topCategory ? TOP_OFFENSE_LABELS[topCategory.key] || topCategory.label : "";
     const topOffense = topCategory && topCategory.count
-      ? { name: topCategory.label, count: topCategory.count }
+      ? { name: topCategoryLabel, count: topCategory.count }
       : null;
 
     const goodMoralFlags = moduleRows.find((module) => module.key === "goodmoral")?.rows.filter((record) => {

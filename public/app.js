@@ -122,6 +122,13 @@ const ANALYTICS_MODULE_COLOR_MAP = Object.fromEntries(
   ANALYTICS_MODULES.map((module) => [module.key, module.color])
 );
 
+const TOP_OFFENSE_MODULES = ["minor", "major", "uniform"];
+const TOP_OFFENSE_LABELS = {
+  minor: "Minor Offense",
+  major: "Major Offense",
+  uniform: "Non-Wearing Violation",
+};
+
 let minorRecords = [];
 let majorRecords = [];
 let uniformRecords = [];
@@ -159,6 +166,12 @@ function isHeadRole() {
 
 function canAccessAllOrganizations() {
   return isHeadRole() && hasGlobalHeadAccess;
+}
+
+function isAlangilanCampusOrganization(org) {
+  const name = String(org?.name || "").trim().toLowerCase();
+  const type = String(org?.type || "").trim().toLowerCase();
+  return name === "alangilan" && type === "campus";
 }
 
 function ensureCoordinatorAccess() {
@@ -308,9 +321,9 @@ async function initializeHeadOrganizationFilter() {
   const organizations = data || [];
   if (!organizations.length) return;
 
-  const visibleOrganizations = organizations;
+  const visibleOrganizations = organizations.filter((org) => !isAlangilanCampusOrganization(org));
   organizationDirectory = new Map(
-    visibleOrganizations.map((org) => [
+    organizations.map((org) => [
       Number(org.id),
       {
         name: String(org.name || "").trim(),
@@ -485,16 +498,8 @@ async function updateRow(table, id, payload) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
-  const { organization_id, ...restPayload } = payload;
-  
-  // Get current academic period to preserve if not in payload
-  const period = getAcademicPeriodRange();
-  const updatePayload = {
-    ...restPayload,
-    ...(period && !restPayload.academic_year ? { academic_year: period.year } : {}),
-    ...(period && !restPayload.semester ? { semester: period.semester } : {}),
-  };
-  
+  const { organization_id, academic_year, semester, ...updatePayload } = payload;
+
   let query = supabase.from(table).update(updatePayload).eq("id", id);
   if (orgId) query = query.eq("organization_id", orgId);
   const { error } = await query;
@@ -505,30 +510,10 @@ async function archiveRow(table, id) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
-  
-  // First, fetch the current record to get its metadata
-  let fetchQuery = supabase.from(table).select("academic_year, semester").eq("id", id);
-  if (orgId) fetchQuery = fetchQuery.eq("organization_id", orgId);
-  
-  const { data: existingRecords, error: fetchError } = await fetchQuery;
-  
-  if (fetchError) throw fetchError;
-  if (!existingRecords || existingRecords.length === 0) {
-    throw new Error("Record not found for archiving.");
-  }
-  
-  const existingRecord = existingRecords[0];
-  
-  // Now update with archived: true and preserve metadata
-  const updatePayload = {
-    archived: true,
-    academic_year: existingRecord.academic_year,
-    semester: existingRecord.semester,
-  };
-  
-  let updateQuery = supabase.from(table).update(updatePayload).eq("id", id);
+
+  let updateQuery = supabase.from(table).update({ archived: true }).eq("id", id);
   if (orgId) updateQuery = updateQuery.eq("organization_id", orgId);
-  
+
   const { error } = await updateQuery;
   if (error) throw error;
 }
@@ -537,31 +522,15 @@ async function dismissMajorRow(id) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
-  
-  // First, fetch the current record to get its metadata
-  let fetchQuery = supabase.from(TABLES.major).select("academic_year, semester").eq("id", id);
-  if (orgId) fetchQuery = fetchQuery.eq("organization_id", orgId);
-  
-  const { data: existingRecords, error: fetchError } = await fetchQuery;
-  
-  if (fetchError) throw fetchError;
-  if (!existingRecords || existingRecords.length === 0) {
-    throw new Error("Record not found for dismissal.");
-  }
-  
-  const existingRecord = existingRecords[0];
-  
-  // Update with dismissal status and preserve metadata
+
   const updatePayload = {
     archived: true,
     status: "dismissed",
-    academic_year: existingRecord.academic_year,
-    semester: existingRecord.semester,
   };
-  
+
   let updateQuery = supabase.from(TABLES.major).update(updatePayload).eq("id", id);
   if (orgId) updateQuery = updateQuery.eq("organization_id", orgId);
-  
+
   const { error } = await updateQuery;
   if (error) throw error;
 }
@@ -851,8 +820,8 @@ function buildModuleTrendSeries(period = getAcademicPeriodRange()) {
 }
 
 function getTopOffense() {
-  const topCategory = ANALYTICS_MODULES
-    .map((module) => ({ name: module.label, count: getModuleRecords(module.key).length }))
+  const topCategory = TOP_OFFENSE_MODULES
+    .map((moduleKey) => ({ name: TOP_OFFENSE_LABELS[moduleKey] || moduleKey, count: getModuleRecords(moduleKey).length }))
     .sort((left, right) => {
       if (right.count !== left.count) return right.count - left.count;
       return left.name.localeCompare(right.name);
@@ -954,12 +923,13 @@ function buildLocalCampusBreakdown() {
 function buildLocalOffenseMapByOrganization() {
   const offenseMapByOrg = new Map();
 
-  ["minor", "major"].forEach((moduleKey) => {
+  TOP_OFFENSE_MODULES.forEach((moduleKey) => {
+    const offenseText = TOP_OFFENSE_LABELS[moduleKey] || moduleKey;
+    const offenseKey = moduleKey;
+
     getModuleRecords(moduleKey).forEach((record) => {
       const orgId = Number(record?.organization_id || 0);
-      const offenseText = String(record?.offense || "").trim();
-      const offenseKey = offenseText.toLowerCase().replace(/\s+/g, " ");
-      if (!orgId || !offenseKey) return;
+      if (!orgId) return;
 
       if (!offenseMapByOrg.has(orgId)) {
         offenseMapByOrg.set(orgId, new Map());
@@ -1218,10 +1188,10 @@ function getAttentionModule(modules) {
 }
 
 function getTopOffenseBreakdown(limit = 6) {
-  const rows = ANALYTICS_MODULES.map((module) => ({
-    key: module.key,
-    name: module.label,
-    count: getModuleRecords(module.key).length,
+  const rows = TOP_OFFENSE_MODULES.map((moduleKey) => ({
+    key: moduleKey,
+    name: TOP_OFFENSE_LABELS[moduleKey] || moduleKey,
+    count: getModuleRecords(moduleKey).length,
   }))
     .sort((left, right) => {
       if (right.count !== left.count) return right.count - left.count;
@@ -1963,7 +1933,8 @@ function renderAnalyticsModule(summary = null) {
     if (analyticsStatusKicker) analyticsStatusKicker.textContent = "Records Distribution";
     if (analyticsStatusTitle) analyticsStatusTitle.textContent = "By Campus & College";
     if (analyticsStatusPill) analyticsStatusPill.textContent = "Organization breakdown";
-    renderAnalyticsCampusChart(analyticsStatusChart, campusData);
+    const campusDistributionRows = campusData.filter((row) => !isAlangilanCampusOrganization(row));
+    renderAnalyticsCampusChart(analyticsStatusChart, campusDistributionRows);
   } else {
     if (analyticsStatusKicker) analyticsStatusKicker.textContent = "Process Health";
     if (analyticsStatusTitle) analyticsStatusTitle.textContent = "Open vs Completed";

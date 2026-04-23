@@ -25,6 +25,31 @@ function normalizeSemesterLabel(value) {
   return "";
 }
 
+function getSemesterCandidates(value) {
+  const normalized = normalizeSemesterLabel(value);
+  if (!normalized) return [];
+
+  const variants = [normalized];
+  if (normalized === "First Semester") variants.push("1st Semester");
+  if (normalized === "Second Semester") variants.push("2nd Semester");
+  return Array.from(new Set(variants));
+}
+
+function filterByAcademicPeriod(records, period) {
+  const expectedYear = String(period?.year || "").trim();
+  const expectedSemester = normalizeSemesterLabel(period?.semester);
+
+  if (!expectedYear || !expectedSemester) {
+    return [];
+  }
+
+  return (records || []).filter((record) => {
+    const recordYear = String(record?.academic_year || "").trim();
+    const recordSemester = normalizeSemesterLabel(record?.semester);
+    return recordYear === expectedYear && recordSemester === expectedSemester;
+  });
+}
+
 function getAcademicPeriod() {
   const year = localStorage.getItem("academicYear") || "2024-2025";
   const semester = normalizeSemesterLabel(localStorage.getItem("semester")) || "First Semester";
@@ -42,18 +67,20 @@ function initializeAcademicPeriodHeader() {
   renderAcademicPeriodHeader();
 
   if (academicYearInput) {
-    academicYearInput.addEventListener("change", () => {
+    academicYearInput.addEventListener("change", async () => {
       const value = String(academicYearInput.value || "").trim() || "2024-2025";
       localStorage.setItem("academicYear", value);
       renderAcademicPeriodHeader();
+      await loadDismissedCases();
     });
   }
 
   if (semesterSelect) {
-    semesterSelect.addEventListener("change", () => {
+    semesterSelect.addEventListener("change", async () => {
       const value = normalizeSemesterLabel(semesterSelect.value) || "First Semester";
       localStorage.setItem("semester", value);
       renderAcademicPeriodHeader();
+      await loadDismissedCases();
     });
   }
 }
@@ -264,24 +291,64 @@ function applyFilters() {
 async function loadDismissedCases() {
   try {
     const supabase = await getSupabase();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error("Session expired. Please login again.");
+    }
+
+    const period = getAcademicPeriod();
+    const query = new URLSearchParams({
+      academic_year: period.year,
+      semester: period.semester,
+    });
+
+    const response = await fetch(`/api/case-dismissal?${query.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      cache: "no-store",
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      renderDismissedRows(filterByAcademicPeriod(Array.isArray(data) ? data : [], period));
+      return;
+    }
+
+    if (response.status !== 404) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData?.error || `Case dismissal request failed (${response.status}).`);
+    }
+
+    // Fallback for local servers still running old route map: query Supabase directly.
     const organizationId = await getOrganizationId();
     if (!organizationId) {
       renderDismissedRows([]);
       return;
     }
 
-    let query = supabase
+    const semesterCandidates = getSemesterCandidates(period.semester);
+    let fallbackQuery = supabase
       .from("major_offenses")
       .select("*")
-      .eq("status", "dismissed")
       .eq("organization_id", organizationId)
+      .eq("status", "dismissed")
+      .eq("archived", true)
+      .eq("academic_year", period.year)
       .order("date_of_complaint", { ascending: false })
       .order("id", { ascending: false });
 
-    const { data, error } = await query;
-    if (error) throw error;
+    if (semesterCandidates.length) {
+      fallbackQuery = fallbackQuery.in("semester", semesterCandidates);
+    }
 
-    renderDismissedRows(data || []);
+    const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+    if (fallbackError) throw fallbackError;
+
+    renderDismissedRows(filterByAcademicPeriod(Array.isArray(fallbackData) ? fallbackData : [], period));
   } catch (error) {
     console.error("Failed to load dismissed cases:", error);
     renderDismissedRows([]);

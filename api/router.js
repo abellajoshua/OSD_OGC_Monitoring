@@ -1,6 +1,8 @@
 const configHandler = require("./config");
 const dashboardHandler = require("./dashboard");
 const analyticsHandler = require("./analytics");
+const archiveHandler = require("./archive");
+const caseDismissalHandler = require("./case-dismissal");
 const adminCreateUserHandler = require("./admin/create-user");
 const adminDeleteUserHandler = require("./admin/delete-user");
 
@@ -81,6 +83,8 @@ function parseRoute(pathname) {
   if (path === "config") return { handler: configHandler };
   if (path === "dashboard") return { handler: dashboardHandler };
   if (path === "analytics") return { handler: analyticsHandler };
+  if (path === "archive") return { handler: archiveHandler };
+  if (path === "case-dismissal") return { handler: caseDismissalHandler };
   if (path === "admin/create-user") return { handler: adminCreateUserHandler };
   if (path === "admin/delete-user") return { handler: adminDeleteUserHandler };
 
