@@ -73,6 +73,15 @@
     </header>
 
     <main class="container-fluid container-xl">
+      <section class="head-scope-bar" id="case-dismissal-org-filter-group" style="display: none;">
+        <div class="scope-filter-card">
+          <label for="case-dismissal-org-filter">Monitoring Scope</label>
+          <select id="case-dismissal-org-filter">
+            <option value="">Loading organizations...</option>
+          </select>
+        </div>
+      </section>
+
       <section class="sheet">
         <div class="log-title">
           <h2>LOGSHEET</h2>
@@ -149,6 +158,6 @@
 
     <script src="runtime-config.js?v=4"></script>
     <script type="module" src="auth-guard.js?v=4"></script>
-    <script type="module" src="case-dismissal.js?v=4"></script>
+    <script type="module" src="case-dismissal.js?v=5"></script>
   </body>
 </html>

@@ -8,13 +8,19 @@ const logoutButton = document.querySelector("#logout-btn");
 const academicYearInput = document.querySelector("#case-dismissal-academic-year");
 const semesterSelect = document.querySelector("#case-dismissal-semester");
 const periodDisplay = document.querySelector("#case-dismissal-period-display");
+const headOrgFilterGroup = document.querySelector("#case-dismissal-org-filter-group");
+const headOrgFilterSelect = document.querySelector("#case-dismissal-org-filter");
 const tableBody = document.querySelector("#case-dismissal-table-body");
 const filterBar = document.querySelector("[data-filter-scope='case-dismissal']");
 const refreshButton = document.querySelector("#refresh-dismissal");
+const brandTitle = document.querySelector(".brand-title");
 
 let currentOrganizationId = null;
 let currentUserRole = localStorage.getItem("userRole") || "";
 let dismissedCases = [];
+let selectedHeadOrganizationId = null;
+let headFilterInitialized = false;
+let canUseDismissalApi = window.location.hostname !== "localhost";
 
 function normalizeSemesterLabel(value) {
   const raw = String(value || "").trim().toLowerCase();
@@ -167,8 +173,102 @@ function getCurrentUserContext() {
   };
 }
 
+function isHeadRole() {
+  return getCurrentUserContext().role === "head";
+}
+
+function isAlangilanCampusOrganization(org) {
+  const name = String(org?.name || "").trim().toLowerCase();
+  const type = String(org?.type || "").trim().toLowerCase();
+  return name === "alangilan" && type === "campus";
+}
+
 function canManageDismissals() {
   return getCurrentUserContext().role === "coordinator";
+}
+
+function canViewDismissals() {
+  const role = getCurrentUserContext().role;
+  return role === "coordinator" || role === "head";
+}
+
+function getScopedDismissalOrganizationId() {
+  if (isHeadRole()) {
+    return selectedHeadOrganizationId || null;
+  }
+  return currentOrganizationId || null;
+}
+
+async function initializeHeadOrganizationFilter() {
+  if (!isHeadRole() || !headOrgFilterGroup || !headOrgFilterSelect) {
+    if (headOrgFilterGroup) {
+      headOrgFilterGroup.style.display = "none";
+    }
+    selectedHeadOrganizationId = null;
+    return;
+  }
+
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id, name, type")
+    .order("type", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("Failed to load organizations for case dismissal filter:", error);
+    return;
+  }
+
+  const organizations = Array.isArray(data) ? data : [];
+  const visibleOrganizations = organizations.filter((org) => !isAlangilanCampusOrganization(org));
+
+  headOrgFilterSelect.innerHTML = [
+    '<option value="">All Campuses and Colleges</option>',
+    ...visibleOrganizations.map((org) => `<option value="${org.id}">${org.name} (${org.type})</option>`),
+  ].join("");
+
+  const storedSelectionRaw = localStorage.getItem("headOrganizationFilterId");
+  const storedSelection = Number(storedSelectionRaw || "");
+  if (storedSelectionRaw && !Number.isNaN(storedSelection)) {
+    const exists = visibleOrganizations.some((org) => Number(org.id) === storedSelection);
+    selectedHeadOrganizationId = exists ? storedSelection : null;
+  } else {
+    selectedHeadOrganizationId = null;
+  }
+
+  if (selectedHeadOrganizationId) {
+    headOrgFilterSelect.value = String(selectedHeadOrganizationId);
+    localStorage.setItem("headOrganizationFilterId", String(selectedHeadOrganizationId));
+  } else {
+    headOrgFilterSelect.value = "";
+    localStorage.removeItem("headOrganizationFilterId");
+  }
+
+  headOrgFilterGroup.style.display = "";
+
+  if (!headFilterInitialized) {
+    headOrgFilterSelect.addEventListener("change", async () => {
+      selectedHeadOrganizationId = Number(headOrgFilterSelect.value) || null;
+      if (selectedHeadOrganizationId) {
+        localStorage.setItem("headOrganizationFilterId", String(selectedHeadOrganizationId));
+      } else {
+        localStorage.removeItem("headOrganizationFilterId");
+      }
+      await loadDismissedCases();
+    });
+    headFilterInitialized = true;
+  }
+}
+
+function applyDismissalInterfaceByRole() {
+  const role = getCurrentUserContext().role;
+
+  if (brandTitle) {
+    brandTitle.textContent = role === "head"
+      ? "OSD & OGC Monitoring - Head (View Only)"
+      : "OSD & OGC Monitoring - Coordinator";
+  }
 }
 
 async function requireDismissalAccess() {
@@ -198,11 +298,14 @@ async function requireDismissalAccess() {
     localStorage.setItem("userRole", currentUserRole);
   }
 
-  if (!canManageDismissals()) {
-    alert("Access denied. Case dismissal management is limited to coordinators.");
+  if (!canViewDismissals()) {
+    alert("Access denied. Case dismissal page is available for coordinators and heads only.");
     window.location.href = "index.html";
     return false;
   }
+
+  applyDismissalInterfaceByRole();
+  await initializeHeadOrganizationFilter();
 
   return true;
 }
@@ -261,8 +364,9 @@ function renderDismissedRows(records) {
         <td>${escapeHtml(String(record.sanction || ""))}</td>
         <td>${escapeHtml(formatDate(record.date_of_suspension))}</td>
         <td>${escapeHtml(formatDate(record.date_of_post_counseling))}</td>
-        <td>
-          <button class="btn-restore" type="button" data-action="restore" data-id="${escapeHtml(String(record.id || ""))}">Restore</button>
+        <td>${canManageDismissals()
+          ? `<button class="btn-restore" type="button" data-action="restore" data-id="${escapeHtml(String(record.id || ""))}">Restore</button>`
+          : '<span class="text-muted">Read Only</span>'}
         </td>
       </tr>
     `
@@ -288,44 +392,85 @@ function applyFilters() {
   renderDismissedRows(getFilteredDismissedRows());
 }
 
+async function getValidAccessToken() {
+  const supabase = await getSupabase();
+  let {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (session?.access_token) {
+    return session.access_token;
+  }
+
+  const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError) {
+    return "";
+  }
+
+  session = refreshData?.session || null;
+  return session?.access_token || "";
+}
+
+async function fetchDismissedCasesWithAuth(queryString) {
+  if (!canUseDismissalApi) {
+    return { response: null, tokenMissing: false };
+  }
+
+  const token = await getValidAccessToken();
+  if (!token) {
+    return { response: null, tokenMissing: true };
+  }
+
+  let response = await fetch(`/api/case-dismissal?${queryString}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  if (response.status === 401) {
+    // Stop using the API endpoint after an unauthorized response to avoid noisy repeated 401 logs.
+    canUseDismissalApi = false;
+    return { response: null, tokenMissing: false };
+  }
+
+  return { response, tokenMissing: false };
+}
+
 async function loadDismissedCases() {
   try {
     const supabase = await getSupabase();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session?.access_token) {
-      throw new Error("Session expired. Please login again.");
-    }
 
     const period = getAcademicPeriod();
     const query = new URLSearchParams({
       academic_year: period.year,
       semester: period.semester,
     });
+    const scopedOrganizationId = getScopedDismissalOrganizationId();
+    if (scopedOrganizationId) {
+      query.set("organization_id", String(scopedOrganizationId));
+    }
 
-    const response = await fetch(`/api/case-dismissal?${query.toString()}`, {
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      cache: "no-store",
-    });
+    const { response, tokenMissing } = await fetchDismissedCasesWithAuth(query.toString());
 
-    if (response.ok) {
+    if (tokenMissing) {
+      throw new Error("Auth session missing!");
+    }
+
+    if (response && response.ok) {
       const data = await response.json();
       renderDismissedRows(filterByAcademicPeriod(Array.isArray(data) ? data : [], period));
       return;
     }
 
-    if (response.status !== 404) {
+    if (response && response.status !== 404) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData?.error || `Case dismissal request failed (${response.status}).`);
     }
 
-    // Fallback for local servers still running old route map: query Supabase directly.
-    const organizationId = await getOrganizationId();
-    if (!organizationId) {
+    // Fallback for local servers still running old route map or auth edge cases.
+    const fallbackScopedOrganizationId = getScopedDismissalOrganizationId();
+    if (!isHeadRole() && !fallbackScopedOrganizationId) {
       renderDismissedRows([]);
       return;
     }
@@ -334,12 +479,15 @@ async function loadDismissedCases() {
     let fallbackQuery = supabase
       .from("major_offenses")
       .select("*")
-      .eq("organization_id", organizationId)
       .eq("status", "dismissed")
       .eq("archived", true)
       .eq("academic_year", period.year)
       .order("date_of_complaint", { ascending: false })
       .order("id", { ascending: false });
+
+    if (fallbackScopedOrganizationId) {
+      fallbackQuery = fallbackQuery.eq("organization_id", fallbackScopedOrganizationId);
+    }
 
     if (semesterCandidates.length) {
       fallbackQuery = fallbackQuery.in("semester", semesterCandidates);
