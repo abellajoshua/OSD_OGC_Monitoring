@@ -89,8 +89,184 @@ const goodmoralOffenseModalSubtitle = document.querySelector("#goodmoral-offense
 const goodmoralOffenseModalBody = document.querySelector("#goodmoral-offense-modal-body");
 const goodmoralOffenseModalActions = document.querySelector("#goodmoral-offense-modal-actions");
 const goodmoralOffenseConfirmBtn = document.querySelector("#goodmoral-offense-confirm-btn");
+const sanctionPickerModal = document.querySelector("#sanction-picker-modal");
+const sanctionPickerList = document.querySelector("#sanction-picker-list");
+const minorSanctionInput = recordForm?.querySelector('input[name="sanction"]') || null;
+const majorSanctionInput = majorForm?.querySelector('input[name="sanction"]') || null;
 let activeInsightContext = null;
 let pendingGoodmoralSubmission = null;
+let activeSanctionInput = null;
+
+const SANCTIONS_BY_ARTICLE = [
+  {
+    article: "Article I",
+    sections: [
+      {
+        section: "Section 1",
+        description: "Students agree to follow all university rules and responsibilities",
+      },
+      {
+        section: "Section 2",
+        description:
+          "Discipline is based on self-respect, respect for authority, and others, promoting a peaceful school environment.",
+      },
+    ],
+  },
+  {
+    article: "Article II",
+    sections: [
+      {
+        section: "Section 3",
+        description:
+          "Covers all college students, including Law and Graduate School, as well as OJT and internship students.",
+      },
+      {
+        section: "Section 3.1",
+        description:
+          "Separate conduct rules apply to laboratory school students (high school and elementary).",
+      },
+    ],
+  },
+  {
+    article: "Article III",
+    sections: [
+      {
+        section: "Section 4",
+        description:
+          "Provides definitions such as: Academic freedom, co-/extra-curricular activities, minor vs. major offenses, disciplinary actions (probation, suspension, dismissal, expulsion), university-related terms (authority, community, premises), documents like MDA (Memorandum of Disciplinary Action).",
+      },
+    ],
+  },
+  {
+    article: "Article IV",
+    sections: [
+      {
+        section: "Section 5",
+        description: "Assistant Director - oversees discipline policies across campuses.",
+      },
+      {
+        section: "Section 6",
+        description: "OSD Head - manages discipline at the campus level.",
+      },
+      {
+        section: "Section 7",
+        description: "OSD Coordinator - handles discipline within colleges/departments.",
+      },
+    ],
+  },
+  {
+    article: "Article V",
+    sections: [
+      {
+        section: "Section 8",
+        description: "Attendance rules (absences, tardiness, excuses).",
+      },
+      {
+        section: "Section 9",
+        description: "ID policies (use, replacement, gate pass).",
+      },
+      {
+        section: "Section 10",
+        description:
+          "Uniform, dress code, and conduct rules (including prohibited attire and behavior).",
+      },
+    ],
+  },
+  {
+    article: "Article VI",
+    sections: [
+      {
+        section: "Section 11",
+        description: "General purpose of discipline rules.",
+      },
+      {
+        section: "Section 12",
+        description: "Minor offenses (e.g., dress code violations, disruptions).",
+      },
+      {
+        section: "Section 13",
+        description:
+          "Major offenses categorized into Sets A-I with increasing severity (e.g., theft, violence, drugs).",
+      },
+      {
+        section: "Section 14",
+        description: "Academic dishonesty (cheating, plagiarism) and corresponding sanctions.",
+      },
+    ],
+  },
+  {
+    article: "Article VII",
+    sections: [
+      {
+        section: "Section 15",
+        description: "Covers unlisted offenses, restitution, and disciplinary consequences.",
+      },
+      {
+        section: "Section 16",
+        description: "Addresses special or unusual cases.",
+      },
+    ],
+  },
+  {
+    article: "Article VIII",
+    sections: [
+      {
+        section: "Section 19",
+        description:
+          "Step-by-step process including filing complaints, investigation and hearings, decision-making and sanctions.",
+      },
+    ],
+  },
+  {
+    article: "Article IX",
+    sections: [
+      {
+        section: "Section 20",
+        description:
+          "Types of boards: University Discipline Board (UDB), Campus Discipline Board (CDB), Local Discipline Board (LDB).",
+      },
+    ],
+  },
+  {
+    article: "Article X",
+    sections: [
+      {
+        section: "Section 21",
+        description: "Records are confidential.",
+      },
+      {
+        section: "Section 22",
+        description: "Records are stored separately from academic files.",
+      },
+      {
+        section: "Section 23",
+        description:
+          "Retention policy: Minor offenses (at least 6 years), Major offenses (permanent).",
+      },
+    ],
+  },
+  {
+    article: "Article XI",
+    sections: [
+      {
+        section: "Section 24",
+        description: "OSD rules override conflicting policies.",
+      },
+      {
+        section: "Section 25",
+        description: "Invalid provisions do not affect others.",
+      },
+      {
+        section: "Section 26",
+        description: "Annual review of policies.",
+      },
+      {
+        section: "Section 27",
+        description: "Changes take effect upon approval.",
+      },
+    ],
+  },
+];
 
 const academicYearInput = document.querySelector("#academic-year-input");
 const semesterSelect = document.querySelector("#semester-select");
@@ -1412,6 +1588,99 @@ function initializeInsightModal() {
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && analyticsInsightModal && !analyticsInsightModal.hidden) {
       closeInsightModal();
+    }
+  });
+}
+
+function formatSanctionSelection(article, section) {
+  return `${article} - ${section}`;
+}
+
+function renderSanctionPicker() {
+  if (!sanctionPickerList) return;
+  const selected = String(activeSanctionInput?.value || "").trim();
+
+  sanctionPickerList.innerHTML = SANCTIONS_BY_ARTICLE.map((entry, index) => {
+    const rows = entry.sections
+      .map((row) => {
+        const selection = formatSanctionSelection(entry.article, row.section);
+        const isSelected = selection === selected;
+        return `
+          <button
+            type="button"
+            class="sanction-picker-option ${isSelected ? "is-selected" : ""}"
+            data-sanction-article="${escapeHtml(entry.article)}"
+            data-sanction-section="${escapeHtml(row.section)}"
+          >
+            <strong>${escapeHtml(row.section)}</strong>
+            <span>${escapeHtml(row.description)}</span>
+          </button>
+        `;
+      })
+      .join("");
+
+    return `
+      <details class="sanction-picker-article" ${index === 0 ? "open" : ""}>
+        <summary>${escapeHtml(entry.article)}</summary>
+        <div class="sanction-picker-article-body">${rows}</div>
+      </details>
+    `;
+  }).join("");
+}
+
+function openSanctionPicker(input) {
+  if (!sanctionPickerModal || !sanctionPickerList || !input) return;
+  activeSanctionInput = input;
+  renderSanctionPicker();
+  sanctionPickerModal.hidden = false;
+}
+
+function closeSanctionPicker() {
+  if (!sanctionPickerModal) return;
+  sanctionPickerModal.hidden = true;
+  activeSanctionInput = null;
+}
+
+function initializeSanctionPicker() {
+  if (!sanctionPickerModal || !sanctionPickerList) return;
+
+  const sanctionInputs = [minorSanctionInput, majorSanctionInput].filter(Boolean);
+  sanctionInputs.forEach((input) => {
+    input.readOnly = true;
+    input.setAttribute("aria-haspopup", "dialog");
+    input.setAttribute("autocomplete", "off");
+    input.addEventListener("click", () => openSanctionPicker(input));
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openSanctionPicker(input);
+    });
+  });
+
+  sanctionPickerModal.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    if (target.closest("[data-sanction-modal-close='true']")) {
+      closeSanctionPicker();
+      return;
+    }
+
+    const option = target.closest("[data-sanction-article][data-sanction-section]");
+    if (!option || !activeSanctionInput) return;
+
+    const article = option.getAttribute("data-sanction-article") || "";
+    const section = option.getAttribute("data-sanction-section") || "";
+    const value = formatSanctionSelection(article, section);
+    activeSanctionInput.value = value;
+    activeSanctionInput.dispatchEvent(new Event("input", { bubbles: true }));
+    activeSanctionInput.dispatchEvent(new Event("change", { bubbles: true }));
+    closeSanctionPicker();
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && sanctionPickerModal && !sanctionPickerModal.hidden) {
+      closeSanctionPicker();
     }
   });
 }
@@ -3743,6 +4012,7 @@ if (reportButton) {
 
 switchTab(getPreferredTab(), { persist: false });
 initializeInsightModal();
+initializeSanctionPicker();
 
 
 if (recordForm) {
