@@ -205,6 +205,67 @@ const SANCTIONS_BY_ARTICLE = [
         section: "Section 16",
         description: "Addresses special or unusual cases.",
       },
+      {
+        section: "Section 17",
+        description: "Consequences to Disciplinary Actions.",
+      },
+      {
+        section: "Section 17.1",
+        description: "Sanctioned students may be required to undergo counseling.",
+      },
+      {
+        section: "Section 17.2",
+        description:
+          "Students cannot attend classes, take exams, submit requirements, or enroll unless cleared by the OSD and the case is resolved first. The complainant is also informed of the outcome.",
+      },
+      {
+        section: "Section 17.3",
+        description: "Students may take special exams only for major exams missed due to sanctions.",
+      },
+      {
+        section: "Section 18",
+        description: "Complementary to Offenses and Sanctions.",
+      },
+      {
+        section: "Section 18.1",
+        description:
+          "If a case cannot proceed due to end of semester, it is postponed to the next term unless delay affects fairness.",
+      },
+      {
+        section: "Section 18.2",
+        description:
+          "If a sanction cannot be served due to end of term, it will be implemented next semester starting the 2nd week unless delay harms justice.",
+      },
+      {
+        section: "Section 18.3",
+        description:
+          "If suspension cannot be fully served, the student may render community service or extension work instead, depending on severity.",
+      },
+      {
+        section: "Section 18.4",
+        description:
+          "Community service is allowed during summer if the student can still attend classes, submits a signed request before the sanction starts, receives work from OSD, and submits a journal plus certificate of completion.",
+      },
+      {
+        section: "Section 18.5",
+        description:
+          "Graduating students remain under case review; if guilty, they must render community service before credentials are released, while non-graduating students follow normal sanctions.",
+      },
+      {
+        section: "Section 18.6",
+        description:
+          "Newly graduated students with pending cases may be elevated to higher authorities, and honors or awards may be revoked if found guilty.",
+      },
+      {
+        section: "Section 18.7",
+        description:
+          "Settlement is allowed only for personal offenses such as minor conflicts, but disciplinary action still applies.",
+      },
+      {
+        section: "Section 18.8",
+        description:
+          "Even if the complainant withdraws the case, the university can continue it, especially if there is suspected pressure or public interest.",
+      },
     ],
   },
   {
