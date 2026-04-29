@@ -1,12 +1,7 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "api/router.js", "use": "@vercel/node" },
-    { "src": "public/**", "use": "@vercel/static" }
-  ],
   "routes": [
     { "src": "/", "dest": "/login.html" },
-    { "src": "/api/(.*)", "dest": "/api/router?path=$1" },
     { "src": "/login", "dest": "/login.html" },
     { "src": "/register", "dest": "/register.html" },
     { "src": "/programs", "dest": "/programs.html" },

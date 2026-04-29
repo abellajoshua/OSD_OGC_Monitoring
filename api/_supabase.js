@@ -162,18 +162,25 @@ function canAccessAllOrganizations(context) {
 function getScopedOrganizationId(req, context) {
   if (!context || !context.role) return null;
 
-  // Head can monitor all organizations and may optionally narrow down via query filter.
-  if (canAccessAllOrganizations(context)) {
-    return parseOrganizationId(req?.query?.organization_id);
-  }
-
-  // Coordinator is always restricted to own organization.
-  if (context.role === "coordinator") {
+  // Coordinators and heads are always restricted to their own organization.
+  if (context.role === "coordinator" || context.role === "head") {
     return context.organizationId;
   }
 
   // Admin is management-only; allow optional org scope for read-only tooling endpoints.
   return parseOrganizationId(req?.query?.organization_id) || null;
+}
+
+function authorize(req, res, next) {
+  return Promise.resolve(getRequestUserContext(req))
+    .then((context) => {
+      req.user = context;
+      if (typeof next === "function") {
+        return next();
+      }
+      return context;
+    })
+    .catch((error) => res.status(getErrorStatus(error)).json({ error: error.message }));
 }
 
 function applyOrganizationScope(query, organizationId) {
@@ -260,6 +267,7 @@ module.exports = {
   applyAcademicPeriodScope,
   applyActiveRecordsScope,
   logApiFlow,
+  authorize,
   normalizeAcademicYear,
   getAcademicPeriodFromPayload,
   normalizeSemesterLabel,

@@ -69,6 +69,84 @@ async function getAccessToken() {
   return session?.access_token || "";
 }
 
+async function parseApiResponse(response) {
+  const text = await response.text();
+
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return {
+      raw: text,
+      error: `Non-JSON response received (${response.status}).`,
+    };
+  }
+}
+
+function getResponseErrorMessage(result, fallbackMessage) {
+  const rawMessage = String(result?.error || result?.message || result?.raw || fallbackMessage || "Request failed").trim();
+  return rawMessage || fallbackMessage || "Request failed";
+}
+
+async function checkServerEnvironmentStatus() {
+  if (!usersStatus) return;
+
+  try {
+    const token = await getAccessToken();
+    if (!token) return;
+
+    const response = await fetch("/api/env-status", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    });
+
+    const result = await parseApiResponse(response);
+    if (!response.ok) {
+      return;
+    }
+
+    const missing = Array.isArray(result?.missing) ? result.missing : [];
+    if (!missing.length) {
+      return;
+    }
+
+    usersStatus.innerHTML = `
+      <div class="alert alert-warning" style="border: none; border-radius: 8px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 1rem; margin: 0 0 1rem 0;">
+        <strong>Server Environment Incomplete:</strong> Missing ${escapeHtml(missing.join(", "))}.<br>
+        Add these exact keys in Vercel Project Settings → Environment Variables, then redeploy.
+      </div>
+    `;
+  } catch {
+    // No-op: avoid blocking admin page load when status check fails.
+  }
+}
+
+function blurActiveElement() {
+  if (document.activeElement && typeof document.activeElement.blur === "function") {
+    document.activeElement.blur();
+  }
+}
+
+function bindCreateUserModalGuards() {
+  const modalElement = document.getElementById("createUserModal");
+  if (!modalElement) return;
+
+  modalElement.addEventListener("show.bs.modal", () => {
+    modalElement.removeAttribute("inert");
+    modalElement.setAttribute("aria-hidden", "false");
+  });
+
+  modalElement.addEventListener("hide.bs.modal", () => {
+    blurActiveElement();
+  });
+
+  modalElement.addEventListener("hidden.bs.modal", () => {
+    modalElement.setAttribute("inert", "");
+    modalElement.setAttribute("aria-hidden", "true");
+  });
+}
+
 // Check if user is admin
 async function checkAdminAccess() {
   const supabase = await getSupabase();
@@ -325,10 +403,10 @@ async function createUser(email, password, fullName, role, organizationId) {
       }),
     });
 
-    const result = await response.json();
+    const result = await parseApiResponse(response);
 
     if (!response.ok) {
-      const rawMessage = String(result.error || 'Failed to create user');
+      const rawMessage = getResponseErrorMessage(result, 'Failed to create user');
       const normalizedMessage = rawMessage.toLowerCase().includes('invalid api key')
         ? 'Server admin setup is incomplete. Please configure a valid SUPABASE_SERVICE_ROLE_KEY.'
         : rawMessage;
@@ -406,10 +484,10 @@ async function deleteUser(email) {
       body: JSON.stringify({ email }),
     });
 
-    const result = await response.json();
+    const result = await parseApiResponse(response);
 
     if (!response.ok) {
-      const errorMessage = result.error || 'Failed to delete user';
+      const errorMessage = getResponseErrorMessage(result, 'Failed to delete user');
       if (errorMessage.toLowerCase().includes("invalid api key")) {
         await deleteUserAccountDirect(email);
         usersStatus.innerHTML = `
@@ -492,10 +570,12 @@ if (createUserForm) {
     if (success) {
       const modalElement = document.getElementById('createUserModal');
       if (modalElement) {
+        blurActiveElement();
         const modal = bootstrap.Modal.getInstance(modalElement);
         if (modal) {
           modal.hide();
         }
+        modalElement.setAttribute("inert", "");
       }
       // Clear the form
       createUserForm.reset();
@@ -535,9 +615,11 @@ if (logoutBtn) {
 
 // Initialize on page load
 (async function init() {
+  bindCreateUserModalGuards();
   const isAdmin = await checkAdminAccess();
   if (isAdmin) {
     await loadOrganizations();
     await loadUsers();
+    await checkServerEnvironmentStatus();
   }
 })();

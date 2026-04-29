@@ -22,6 +22,18 @@ let selectedHeadOrganizationId = null;
 let headFilterInitialized = false;
 let canUseDismissalApi = window.location.hostname !== "localhost";
 
+async function parseApiResponse(response) {
+  const text = await response.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return {
+      raw: text,
+      error: `Non-JSON response received (${response.status}).`,
+    };
+  }
+}
+
 function normalizeSemesterLabel(value) {
   const raw = String(value || "").trim().toLowerCase();
   if (!raw) return "";
@@ -93,6 +105,16 @@ function initializeAcademicPeriodHeader() {
 
 function setDrawerOpen(isOpen) {
   if (!drawer || !drawerOverlay || !menuButton) return;
+
+  if (!isOpen) {
+    if (drawer.contains(document.activeElement) && typeof document.activeElement.blur === "function") {
+      document.activeElement.blur();
+    }
+    drawer.setAttribute("inert", "");
+  } else {
+    drawer.removeAttribute("inert");
+  }
+
   drawer.classList.toggle("is-open", isOpen);
   drawer.setAttribute("aria-hidden", String(!isOpen));
   drawerOverlay.hidden = !isOpen;
@@ -462,13 +484,13 @@ async function loadDismissedCases() {
     }
 
     if (response && response.ok) {
-      const data = await response.json();
+      const data = await parseApiResponse(response);
       renderDismissedRows(filterByAcademicPeriod(Array.isArray(data) ? data : [], period));
       return;
     }
 
     if (response && response.status !== 404) {
-      const errorData = await response.json().catch(() => ({}));
+      const errorData = await parseApiResponse(response);
       throw new Error(errorData?.error || `Case dismissal request failed (${response.status}).`);
     }
 

@@ -39,8 +39,23 @@ If you need to reset all operational records while keeping account data:
 2. Set **Build Command** to blank and **Output Directory** to the project root.
 3. Add environment variables:
    - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
 4. Deploy.
+
+## Verify required Vercel env vars
+1. In Vercel Dashboard, open your project.
+2. Go to **Settings** -> **Environment Variables**.
+3. Confirm these exact keys exist:
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+4. After changes, redeploy the project.
+5. Optional CLI check:
+   - `vercel env ls`
+6. Runtime check (admin only):
+   - Open Admin page and it will call `/api/env-status`.
+   - If anything is missing, a warning banner is shown.
 
 ## Notes
 - The “Print / Save PDF” button uses the browser print dialog.

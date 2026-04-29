@@ -36,7 +36,8 @@ async function fetchServerConfig() {
   try {
     const response = await fetch("/api/config", { cache: "no-store" });
     if (!response.ok) return null;
-    const data = await response.json();
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : {};
     return normalizeConfig(data || {});
   } catch {
     return null;
