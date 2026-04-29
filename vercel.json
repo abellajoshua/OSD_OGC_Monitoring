@@ -1,7 +1,7 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/**/*.js", "use": "@vercel/node" },
+    { "src": "api/index.js", "use": "@vercel/node" },
     { "src": "public/**", "use": "@vercel/static" }
   ],
   "routes": [
@@ -10,7 +10,7 @@
     { "src": "/register", "dest": "/public/register.html" },
     { "src": "/programs", "dest": "/public/programs.html" },
     { "src": "/archive", "dest": "/public/archive.html" },
-    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/api/(.*)", "dest": "/api/index.js" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/public/$1" }
   ]
