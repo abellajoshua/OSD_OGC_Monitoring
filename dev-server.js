@@ -2,10 +2,12 @@ require("dotenv").config();
 
 const express = require("express");
 const path = require("path");
+const { authorize } = require("./api/_supabase");
 
 const dashboardHandler = require("./api/dashboard");
 const analyticsHandler = require("./api/analytics");
 const configHandler = require("./api/config");
+const envStatusHandler = require("./api/env-status");
 const archiveHandler = require("./api/archive");
 const caseDismissalHandler = require("./api/case-dismissal");
 const minorHandler = require("./api/minor-offenses/index");
@@ -54,6 +56,7 @@ app.get("/", (_req, res) => {
 });
 
 app.all("/api/config", (req, res) => configHandler(req, res));
+app.all("/api/env-status", (req, res) => envStatusHandler(req, res));
 app.all("/api/dashboard", (req, res) => dashboardHandler(req, res));
 app.all("/api/analytics", (req, res) => analyticsHandler(req, res));
 app.all("/api/archive", (req, res) => archiveHandler(req, res));
@@ -108,8 +111,8 @@ app.all("/api/leave-of-absence/:id", (req, res) => {
   return leaveOfAbsenceByIdHandler(req, res);
 });
 
-app.all("/api/admin/create-user", (req, res) => createUserHandler(req, res));
-app.all("/api/admin/delete-user", (req, res) => deleteUserHandler(req, res));
+app.all("/api/admin/create-user", authorize, (req, res) => createUserHandler(req, res));
+app.all("/api/admin/delete-user", authorize, (req, res) => deleteUserHandler(req, res));
 
 app.listen(PORT, () => {
   console.log(`OSD/OGC Monitoring server running on http://localhost:${PORT}`);

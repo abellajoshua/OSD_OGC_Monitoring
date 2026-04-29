@@ -9,6 +9,18 @@ const periodDisplay = document.querySelector("#archive-period-display");
 let currentOrganizationId = null;
 let currentUserRole = localStorage.getItem("userRole") || "";
 
+async function parseApiResponse(response) {
+  const text = await response.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return {
+      raw: text,
+      error: `Non-JSON response received (${response.status}).`,
+    };
+  }
+}
+
 const ROLE_COORDINATOR = "coordinator";
 const MODULE_TABLE_MAP = {
   minor: "minor_offenses",
@@ -180,12 +192,12 @@ async function fetchArchivedRows(moduleKey) {
     }
 
     if (response.ok) {
-      const data = await response.json();
+      const data = await parseApiResponse(response);
       return filterByAcademicPeriod(Array.isArray(data) ? data : [], period);
     }
 
     if (response.status !== 404) {
-      const errorData = await response.json().catch(() => ({}));
+      const errorData = await parseApiResponse(response);
       throw new Error(errorData?.error || `Archive request failed (${response.status}).`);
     }
 
