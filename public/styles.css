@@ -260,6 +260,51 @@ body {
   background: linear-gradient(180deg, #fff7f7 0%, #ffffff 100%);
 }
 
+.case-dismissal-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(2px);
+  z-index: 1039;
+}
+
+.case-dismissal-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: min(320px, 86vw);
+  height: 100vh;
+  padding: 14px 12px 12px;
+  background: linear-gradient(180deg, #fff7f7 0%, #ffffff 100%);
+  border-right: 1px solid rgba(164, 19, 33, 0.12);
+  box-shadow: 18px 0 40px rgba(12, 20, 35, 0.18);
+  transform: translateX(-102%);
+  transition: transform 0.24s ease;
+  z-index: 1040;
+  overflow-y: auto;
+}
+
+.case-dismissal-drawer.is-open {
+  transform: translateX(0);
+}
+
+.case-dismissal-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(164, 19, 33, 0.12);
+}
+
+.case-dismissal-drawer-header h5 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
 .nav-sidebar {
   width: 100%;
   flex-direction: column;
@@ -268,6 +313,8 @@ body {
 .nav-sidebar .nav-btn {
   width: 100%;
   text-align: left;
+  font-size: 15px;
+  padding: 11px 18px;
 }
 
 .nav-btn {
@@ -960,6 +1007,78 @@ h1 {
   font-size: 18px;
 }
 
+.analytics-college-offense-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.analytics-org-topoffense-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.analytics-org-topoffense-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.analytics-org-topoffense-panel-head h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.analytics-college-offense-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 10px 12px;
+}
+
+.analytics-college-offense-org {
+  display: grid;
+  gap: 2px;
+}
+
+.analytics-college-offense-org strong {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.analytics-college-offense-org span {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.analytics-college-offense-main {
+  display: grid;
+  justify-items: end;
+  text-align: right;
+  gap: 3px;
+}
+
+.analytics-college-offense-name {
+  font-size: 12px;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.analytics-college-offense-meta {
+  font-size: 11px;
+  color: #475569;
+}
+
 .analytics-top-offense-card {
   display: grid;
   gap: 8px;
@@ -974,6 +1093,12 @@ h1 {
   font-size: 28px;
   line-height: 1.05;
   color: var(--ink);
+}
+
+@media (max-width: 920px) {
+  .analytics-org-topoffense-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .analytics-top-offense-count {
@@ -1293,6 +1418,107 @@ h1 {
   gap: 10px;
 }
 
+.sanction-picker-input {
+  cursor: pointer;
+  background-image: linear-gradient(180deg, #ffffff 0%, #fff8f8 100%);
+}
+
+.sanction-picker-input:focus {
+  border-color: rgba(164, 19, 33, 0.4);
+  box-shadow: 0 0 0 3px rgba(164, 19, 33, 0.14);
+}
+
+.sanction-picker-input[readonly] {
+  color: #0f172a;
+  caret-color: transparent;
+}
+
+.sanction-picker-modal-panel {
+  width: min(920px, calc(100vw - 28px));
+}
+
+.sanction-picker-list {
+  display: grid;
+  gap: 10px;
+}
+
+.sanction-picker-article {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.sanction-picker-article summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px 14px;
+  font-weight: 700;
+  color: #0f172a;
+  background: linear-gradient(180deg, #ffffff 0%, #fff8f8 100%);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.sanction-picker-article summary::-webkit-details-marker {
+  display: none;
+}
+
+.sanction-picker-article-body {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.sanction-picker-option {
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 12px;
+  background: #fff;
+  color: #0f172a;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.sanction-picker-option strong {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.sanction-picker-option span {
+  font-size: 12px;
+  color: #5b6473;
+  line-height: 1.45;
+}
+
+.sanction-picker-option:hover {
+  transform: translateY(-1px);
+  border-color: rgba(164, 19, 33, 0.4);
+  box-shadow: 0 10px 18px rgba(12, 20, 35, 0.12);
+}
+
+.sanction-picker-option.is-selected {
+  border-color: rgba(164, 19, 33, 0.6);
+  background: rgba(164, 19, 33, 0.08);
+}
+
+@media (max-width: 768px) {
+  .sanction-picker-modal-panel {
+    width: min(920px, calc(100vw - 16px));
+  }
+
+  .sanction-picker-article summary {
+    padding: 11px 12px;
+  }
+
+  .sanction-picker-option {
+    padding: 10px;
+  }
+}
+
 .analytics-insight-drilldown {
   display: grid;
   grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
@@ -1493,6 +1719,10 @@ h1 {
 
   .analytics-insights-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analytics-college-offense-list {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1732,10 +1962,132 @@ h1 {
   width: 100%;
 }
 
+.analytics-campus-wrap {
+  width: 100%;
+}
+
+.analytics-campus-chart-shell {
+  position: relative;
+  width: 100%;
+}
+
+.analytics-campus-tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 150px;
+  max-width: 210px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.96);
+  color: #f8fafc;
+  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.18);
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+  transition: opacity 0.06s linear, transform 0.06s linear;
+  pointer-events: none;
+  z-index: 5;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.analytics-campus-tooltip.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.analytics-campus-tooltip strong {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.analytics-campus-tooltip span {
+  display: block;
+  color: rgba(248, 250, 252, 0.8);
+}
+
+.analytics-campus-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.analytics-campus-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "dot name count"
+    "dot type type";
+  gap: 4px 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+}
+
+.analytics-campus-row.is-zero {
+  opacity: 0.72;
+}
+
+.analytics-campus-swatch {
+  grid-area: dot;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.analytics-campus-name {
+  grid-area: name;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.analytics-campus-count {
+  grid-area: count;
+  color: #0f172a;
+  font-weight: 700;
+  min-width: 20px;
+  text-align: right;
+}
+
+.analytics-campus-type {
+  grid-area: type;
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+@media (max-width: 980px) {
+  .analytics-campus-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .analytics-campus-list {
+    grid-template-columns: 1fr;
+  }
+}
+
 .analytics-donut-svg {
   max-width: 248px;
   margin: 0 auto;
   filter: drop-shadow(0 10px 16px rgba(15, 23, 42, 0.08));
+}
+
+.analytics-campus-wrap .analytics-donut-svg {
+  max-width: 248px;
 }
 
 .analytics-donut-value {
@@ -2386,6 +2738,127 @@ tbody td {
   cursor: pointer;
 }
 
+.btn-view {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  background: rgba(15, 23, 42, 0.04);
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+.btn-restore {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(22, 163, 74, 0.28);
+  background: rgba(22, 163, 74, 0.1);
+  color: #166534;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.case-dismissal-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(22, 163, 74, 0.18);
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.12), rgba(255, 255, 255, 0.95));
+  color: #14532d;
+  box-shadow: 0 12px 24px rgba(12, 20, 35, 0.08);
+}
+
+.case-dismissal-banner strong {
+  display: block;
+  font-size: 14px;
+}
+
+.case-dismissal-banner span {
+  font-size: 13px;
+  color: #166534;
+}
+
+.case-dismissal-summary {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.case-dismissal-summary-card {
+  border: 1px solid rgba(164, 19, 33, 0.12);
+  border-radius: 18px;
+  background: #fff;
+  padding: 16px;
+  box-shadow: 0 14px 30px rgba(12, 20, 35, 0.06);
+}
+
+.case-dismissal-summary-card span {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.case-dismissal-summary-card strong {
+  font-size: 24px;
+}
+
+.case-dismissal-detail-sheet {
+  margin-top: 1.5rem;
+}
+
+.case-dismissal-detail-empty {
+  padding: 20px;
+  border-radius: 18px;
+  border: 1px dashed rgba(164, 19, 33, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(252, 247, 247, 0.96) 100%);
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.case-dismissal-detail-empty strong {
+  color: var(--accent);
+}
+
+.case-dismissal-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.case-dismissal-detail {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, #ffffff 0%, #fbf7f7 100%);
+}
+
+.case-dismissal-detail span {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.case-dismissal-detail strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+
 .btn-edit {
   padding: 6px 10px;
   border-radius: 10px;
@@ -2415,4 +2888,327 @@ tbody td {
   background: rgba(164, 19, 33, 0.12);
   color: #a41321;
   border: 1px solid rgba(164, 19, 33, 0.3);
+}
+
+.goodmoral-offense-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.goodmoral-offense-tag {
+  appearance: none;
+  border: 1px solid rgba(164, 19, 33, 0.3);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+}
+
+.goodmoral-offense-tag:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(164, 19, 33, 0.12);
+}
+
+.goodmoral-offense-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.goodmoral-offense-modal-panel {
+  width: min(920px, calc(100vw - 40px)) !important;
+  max-height: calc(100vh - 80px) !important;
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-modal-scroll {
+  padding: 28px !important;
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-modal-head {
+  margin-bottom: 20px !important;
+  padding-bottom: 16px !important;
+  border-bottom: 2px solid rgba(164, 19, 33, 0.1);
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-modal-head h3 {
+  font-size: 24px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.3px;
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-modal-head button {
+  border: none;
+  background: transparent;
+  color: #999;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  width: 32px;
+  border-radius: 8px;
+  transition: all 150ms ease-out;
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-modal-head button:hover {
+  background: rgba(164, 19, 33, 0.08);
+  color: #666;
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-sub {
+  font-size: 14px !important;
+  color: #777 !important;
+  margin-top: 4px;
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-modal-body {
+  gap: 16px;
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-modal-item {
+  background: linear-gradient(135deg, #fafafa 0%, #ffffff 100%);
+  border: 1px solid rgba(164, 19, 33, 0.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-modal-item strong {
+  font-size: 16px;
+  color: var(--ink);
+  font-weight: 600;
+  display: block;
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-modal-item span {
+  font-size: 13px;
+  color: var(--muted);
+  display: block;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-records-list {
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  padding: 14px;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-record-item {
+  background: #ffffff;
+  border: 1px solid rgba(164, 19, 33, 0.12);
+  border-radius: 12px;
+  padding: 14px 16px;
+  transition: all 150ms ease-out;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-record-item:hover {
+  border-color: rgba(164, 19, 33, 0.2);
+  box-shadow: 0 4px 12px rgba(164, 19, 33, 0.08);
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-record-item strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-record-item span {
+  font-size: 13px;
+  color: #999;
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-record-item small {
+  font-size: 12px;
+  color: #888;
+}
+
+.goodmoral-offense-modal-panel .analytics-insight-empty-state {
+  padding: 24px 18px;
+  border: 2px dashed rgba(164, 19, 33, 0.15);
+  background: rgba(255, 248, 248, 0.5);
+  font-size: 14px;
+  color: #999;
+  text-align: center;
+}
+
+.goodmoral-offense-modal-panel .goodmoral-offense-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid rgba(15, 23, 42, 0.08);
+}
+
+.goodmoral-offense-modal-panel .goodmoral-offense-modal-actions button {
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  transition: all 150ms ease-out;
+  letter-spacing: 0.3px;
+}
+
+.goodmoral-offense-modal-panel .goodmoral-offense-modal-actions .primary {
+  background: linear-gradient(135deg, #a41321 0%, #8a0d1a 100%);
+  color: white;
+  box-shadow: 0 8px 20px rgba(164, 19, 33, 0.2);
+}
+
+.goodmoral-offense-modal-panel .goodmoral-offense-modal-actions .primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(164, 19, 33, 0.28);
+}
+
+.goodmoral-offense-modal-panel .goodmoral-offense-modal-actions .primary:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(164, 19, 33, 0.2);
+}
+
+.goodmoral-offense-modal-panel .goodmoral-offense-modal-actions .ghost {
+  background: transparent;
+  color: #666;
+  border: 1px solid #ddd;
+}
+
+.goodmoral-offense-modal-panel .goodmoral-offense-modal-actions .ghost:hover {
+  background: rgba(15, 23, 42, 0.04);
+  border-color: #ccc;
+}
+
+@media (max-width: 768px) {
+  .goodmoral-offense-modal-panel {
+    width: calc(100vw - 24px) !important;
+  }
+
+  .goodmoral-offense-modal-panel .analytics-insight-modal-scroll {
+    padding: 20px !important;
+  }
+
+  .goodmoral-offense-modal-panel .analytics-insight-modal-head h3 {
+    font-size: 20px !important;
+  }
+
+  .goodmoral-offense-modal-panel .goodmoral-offense-modal-actions {
+    flex-direction: column-reverse;
+    gap: 10px;
+  }
+
+  .goodmoral-offense-modal-panel .goodmoral-offense-modal-actions button {
+    width: 100%;
+  }
+}
+
+.goodmoral-offense-section {
+  border: 1px solid rgba(164, 19, 33, 0.12);
+  border-radius: 14px;
+  padding: 18px;
+  background: #ffffff;
+  margin-bottom: 14px;
+  transition: all 150ms ease-out;
+}
+
+.goodmoral-offense-section:last-child {
+  margin-bottom: 0;
+}
+
+.goodmoral-offense-section:hover {
+  border-color: rgba(164, 19, 33, 0.2);
+  box-shadow: 0 4px 12px rgba(164, 19, 33, 0.06);
+}
+
+.goodmoral-offense-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid rgba(164, 19, 33, 0.1);
+}
+
+.goodmoral-offense-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.goodmoral-offense-badge-minor {
+  background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(248, 113, 113, 0.3);
+}
+
+.goodmoral-offense-badge-major {
+  background: linear-gradient(135deg, #a41321 0%, #8a0d1a 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(164, 19, 33, 0.3);
+}
+
+.goodmoral-offense-section-header h4 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.2px;
+}
+
+.goodmoral-offense-section-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 20px;
+  text-align: center;
+}
+
+.goodmoral-offense-empty-icon {
+  font-size: 32px;
+  color: #ddd;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.goodmoral-offense-empty-text {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #999;
+  letter-spacing: 0.3px;
+}
+
+.goodmoral-offense-section-records {
+  display: grid;
+  gap: 10px;
+}
+
+.goodmoral-offense-section-records .analytics-insight-record-item {
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+  border: 1px solid rgba(164, 19, 33, 0.1);
+  margin: 0;
+}
+
+.goodmoral-offense-section-records .analytics-insight-record-item:hover {
+  background: #ffffff;
+  border-color: rgba(164, 19, 33, 0.2);
 }

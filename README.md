@@ -19,6 +19,14 @@ OSD_OGC_Monitoring is a web-based system designed to centralize and monitor OSD 
    - `SUPABASE_ANON_KEY`
    - For local dev, you can place them in `.env` (see `.env.example`).
 
+## Fresh database reset (preserve accounts)
+If you need to reset all operational records while keeping account data:
+1. Run `supabase_reset_fresh.sql`.
+2. Run `supabase_policies.sql` again (policies are recreated after table rebuild).
+3. Verify that `public.user_accounts` and `public.organizations` still contain your account mappings.
+4. Optional test data: run `supabase_seed_2024_2025.sql` to seed AY 2024-2025 records
+   for First/Second/Summer with variable counts (5/3/2 per module).
+
 ## Deploy to GitHub Pages
 1. Push to `main`.
 2. In GitHub repo settings, open **Pages**.

@@ -99,6 +99,7 @@
           <button class="nav-btn" data-tab="idreplacement">ID Replacement</button>
           <button class="nav-btn" data-tab="leaveofabsence">Leave of Absence</button>
           <a href="archived-records.html" class="nav-btn">Archived Records</a>
+          <a href="case-dismissal.html" class="nav-btn">Case Dismissal</a>
           <a href="admin.html" class="nav-btn" id="admin-link" style="display: none;">Admin Panel</a>
           <button class="nav-btn" id="logout-btn">Logout</button>
         </nav>
@@ -140,10 +141,10 @@
                 <span>Pending Sanctions</span>
                 <strong data-stat="pending">--</strong>
               </div>
-              <div class="stat">
-                <span>Resolved This Week</span>
-                <strong data-stat="resolved">--</strong>
-              </div>
+               <div class="stat">
+                 <span>Resolved Cases</span>
+                 <strong data-stat="resolvecases">--</strong>
+               </div>
               <div class="stat">
                 <span>Follow-ups Due</span>
                 <strong data-stat="followups">--</strong>
@@ -265,12 +266,36 @@
             <article class="analytics-card">
               <div class="analytics-card-head">
                 <div>
-                  <p class="analytics-kicker">Process Health</p>
-                  <h3>Open vs Completed</h3>
+                  <p class="analytics-kicker" id="analytics-status-kicker">Process Health</p>
+                  <h3 id="analytics-status-title">Open vs Completed</h3>
                 </div>
-                <span class="analytics-pill">Case status</span>
+                <span class="analytics-pill" id="analytics-status-pill">Case status</span>
               </div>
               <div class="chart-slot chart-slot-donut" id="analytics-status-chart"></div>
+            </article>
+
+            <article class="analytics-card analytics-card-wide" id="analytics-college-topoffense-card">
+              <div class="analytics-card-head">
+                <div>
+                  <p class="analytics-kicker">Top Offense</p>
+                  <h3>Per Campus &amp; College</h3>
+                </div>
+                <span class="analytics-pill">Head only</span>
+              </div>
+              <div class="analytics-org-topoffense-grid">
+                <section class="analytics-org-topoffense-panel">
+                  <div class="analytics-org-topoffense-panel-head">
+                    <h4>Campus</h4>
+                  </div>
+                  <div class="analytics-college-offense-list" id="analytics-campus-topoffense-list"></div>
+                </section>
+                <section class="analytics-org-topoffense-panel">
+                  <div class="analytics-org-topoffense-panel-head">
+                    <h4>College</h4>
+                  </div>
+                  <div class="analytics-college-offense-list" id="analytics-college-topoffense-list"></div>
+                </section>
+              </div>
             </article>
 
           </section>
@@ -343,7 +368,7 @@
             </div>
             <div class="form-grid">
               <label>
-                Date of Complaint
+                Date of Complaint Received
                 <input type="date" name="date_of_complaint" required />
               </label>
               <label>
@@ -379,7 +404,7 @@
               </label>
               <label>
                 Sanction
-                <input type="text" name="sanction" required />
+                <input type="text" name="sanction" class="sanction-picker-input" placeholder="Select sanction" readonly required />
               </label>
               <label>
                 Date of Sanction
@@ -394,7 +419,7 @@
             <table>
               <thead>
                 <tr>
-                  <th rowspan="2">Date of Complaint</th>
+                  <th rowspan="2">Date of Complaint Received</th>
                   <th rowspan="2">Name of Student</th>
                   <th rowspan="2">SR Code</th>
                   <th rowspan="2">Year / Program</th>
@@ -441,7 +466,7 @@
 
           <div class="sheet-actions">
             <button class="primary" id="export-major-pdf">Print PDF</button>
-            <button class="ghost" type="button" data-archive="major-offenses" style="margin-left: 10px;">Archive CSV</button>
+            <a class="ghost" href="case-dismissal.html" style="margin-left: 10px; text-decoration: none; color: black;">Case Dismissal</a>
           </div>
 
           <form id="major-form" class="record-form">
@@ -451,7 +476,7 @@
             </div>
             <div class="form-grid">
               <label>
-                Date of Complaint
+                Date of Complaint Received
                 <input type="date" name="date_of_complaint" required />
               </label>
               <label>
@@ -495,7 +520,7 @@
               </label>
               <label>
                 Sanction
-                <input type="text" name="sanction" required />
+                <input type="text" name="sanction" class="sanction-picker-input" placeholder="Select sanction" readonly required />
               </label>
               <label>
                 Date of Suspension
@@ -514,7 +539,7 @@
             <table>
               <thead>
                 <tr>
-                  <th rowspan="2">Date of Complaint</th>
+                  <th rowspan="2">Date of Complaint Received</th>
                   <th rowspan="2">Name of Student</th>
                   <th rowspan="2">SR Code</th>
                   <th rowspan="2">Year / Program</th>
@@ -1035,11 +1060,44 @@
           </div>
         </div>
       </section>
+
+      <div class="analytics-insight-modal" id="goodmoral-offense-modal" hidden aria-live="polite">
+        <div class="analytics-insight-modal-backdrop" data-goodmoral-offense-close="true"></div>
+        <div class="analytics-insight-modal-panel goodmoral-offense-modal-panel" role="dialog" aria-modal="true" aria-labelledby="goodmoral-offense-modal-title">
+          <div class="analytics-insight-modal-scroll">
+            <div class="analytics-insight-modal-head">
+              <div>
+                <h3 id="goodmoral-offense-modal-title">Offense Details</h3>
+                <p class="analytics-insight-sub" id="goodmoral-offense-modal-subtitle"></p>
+              </div>
+              <button type="button" class="analytics-insight-modal-close" data-goodmoral-offense-close="true" aria-label="Close offense details">✕</button>
+            </div>
+            <div class="analytics-insight-modal-body" id="goodmoral-offense-modal-body"></div>
+            <div class="goodmoral-offense-modal-actions" id="goodmoral-offense-modal-actions">
+              <button type="button" class="ghost" data-goodmoral-offense-close="true">Cancel</button>
+              <button type="button" class="primary" id="goodmoral-offense-confirm-btn">Save Record</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="analytics-insight-modal" id="sanction-picker-modal" hidden>
+        <div class="analytics-insight-modal-backdrop" data-sanction-modal-close="true"></div>
+        <div class="analytics-insight-modal-panel sanction-picker-modal-panel" role="dialog" aria-modal="true" aria-labelledby="sanction-picker-title">
+          <div class="analytics-insight-modal-scroll">
+            <div class="analytics-insight-modal-head">
+              <h3 id="sanction-picker-title">Select Sanction</h3>
+              <button type="button" class="analytics-insight-modal-close" data-sanction-modal-close="true" aria-label="Close sanction picker">Close</button>
+            </div>
+            <div class="sanction-picker-list" id="sanction-picker-list"></div>
+          </div>
+        </div>
+      </div>
     </main>
 
     <script src="runtime-config.js?v=4"></script>
     <script type="module" src="auth-guard.js?v=4"></script>
-    <script type="module" src="app.js?v=4"></script>
+    <script type="module" src="app.js?v=5"></script>
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"

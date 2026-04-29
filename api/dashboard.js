@@ -38,9 +38,6 @@ module.exports = async (req, res) => {
     const context = await getRequestUserContext(req);
     const supabase = getSupabaseClient();
     const scopedOrganizationId = getScopedOrganizationId(req, context);
-    const today = new Date();
-    const weekStart = new Date();
-    weekStart.setDate(today.getDate() - 6);
 
     const [
       minorCount,
@@ -48,7 +45,6 @@ module.exports = async (req, res) => {
       gatepassCount,
       goodMoralCount,
       pendingSanctions,
-      resolvedThisWeek,
       followUpsUniform,
       followUpsGatepass,
       followUpsGoodMoral,
@@ -59,10 +55,6 @@ module.exports = async (req, res) => {
       countTable(supabase, "good_moral", scopedOrganizationId),
       countWithFilter(supabase, "minor_offenses", {
         or: "sanction.is.null,sanction.eq.,date_of_sanction.is.null,date_of_sanction.eq.",
-      }, scopedOrganizationId),
-      countWithFilter(supabase, "minor_offenses", {
-        gte: { column: "date_of_sanction", value: toISODate(weekStart) },
-        lte: { column: "date_of_sanction", value: toISODate(today) },
       }, scopedOrganizationId),
       countWithFilter(supabase, "non_wearing_uniform", {
         or: "time_out.is.null,time_out.eq.",
@@ -78,8 +70,8 @@ module.exports = async (req, res) => {
     return res.status(200).json({
       activeCases: minorCount + uniformCount + gatepassCount + goodMoralCount,
       pendingSanctions,
-      resolvedThisWeek,
       followUpsDue: followUpsUniform + followUpsGatepass + followUpsGoodMoral,
+      resolveCases: (minorCount + uniformCount + gatepassCount + goodMoralCount) - pendingSanctions,
     });
   } catch (error) {
     return res.status(getErrorStatus(error)).json({ error: error.message });

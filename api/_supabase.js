@@ -156,21 +156,15 @@ function parseOrganizationId(value) {
 function canAccessAllOrganizations(context) {
   if (!context) return false;
   const role = String(context.role || "").trim().toLowerCase();
-  const organizationName = String(context.organizationName || "").trim().toLowerCase();
-  return role === "head" && organizationName === "alangilan";
+  return role === "head";
 }
 
 function getScopedOrganizationId(req, context) {
   if (!context || !context.role) return null;
 
-  // Only Alangilan Head can monitor all orgs and optionally narrow down via query filter.
+  // Head can monitor all organizations and may optionally narrow down via query filter.
   if (canAccessAllOrganizations(context)) {
     return parseOrganizationId(req?.query?.organization_id);
-  }
-
-  // Non-exempt heads are restricted to their own organization.
-  if (context.role === "head") {
-    return context.organizationId;
   }
 
   // Coordinator is always restricted to own organization.
@@ -187,6 +181,75 @@ function applyOrganizationScope(query, organizationId) {
   return query.eq("organization_id", organizationId);
 }
 
+function normalizeSemesterLabel(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "";
+
+  if (raw === "first" || raw === "1st" || raw.includes("first") || raw.includes("1st")) {
+    return "First Semester";
+  }
+  if (raw === "second" || raw === "2nd" || raw.includes("second") || raw.includes("2nd")) {
+    return "Second Semester";
+  }
+  if (raw === "summer" || raw.includes("summer")) {
+    return "Summer Class";
+  }
+
+  return "";
+}
+
+function getSemesterCandidates(semesterValue) {
+  const normalized = normalizeSemesterLabel(semesterValue);
+  if (!normalized) return [];
+
+  const variants = [normalized];
+  if (normalized === "First Semester") variants.push("1st Semester");
+  if (normalized === "Second Semester") variants.push("2nd Semester");
+  return Array.from(new Set(variants));
+}
+
+function applyAcademicPeriodScope(query, queryParams) {
+  const academicYear = String(queryParams?.academic_year || "").trim();
+  const semesterCandidates = getSemesterCandidates(queryParams?.semester);
+  let scopedQuery = query;
+
+  if (academicYear) {
+    scopedQuery = scopedQuery.eq("academic_year", academicYear);
+  }
+
+  if (semesterCandidates.length) {
+    scopedQuery = scopedQuery.in("semester", semesterCandidates);
+  }
+
+  return scopedQuery;
+}
+
+function normalizeAcademicYear(value) {
+  const text = String(value || "").trim();
+  return /^\d{4}-\d{4}$/.test(text) ? text : "";
+}
+
+function getAcademicPeriodFromPayload(payload) {
+  const academicYear = normalizeAcademicYear(payload?.academic_year);
+  const semester = normalizeSemesterLabel(payload?.semester);
+  if (!academicYear || !semester) {
+    return null;
+  }
+
+  return {
+    academicYear,
+    semester,
+  };
+}
+
+function applyActiveRecordsScope(query) {
+  return query.or("archived.is.null,archived.eq.false");
+}
+
+function logApiFlow(step, details = {}) {
+  console.log(`[API:${step}]`, details);
+}
+
 module.exports = {
   getSupabaseClient,
   hasServiceRolePrivileges,
@@ -194,6 +257,13 @@ module.exports = {
   getRequestUserContext,
   getScopedOrganizationId,
   applyOrganizationScope,
+  applyAcademicPeriodScope,
+  applyActiveRecordsScope,
+  logApiFlow,
+  normalizeAcademicYear,
+  getAcademicPeriodFromPayload,
+  normalizeSemesterLabel,
+  getSemesterCandidates,
   canAccessAllOrganizations,
   ensureRole,
   getErrorStatus,

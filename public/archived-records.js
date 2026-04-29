@@ -1,55 +1,24 @@
 import { getSupabase } from "./supabaseClient.js?v=4";
 
-// Tab navigation
 const navBtns = document.querySelectorAll(".nav-btn");
 const tabs = document.querySelectorAll(".tab");
-
-navBtns.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const tabName = btn.getAttribute("data-tab");
-    if (!tabName) return;
-
-    navBtns.forEach((b) => b.classList.remove("active"));
-    tabs.forEach((t) => t.classList.remove("active"));
-
-    btn.classList.add("active");
-    document.getElementById(tabName)?.classList.add("active");
-
-    loadArchivedRecords(tabName);
-
-    // Close sidebar menu after selecting a tab
-    const sidebar = document.getElementById("sidebarNav");
-    if (sidebar && window.bootstrap && sidebar.classList.contains("show")) {
-      window.bootstrap.Offcanvas.getOrCreateInstance(sidebar).hide();
-    }
-  });
-});
-
-// Logout
-document.getElementById("logout-btn")?.addEventListener("click", async () => {
-  try {
-    const supabase = await getSupabase();
-    await supabase.auth.signOut();
-    window.location.href = "login.html";
-  } catch (err) {
-    console.error("Error signing out:", err);
-  }
-});
-
-// Load archived records on page load
-document.addEventListener("DOMContentLoaded", () => {
-  enforceArchivePageAccess()
-    .then((allowed) => {
-      if (!allowed) return;
-      loadArchivedRecords("minor");
-    })
-    .catch(() => {
-      window.location.href = "login.html";
-    });
-});
+const academicYearInput = document.querySelector("#archive-academic-year");
+const semesterSelect = document.querySelector("#archive-semester");
+const periodDisplay = document.querySelector("#archive-period-display");
 
 let currentOrganizationId = null;
 let currentUserRole = localStorage.getItem("userRole") || "";
+
+const ROLE_COORDINATOR = "coordinator";
+const MODULE_TABLE_MAP = {
+  minor: "minor_offenses",
+  major: "major_offenses",
+  uniform: "non_wearing_uniform",
+  gatepass: "gatepass",
+  goodmoral: "good_moral",
+  idreplacement: "id_replacement",
+  leaveofabsence: "leave_of_absence",
+};
 
 function normalizeSemesterLabel(value) {
   const raw = String(value || "").trim().toLowerCase();
@@ -60,57 +29,68 @@ function normalizeSemesterLabel(value) {
   return "";
 }
 
+function getSemesterCandidates(value) {
+  const normalized = normalizeSemesterLabel(value);
+  if (!normalized) return [];
+
+  const variants = [normalized];
+  if (normalized === "First Semester") variants.push("1st Semester");
+  if (normalized === "Second Semester") variants.push("2nd Semester");
+  return Array.from(new Set(variants));
+}
+
+function filterByAcademicPeriod(records, period) {
+  const expectedYear = String(period?.year || "").trim();
+  const expectedSemester = normalizeSemesterLabel(period?.semester);
+
+  return (records || []).filter((record) => {
+    const rowYear = String(record?.academic_year || "").trim();
+    const rowSemester = normalizeSemesterLabel(record?.semester);
+    return rowYear === expectedYear && rowSemester === expectedSemester;
+  });
+}
+
 function getAcademicPeriod() {
   const year = localStorage.getItem("academicYear") || "2024-2025";
   const semester = normalizeSemesterLabel(localStorage.getItem("semester")) || "First Semester";
   return { year, semester };
 }
 
-function getAcademicPeriodRange() {
-  const { year, semester } = getAcademicPeriod();
-  const match = String(year || "").trim().match(/^(\d{4})-(\d{4})$/);
-  if (!match) return null;
-
-  const startYear = Number(match[1]);
-  const endYear = Number(match[2]);
-  if (!Number.isInteger(startYear) || !Number.isInteger(endYear) || endYear !== startYear + 1) {
-    return null;
-  }
-
-  let startDate;
-  let endDate;
-  if (semester === "First Semester") {
-    startDate = new Date(startYear, 7, 1);
-    endDate = new Date(startYear, 11, 31);
-  } else if (semester === "Second Semester") {
-    startDate = new Date(endYear, 0, 1);
-    endDate = new Date(endYear, 4, 31);
-  } else if (semester === "Summer Class") {
-    startDate = new Date(endYear, 5, 1);
-    endDate = new Date(endYear, 6, 31);
-  } else {
-    return null;
-  }
-
-  const toISODate = (date) => {
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, "0");
-    const dd = String(date.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
-  return {
-    year,
-    semester,
-    startDate: toISODate(startDate),
-    endDate: toISODate(endDate),
-  };
+function renderAcademicPeriodHeader() {
+  const period = getAcademicPeriod();
+  if (academicYearInput) academicYearInput.value = period.year;
+  if (semesterSelect) semesterSelect.value = period.semester;
+  if (periodDisplay) periodDisplay.textContent = `${period.semester} AY ${period.year}`;
 }
 
-const ROLE_COORDINATOR = "coordinator";
-
 function canManageArchivedRecords() {
-  return currentUserRole === ROLE_COORDINATOR;
+  return String(currentUserRole || "").trim().toLowerCase() === ROLE_COORDINATOR;
+}
+
+function getActiveArchiveTab() {
+  return document.querySelector(".nav-btn.active")?.getAttribute("data-tab") || "minor";
+}
+
+function initializeAcademicPeriodHeader() {
+  renderAcademicPeriodHeader();
+
+  if (academicYearInput) {
+    academicYearInput.addEventListener("change", async () => {
+      const value = String(academicYearInput.value || "").trim() || "2024-2025";
+      localStorage.setItem("academicYear", value);
+      renderAcademicPeriodHeader();
+      await loadArchivedRecords(getActiveArchiveTab());
+    });
+  }
+
+  if (semesterSelect) {
+    semesterSelect.addEventListener("change", async () => {
+      const value = normalizeSemesterLabel(semesterSelect.value) || "First Semester";
+      localStorage.setItem("semester", value);
+      renderAcademicPeriodHeader();
+      await loadArchivedRecords(getActiveArchiveTab());
+    });
+  }
 }
 
 async function enforceArchivePageAccess() {
@@ -151,10 +131,12 @@ async function enforceArchivePageAccess() {
 
 async function getCurrentOrganizationId() {
   if (currentOrganizationId) return currentOrganizationId;
+
   const supabase = await getSupabase();
   const {
     data: { session },
   } = await supabase.auth.getSession();
+
   if (!session) return null;
 
   const { data: account } = await supabase
@@ -167,44 +149,70 @@ async function getCurrentOrganizationId() {
   return currentOrganizationId;
 }
 
-// Fetch archived rows from a table
-async function fetchArchivedRows(table, dateColumn) {
+async function fetchArchivedRows(moduleKey) {
   try {
     const supabase = await getSupabase();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error("Session expired. Please login again.");
+    }
+
+    const period = getAcademicPeriod();
+    const query = new URLSearchParams({
+      module: moduleKey,
+      academic_year: period.year,
+      semester: period.semester,
+    });
+
+    const response = await fetch(`/api/archive?${query.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      cache: "no-store",
+    });
+
+    const tableName = MODULE_TABLE_MAP[moduleKey];
+    if (!tableName) {
+      throw new Error("Invalid archive module.");
+    }
+
+    if (response.ok) {
+      const data = await response.json();
+      return filterByAcademicPeriod(Array.isArray(data) ? data : [], period);
+    }
+
+    if (response.status !== 404) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData?.error || `Archive request failed (${response.status}).`);
+    }
+
     const organizationId = await getCurrentOrganizationId();
-    const period = getAcademicPeriodRange();
-    let query = supabase
-      .from(table)
+    const semesterCandidates = getSemesterCandidates(period.semester);
+    let fallbackQuery = supabase
+      .from(tableName)
       .select("*")
       .eq("archived", true)
-      .eq("organization_id", organizationId);
+      .eq("academic_year", period.year)
+      .in("semester", semesterCandidates)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
 
-    if (period) {
-      query = query.eq("academic_year", period.year).eq("semester", period.semester);
+    if (organizationId) {
+      fallbackQuery = fallbackQuery.eq("organization_id", organizationId);
     }
 
-    let { data, error } = await query.order("created_at", { ascending: false });
-
-    if (error && String(error.message || "").toLowerCase().includes("academic_year")) {
-      ({ data, error } = await supabase
-        .from(table)
-        .select("*")
-        .eq("archived", true)
-        .eq("organization_id", organizationId)
-        .gte(dateColumn || "created_at", period?.startDate || "0001-01-01")
-        .lte(dateColumn || "created_at", period?.endDate || "9999-12-31")
-        .order("created_at", { ascending: false }));
-    }
-
-    if (error) throw error;
-    return data || [];
+    const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+    if (fallbackError) throw fallbackError;
+    return filterByAcademicPeriod(Array.isArray(fallbackData) ? fallbackData : [], period);
   } catch (err) {
-    console.error(`Error fetching archived records from ${table}:`, err);
+    console.error(`Error fetching archived records (${moduleKey}):`, err);
     return [];
   }
 }
 
-// Restore a record (set archived = false)
 async function restoreRow(table, id) {
   if (!canManageArchivedRecords()) {
     alert("Read-only access: Head users cannot manage archived records.");
@@ -224,25 +232,19 @@ async function restoreRow(table, id) {
     if (error) throw error;
 
     alert("Record restored successfully!");
-    
-    // Reload current tab
-    const activeTab = document.querySelector(".nav-btn.active")?.getAttribute("data-tab");
-    if (activeTab) {
-      loadArchivedRecords(activeTab);
-    }
+    await loadArchivedRecords(getActiveArchiveTab());
   } catch (err) {
     console.error("Error restoring record:", err);
-    alert("Failed to restore record: " + err.message);
+    alert(`Failed to restore record: ${err.message}`);
   }
 }
 
-// Permanently delete a record
 async function permanentlyDeleteRow(table, id) {
   if (!canManageArchivedRecords()) {
     alert("Read-only access: Head users cannot manage archived records.");
     return;
   }
-  if (!confirm("⚠️ PERMANENTLY DELETE this record?\n\nThis action CANNOT be undone!")) {
+  if (!confirm("PERMANENTLY DELETE this record?\n\nThis action CANNOT be undone!")) {
     return;
   }
 
@@ -258,19 +260,13 @@ async function permanentlyDeleteRow(table, id) {
     if (error) throw error;
 
     alert("Record permanently deleted.");
-    
-    // Reload current tab
-    const activeTab = document.querySelector(".nav-btn.active")?.getAttribute("data-tab");
-    if (activeTab) {
-      loadArchivedRecords(activeTab);
-    }
+    await loadArchivedRecords(getActiveArchiveTab());
   } catch (err) {
     console.error("Error deleting record:", err);
-    alert("Failed to delete record: " + err.message);
+    alert(`Failed to delete record: ${err.message}`);
   }
 }
 
-// Attach restore and delete actions to row
 function attachRowActions(row, table, id) {
   const restoreBtn = row.querySelector(".restore-btn");
   const deleteBtn = row.querySelector(".delete-btn");
@@ -279,38 +275,45 @@ function attachRowActions(row, table, id) {
   deleteBtn?.addEventListener("click", () => permanentlyDeleteRow(table, id));
 }
 
-// Load archived records for specific table
 async function loadArchivedRecords(tabName) {
   let table = "";
+  let moduleKey = "";
   let tbodyId = "";
 
   switch (tabName) {
     case "minor":
       table = "minor_offenses";
+      moduleKey = "minor";
       tbodyId = "minor-table-body";
       break;
     case "major":
       table = "major_offenses";
+      moduleKey = "major";
       tbodyId = "major-table-body";
       break;
     case "uniform":
       table = "non_wearing_uniform";
+      moduleKey = "uniform";
       tbodyId = "uniform-table-body";
       break;
     case "gatepass":
       table = "gatepass";
+      moduleKey = "gatepass";
       tbodyId = "gatepass-table-body";
       break;
     case "goodmoral":
       table = "good_moral";
+      moduleKey = "goodmoral";
       tbodyId = "goodmoral-table-body";
       break;
     case "idreplacement":
       table = "id_replacement";
+      moduleKey = "idreplacement";
       tbodyId = "idreplacement-table-body";
       break;
     case "leaveofabsence":
       table = "leave_of_absence";
+      moduleKey = "leaveofabsence";
       tbodyId = "leaveofabsence-table-body";
       break;
     default:
@@ -320,17 +323,15 @@ async function loadArchivedRecords(tabName) {
   const tbody = document.getElementById(tbodyId);
   if (!tbody) return;
 
-  // Show loading state
   tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">Loading...</td></tr>';
 
-  const rows = await fetchArchivedRows(table, tabName === "minor" || tabName === "major" ? "date_of_complaint" : "date");
+  const rows = await fetchArchivedRows(moduleKey);
 
   if (rows.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No archived records found.</td></tr>';
     return;
   }
 
-  // Render rows based on table type
   if (tabName === "minor") {
     renderMinorRows(rows, tbody);
   } else if (tabName === "major") {
@@ -348,7 +349,6 @@ async function loadArchivedRecords(tabName) {
   }
 }
 
-// Render functions for each table type
 function renderMinorRows(rows, tbody) {
   tbody.innerHTML = rows
     .map(
@@ -360,8 +360,8 @@ function renderMinorRows(rows, tbody) {
       <td>${r.offense || ""}</td>
       <td>${r.sanction || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
@@ -384,8 +384,8 @@ function renderMajorRows(rows, tbody) {
       <td>${r.offense || ""}</td>
       <td>${r.sanction || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
@@ -408,8 +408,8 @@ function renderUniformRows(rows, tbody) {
       <td>${r.course || ""}</td>
       <td>${r.reason || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
@@ -432,8 +432,8 @@ function renderGatepassRows(rows, tbody) {
       <td>${r.course || ""}</td>
       <td>${r.reason || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
@@ -456,8 +456,8 @@ function renderGoodmoralRows(rows, tbody) {
       <td>${r.course || ""}</td>
       <td>${r.purpose || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
@@ -480,8 +480,8 @@ function renderIdReplacementRows(rows, tbody) {
       <td>${r.course || ""}</td>
       <td>${r.reason || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
@@ -504,8 +504,8 @@ function renderLeaveOfAbsenceRows(rows, tbody) {
       <td>${r.course || ""}</td>
       <td>${r.semester_period_covered || ""}</td>
       <td>
-        <button class="btn btn-sm btn-success restore-btn">Restore</button>
-        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        <button class="btn-restore restore-btn" type="button">Restore</button>
+        <button class="btn-delete delete-btn" type="button">Delete</button>
       </td>
     </tr>
   `
@@ -516,3 +516,45 @@ function renderLeaveOfAbsenceRows(rows, tbody) {
     attachRowActions(row, "leave_of_absence", rows[idx].id);
   });
 }
+
+navBtns.forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const tabName = btn.getAttribute("data-tab");
+    if (!tabName) return;
+
+    navBtns.forEach((b) => b.classList.remove("active"));
+    tabs.forEach((t) => t.classList.remove("active"));
+
+    btn.classList.add("active");
+    document.getElementById(tabName)?.classList.add("active");
+
+    await loadArchivedRecords(tabName);
+
+    const sidebar = document.getElementById("sidebarNav");
+    if (sidebar && window.bootstrap && sidebar.classList.contains("show")) {
+      window.bootstrap.Offcanvas.getOrCreateInstance(sidebar).hide();
+    }
+  });
+});
+
+document.getElementById("logout-btn")?.addEventListener("click", async () => {
+  try {
+    const supabase = await getSupabase();
+    await supabase.auth.signOut();
+    window.location.href = "login.html";
+  } catch (err) {
+    console.error("Error signing out:", err);
+  }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  enforceArchivePageAccess()
+    .then(async (allowed) => {
+      if (!allowed) return;
+      initializeAcademicPeriodHeader();
+      await loadArchivedRecords("minor");
+    })
+    .catch(() => {
+      window.location.href = "login.html";
+    });
+});

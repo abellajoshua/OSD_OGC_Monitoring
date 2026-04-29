@@ -17,6 +17,9 @@ if (logoutButton) {
   logoutButton.addEventListener("click", async () => {
     const supabase = await getSupabase();
     await supabase.auth.signOut();
+    localStorage.removeItem("organizationId");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("headOrganizationFilterId");
     window.location.href = "login.html";
   });
 }

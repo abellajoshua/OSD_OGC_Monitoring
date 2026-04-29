@@ -44,7 +44,7 @@ const exportLeaveofabsenceButton = document.querySelector("#export-leaveofabsenc
 const dashboardActivityBody = document.querySelector("#dashboard-activity-body");
 const statActive = document.querySelector("[data-stat='active']");
 const statPending = document.querySelector("[data-stat='pending']");
-const statResolved = document.querySelector("[data-stat='resolved']");
+const statResolveCases = document.querySelector("[data-stat='resolvecases']");
 const statFollowups = document.querySelector("[data-stat='followups']");
 const kpiMinor = document.querySelector("[data-kpi='minor']");
 const kpiMajor = document.querySelector("[data-kpi='major']");
@@ -65,6 +65,12 @@ const analyticsTrendLabel = document.querySelector("#analytics-trend-label");
 const analyticsModuleChart = document.querySelector("#analytics-module-chart");
 const analyticsTrendChart = document.querySelector("#analytics-trend-chart");
 const analyticsStatusChart = document.querySelector("#analytics-status-chart");
+const analyticsStatusKicker = document.querySelector("#analytics-status-kicker");
+const analyticsStatusTitle = document.querySelector("#analytics-status-title");
+const analyticsStatusPill = document.querySelector("#analytics-status-pill");
+const analyticsCollegeTopOffenseCard = document.querySelector("#analytics-college-topoffense-card");
+const analyticsCampusTopOffenseList = document.querySelector("#analytics-campus-topoffense-list");
+const analyticsCollegeTopOffenseList = document.querySelector("#analytics-college-topoffense-list");
 const analyticsTopOffense = document.querySelector("#analytics-top-offense");
 const analyticsTopOffenseCount = document.querySelector("#analytics-top-offense-count");
 const analyticsBusiestDay = document.querySelector("#analytics-busiest-day");
@@ -77,7 +83,251 @@ const analyticsInsightCards = document.querySelectorAll(".analytics-insight-card
 const analyticsInsightModal = document.querySelector("#analytics-insight-modal");
 const analyticsInsightModalTitle = document.querySelector("#analytics-insight-modal-title");
 const analyticsInsightModalBody = document.querySelector("#analytics-insight-modal-body");
+const goodmoralOffenseModal = document.querySelector("#goodmoral-offense-modal");
+const goodmoralOffenseModalTitle = document.querySelector("#goodmoral-offense-modal-title");
+const goodmoralOffenseModalSubtitle = document.querySelector("#goodmoral-offense-modal-subtitle");
+const goodmoralOffenseModalBody = document.querySelector("#goodmoral-offense-modal-body");
+const goodmoralOffenseModalActions = document.querySelector("#goodmoral-offense-modal-actions");
+const goodmoralOffenseConfirmBtn = document.querySelector("#goodmoral-offense-confirm-btn");
+const sanctionPickerModal = document.querySelector("#sanction-picker-modal");
+const sanctionPickerList = document.querySelector("#sanction-picker-list");
+const minorSanctionInput = recordForm?.querySelector('input[name="sanction"]') || null;
+const majorSanctionInput = majorForm?.querySelector('input[name="sanction"]') || null;
 let activeInsightContext = null;
+let pendingGoodmoralSubmission = null;
+let activeSanctionInput = null;
+
+const SANCTIONS_BY_ARTICLE = [
+  {
+    article: "Article I",
+    sections: [
+      {
+        section: "Section 1",
+        description: "Students agree to follow all university rules and responsibilities",
+      },
+      {
+        section: "Section 2",
+        description:
+          "Discipline is based on self-respect, respect for authority, and others, promoting a peaceful school environment.",
+      },
+    ],
+  },
+  {
+    article: "Article II",
+    sections: [
+      {
+        section: "Section 3",
+        description:
+          "Covers all college students, including Law and Graduate School, as well as OJT and internship students.",
+      },
+      {
+        section: "Section 3.1",
+        description:
+          "Separate conduct rules apply to laboratory school students (high school and elementary).",
+      },
+    ],
+  },
+  {
+    article: "Article III",
+    sections: [
+      {
+        section: "Section 4",
+        description:
+          "Provides definitions such as: Academic freedom, co-/extra-curricular activities, minor vs. major offenses, disciplinary actions (probation, suspension, dismissal, expulsion), university-related terms (authority, community, premises), documents like MDA (Memorandum of Disciplinary Action).",
+      },
+    ],
+  },
+  {
+    article: "Article IV",
+    sections: [
+      {
+        section: "Section 5",
+        description: "Assistant Director - oversees discipline policies across campuses.",
+      },
+      {
+        section: "Section 6",
+        description: "OSD Head - manages discipline at the campus level.",
+      },
+      {
+        section: "Section 7",
+        description: "OSD Coordinator - handles discipline within colleges/departments.",
+      },
+    ],
+  },
+  {
+    article: "Article V",
+    sections: [
+      {
+        section: "Section 8",
+        description: "Attendance rules (absences, tardiness, excuses).",
+      },
+      {
+        section: "Section 9",
+        description: "ID policies (use, replacement, gate pass).",
+      },
+      {
+        section: "Section 10",
+        description:
+          "Uniform, dress code, and conduct rules (including prohibited attire and behavior).",
+      },
+    ],
+  },
+  {
+    article: "Article VI",
+    sections: [
+      {
+        section: "Section 11",
+        description: "General purpose of discipline rules.",
+      },
+      {
+        section: "Section 12",
+        description: "Minor offenses (e.g., dress code violations, disruptions).",
+      },
+      {
+        section: "Section 13",
+        description:
+          "Major offenses categorized into Sets A-I with increasing severity (e.g., theft, violence, drugs).",
+      },
+      {
+        section: "Section 14",
+        description: "Academic dishonesty (cheating, plagiarism) and corresponding sanctions.",
+      },
+    ],
+  },
+  {
+    article: "Article VII",
+    sections: [
+      {
+        section: "Section 15",
+        description: "Covers unlisted offenses, restitution, and disciplinary consequences.",
+      },
+      {
+        section: "Section 16",
+        description: "Addresses special or unusual cases.",
+      },
+      {
+        section: "Section 17",
+        description: "Consequences to Disciplinary Actions.",
+      },
+      {
+        section: "Section 17.1",
+        description: "Sanctioned students may be required to undergo counseling.",
+      },
+      {
+        section: "Section 17.2",
+        description:
+          "Students cannot attend classes, take exams, submit requirements, or enroll unless cleared by the OSD and the case is resolved first. The complainant is also informed of the outcome.",
+      },
+      {
+        section: "Section 17.3",
+        description: "Students may take special exams only for major exams missed due to sanctions.",
+      },
+      {
+        section: "Section 18",
+        description: "Complementary to Offenses and Sanctions.",
+      },
+      {
+        section: "Section 18.1",
+        description:
+          "If a case cannot proceed due to end of semester, it is postponed to the next term unless delay affects fairness.",
+      },
+      {
+        section: "Section 18.2",
+        description:
+          "If a sanction cannot be served due to end of term, it will be implemented next semester starting the 2nd week unless delay harms justice.",
+      },
+      {
+        section: "Section 18.3",
+        description:
+          "If suspension cannot be fully served, the student may render community service or extension work instead, depending on severity.",
+      },
+      {
+        section: "Section 18.4",
+        description:
+          "Community service is allowed during summer if the student can still attend classes, submits a signed request before the sanction starts, receives work from OSD, and submits a journal plus certificate of completion.",
+      },
+      {
+        section: "Section 18.5",
+        description:
+          "Graduating students remain under case review; if guilty, they must render community service before credentials are released, while non-graduating students follow normal sanctions.",
+      },
+      {
+        section: "Section 18.6",
+        description:
+          "Newly graduated students with pending cases may be elevated to higher authorities, and honors or awards may be revoked if found guilty.",
+      },
+      {
+        section: "Section 18.7",
+        description:
+          "Settlement is allowed only for personal offenses such as minor conflicts, but disciplinary action still applies.",
+      },
+      {
+        section: "Section 18.8",
+        description:
+          "Even if the complainant withdraws the case, the university can continue it, especially if there is suspected pressure or public interest.",
+      },
+    ],
+  },
+  {
+    article: "Article VIII",
+    sections: [
+      {
+        section: "Section 19",
+        description:
+          "Step-by-step process including filing complaints, investigation and hearings, decision-making and sanctions.",
+      },
+    ],
+  },
+  {
+    article: "Article IX",
+    sections: [
+      {
+        section: "Section 20",
+        description:
+          "Types of boards: University Discipline Board (UDB), Campus Discipline Board (CDB), Local Discipline Board (LDB).",
+      },
+    ],
+  },
+  {
+    article: "Article X",
+    sections: [
+      {
+        section: "Section 21",
+        description: "Records are confidential.",
+      },
+      {
+        section: "Section 22",
+        description: "Records are stored separately from academic files.",
+      },
+      {
+        section: "Section 23",
+        description:
+          "Retention policy: Minor offenses (at least 6 years), Major offenses (permanent).",
+      },
+    ],
+  },
+  {
+    article: "Article XI",
+    sections: [
+      {
+        section: "Section 24",
+        description: "OSD rules override conflicting policies.",
+      },
+      {
+        section: "Section 25",
+        description: "Invalid provisions do not affect others.",
+      },
+      {
+        section: "Section 26",
+        description: "Annual review of policies.",
+      },
+      {
+        section: "Section 27",
+        description: "Changes take effect upon approval.",
+      },
+    ],
+  },
+];
 
 const academicYearInput = document.querySelector("#academic-year-input");
 const semesterSelect = document.querySelector("#semester-select");
@@ -109,6 +359,13 @@ const ANALYTICS_MODULE_COLOR_MAP = Object.fromEntries(
   ANALYTICS_MODULES.map((module) => [module.key, module.color])
 );
 
+const TOP_OFFENSE_MODULES = ["minor", "major", "uniform"];
+const TOP_OFFENSE_LABELS = {
+  minor: "Minor Offense",
+  major: "Major Offense",
+  uniform: "Non-Wearing Violation",
+};
+
 let minorRecords = [];
 let majorRecords = [];
 let uniformRecords = [];
@@ -117,10 +374,12 @@ let goodmoralRecords = [];
 let idreplacementRecords = [];
 let leaveofabsenceRecords = [];
 let currentOrganizationId = null;
+let currentUserId = null;
 let currentUserRole = localStorage.getItem("userRole") || "";
 let selectedHeadOrganizationId = null;
 let headFilterInitialized = false;
 let hasGlobalHeadAccess = false;
+let organizationDirectory = new Map();
 let analyticsSummary = null;
 let isAcademicPeriodLoading = false;
 const ACTIVE_TAB_STORAGE_KEY = "activeTab";
@@ -128,6 +387,11 @@ const ACTIVE_TAB_STORAGE_KEY = "activeTab";
 const ROLE_ADMIN = "admin";
 const ROLE_HEAD = "head";
 const ROLE_COORDINATOR = "coordinator";
+const CASE_DISMISSAL_PAGE = "case-dismissal.html";
+
+function logDataFlow(step, details = {}) {
+  console.log(`[DataFlow] ${step}`, details);
+}
 
 function canEditRecords() {
   return currentUserRole === ROLE_COORDINATOR;
@@ -139,6 +403,12 @@ function isHeadRole() {
 
 function canAccessAllOrganizations() {
   return isHeadRole() && hasGlobalHeadAccess;
+}
+
+function isAlangilanCampusOrganization(org) {
+  const name = String(org?.name || "").trim().toLowerCase();
+  const type = String(org?.type || "").trim().toLowerCase();
+  return name === "alangilan" && type === "campus";
 }
 
 function ensureCoordinatorAccess() {
@@ -155,6 +425,18 @@ function renderRecordActions(recordId) {
   return `
     <button class="btn-edit" type="button" data-action="edit" data-id="${recordId}">Edit</button>
     <button class="btn-delete" type="button" data-action="archive" data-id="${recordId}">Archive</button>
+  `;
+}
+
+function renderMajorRecordActions(recordId) {
+  if (!canEditRecords()) {
+    return `<span class="text-muted">Read Only</span>`;
+  }
+
+  return `
+    <button class="btn-edit" type="button" data-action="edit" data-id="${recordId}">Edit</button>
+    <button class="btn-delete" type="button" data-action="archive" data-id="${recordId}">Archive</button>
+    <button class="btn-delete" type="button" data-action="dismiss" data-id="${recordId}">Case Dismissal</button>
   `;
 }
 
@@ -207,18 +489,15 @@ function applyHeadInterfaceRestrictions() {
 }
 
 async function getCurrentOrganizationId() {
-  if (currentOrganizationId) return currentOrganizationId;
-  const cached = localStorage.getItem("organizationId");
-  if (cached) {
-    currentOrganizationId = Number(cached);
-    return currentOrganizationId;
-  }
-
   const supabase = await getSupabase();
   const {
     data: { session },
   } = await supabase.auth.getSession();
   if (!session) return null;
+
+  if (currentOrganizationId && currentUserId === session.user.id) {
+    return currentOrganizationId;
+  }
 
   const { data: account } = await supabase
     .from("user_accounts")
@@ -227,17 +506,25 @@ async function getCurrentOrganizationId() {
     .single();
 
   currentUserRole = String(account?.role || currentUserRole || "").trim().toLowerCase();
-  hasGlobalHeadAccess =
-    String(account?.role || "").trim().toLowerCase() === ROLE_HEAD &&
-    String(account?.organizations?.name || "").trim().toLowerCase() === "alangilan";
+  hasGlobalHeadAccess = String(account?.role || "").trim().toLowerCase() === ROLE_HEAD;
   if (currentUserRole) {
     localStorage.setItem("userRole", currentUserRole);
   }
 
+  currentUserId = session.user.id;
   currentOrganizationId = account?.organization_id || null;
   if (currentOrganizationId) {
     localStorage.setItem("organizationId", String(currentOrganizationId));
+  } else {
+    localStorage.removeItem("organizationId");
   }
+
+  logDataFlow("Resolved user context", {
+    userId: currentUserId,
+    role: currentUserRole,
+    organizationId: currentOrganizationId,
+  });
+
   return currentOrganizationId;
 }
 
@@ -271,8 +558,15 @@ async function initializeHeadOrganizationFilter() {
   const organizations = data || [];
   if (!organizations.length) return;
 
-  const visibleOrganizations = organizations.filter(
-    (org) => String(org.name || "").trim().toLowerCase() !== "alangilan"
+  const visibleOrganizations = organizations.filter((org) => !isAlangilanCampusOrganization(org));
+  organizationDirectory = new Map(
+    organizations.map((org) => [
+      Number(org.id),
+      {
+        name: String(org.name || "").trim(),
+        type: String(org.type || "").trim().toLowerCase(),
+      },
+    ])
   );
 
   headOrgFilterSelect.innerHTML = [
@@ -339,51 +633,56 @@ async function fetchTableRows(table, dateColumn, queryContext = null) {
   const primaryOrderColumn = dateColumn || "id";
   const orgId = queryContext?.orgId !== undefined ? queryContext.orgId : await getScopedReadOrganizationId();
   const period = queryContext?.period ?? getAcademicPeriodRange();
-  const attempts = [
-    { useArchived: true, useAcademicColumns: true, useDateRange: false },
-    { useArchived: false, useAcademicColumns: true, useDateRange: false },
-    { useArchived: true, useAcademicColumns: false, useDateRange: true },
-    { useArchived: false, useAcademicColumns: false, useDateRange: true },
-  ];
-
-  let lastError = null;
-
-  for (const attempt of attempts) {
+  const runQuery = async ({ useArchivedFilter, periodMode }) => {
     let query = supabase.from(table).select("*");
 
-    if (attempt.useArchived) {
-      query = query.eq("archived", false);
+    if (useArchivedFilter) {
+      query = query.or("archived.is.null,archived.eq.false");
     }
+
     if (orgId) {
       query = query.eq("organization_id", orgId);
     }
 
-    if (period) {
-      if (attempt.useAcademicColumns) {
-        query = query.eq("academic_year", period.year).eq("semester", period.semester);
-      } else if (attempt.useDateRange && dateColumn) {
-        query = query.gte(dateColumn, period.startDate).lte(dateColumn, period.endDate);
+    if (period && periodMode === "metadata") {
+      const semesterCandidates = getSemesterFilterCandidates(period.semester);
+      query = query.eq("academic_year", period.year);
+      if (semesterCandidates.length) {
+        query = query.in("semester", semesterCandidates);
       }
     }
 
-    const { data, error } = await query
-      .order(primaryOrderColumn, { ascending: false })
-      .order("id", { ascending: false });
+    return query.order(primaryOrderColumn, { ascending: false }).order("id", { ascending: false });
+  };
 
+  const attempts = [];
+  const preferredPeriodMode = period ? "metadata" : "none";
+  attempts.push({ useArchivedFilter: true, periodMode: preferredPeriodMode });
+  attempts.push({ useArchivedFilter: false, periodMode: preferredPeriodMode });
+
+  let lastError = null;
+
+  for (const attempt of attempts) {
+    const { data, error } = await runQuery(attempt);
     if (!error) {
-      return data || [];
+      const rows = data || [];
+      logDataFlow("Fetch rows success", {
+        table,
+        rowCount: rows.length,
+        organizationId: orgId || null,
+        period: period || null,
+        attempt,
+      });
+      console.log("Fetched Data:", rows);
+      return rows;
     }
 
     lastError = error;
-    const message = String(error.message || "").toLowerCase();
-
-    if (attempt.useArchived && !message.includes("archived")) {
-      continue;
-    }
-
-    if (attempt.useAcademicColumns && !(message.includes("academic_year") || message.includes("semester"))) {
-      continue;
-    }
+    logDataFlow("Fetch rows attempt failed", {
+      table,
+      attempt,
+      message: error.message,
+    });
   }
 
   if (lastError) throw lastError;
@@ -394,32 +693,51 @@ async function createRow(table, payload) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
+  if (!orgId) {
+    throw new Error("Unable to determine organization for current account.");
+  }
   const period = getAcademicPeriodRange();
   const safePayload = {
     ...payload,
     organization_id: orgId,
+    archived: false,
     ...(period ? { academic_year: period.year, semester: period.semester } : {}),
   };
 
-  let { error } = await supabase.from(table).insert(safePayload);
+  logDataFlow("Create row payload", {
+    table,
+    organizationId: orgId,
+    payload: safePayload,
+  });
+
+  let { data, error } = await supabase.from(table).insert(safePayload).select("*").single();
 
   if (error) {
     const message = String(error.message || "").toLowerCase();
     if (message.includes("academic_year") || message.includes("semester")) {
-      const fallbackPayload = { ...payload, organization_id: orgId };
-      ({ error } = await supabase.from(table).insert(fallbackPayload));
+      const fallbackPayload = { ...payload, organization_id: orgId, archived: false };
+      ({ data, error } = await supabase.from(table).insert(fallbackPayload).select("*").single());
     }
   }
 
   if (error) throw error;
+
+  logDataFlow("Create row result", {
+    table,
+    insertedId: data?.id || null,
+    organizationId: data?.organization_id || orgId,
+  });
+
+  return data || null;
 }
 
 async function updateRow(table, id, payload) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
-  const { organization_id, academic_year, semester, ...safePayload } = payload;
-  let query = supabase.from(table).update(safePayload).eq("id", id);
+  const { organization_id, academic_year, semester, ...updatePayload } = payload;
+
+  let query = supabase.from(table).update(updatePayload).eq("id", id);
   if (orgId) query = query.eq("organization_id", orgId);
   const { error } = await query;
   if (error) throw error;
@@ -429,9 +747,28 @@ async function archiveRow(table, id) {
   ensureCoordinatorAccess();
   const supabase = await getSupabase();
   const orgId = await getCurrentOrganizationId();
-  let query = supabase.from(table).update({ archived: true }).eq("id", id);
-  if (orgId) query = query.eq("organization_id", orgId);
-  const { error } = await query;
+
+  let updateQuery = supabase.from(table).update({ archived: true }).eq("id", id);
+  if (orgId) updateQuery = updateQuery.eq("organization_id", orgId);
+
+  const { error } = await updateQuery;
+  if (error) throw error;
+}
+
+async function dismissMajorRow(id) {
+  ensureCoordinatorAccess();
+  const supabase = await getSupabase();
+  const orgId = await getCurrentOrganizationId();
+
+  const updatePayload = {
+    archived: true,
+    status: "dismissed",
+  };
+
+  let updateQuery = supabase.from(TABLES.major).update(updatePayload).eq("id", id);
+  if (orgId) updateQuery = updateQuery.eq("organization_id", orgId);
+
+  const { error } = await updateQuery;
   if (error) throw error;
 }
 
@@ -464,6 +801,11 @@ function hasTab(targetId) {
 }
 
 function getPreferredTab() {
+  const hashTab = String(window.location.hash || "").replace(/^#/, "");
+  if (hashTab && hasTab(hashTab)) {
+    return hashTab;
+  }
+
   const storedTab = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
   if (storedTab && hasTab(storedTab)) {
     return storedTab;
@@ -715,8 +1057,8 @@ function buildModuleTrendSeries(period = getAcademicPeriodRange()) {
 }
 
 function getTopOffense() {
-  const topCategory = ANALYTICS_MODULES
-    .map((module) => ({ name: module.label, count: getModuleRecords(module.key).length }))
+  const topCategory = TOP_OFFENSE_MODULES
+    .map((moduleKey) => ({ name: TOP_OFFENSE_LABELS[moduleKey] || moduleKey, count: getModuleRecords(moduleKey).length }))
     .sort((left, right) => {
       if (right.count !== left.count) return right.count - left.count;
       return left.name.localeCompare(right.name);
@@ -754,6 +1096,7 @@ function buildLocalAnalyticsSummary() {
       goodMoralFlags,
     },
     modules,
+    campus: buildLocalCampusBreakdown(),
     status: {
       completed: completedRecords,
       pending: pendingRecords,
@@ -773,6 +1116,191 @@ function buildLocalAnalyticsSummary() {
   };
 }
 
+function buildLocalCampusBreakdown() {
+  const grouped = new Map();
+
+  ANALYTICS_MODULES.forEach((module) => {
+    const moduleRecords = getModuleRecords(module.key);
+    moduleRecords.forEach((record) => {
+      const orgId = Number(record?.organization_id || 0);
+      if (!orgId) return;
+
+      const current = grouped.get(orgId) || 0;
+      grouped.set(orgId, current + 1);
+    });
+  });
+
+  const rows = Array.from(organizationDirectory.entries()).map(([organizationId, meta]) => ({
+    organizationId,
+    name: meta?.name || `Organization ${organizationId}`,
+    type: meta?.type || "organization",
+    count: grouped.get(organizationId) || 0,
+  }));
+
+  if (!rows.length) {
+    return Array.from(grouped.entries())
+      .map(([organizationId, count]) => ({
+        organizationId: Number(organizationId),
+        name: `Organization ${organizationId}`,
+        type: "organization",
+        count,
+      }))
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return String(a.name).localeCompare(String(b.name));
+      });
+  }
+
+  return rows.sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return String(a.name).localeCompare(String(b.name));
+  });
+}
+
+function buildLocalOffenseMapByOrganization() {
+  const offenseMapByOrg = new Map();
+
+  TOP_OFFENSE_MODULES.forEach((moduleKey) => {
+    const offenseText = TOP_OFFENSE_LABELS[moduleKey] || moduleKey;
+    const offenseKey = moduleKey;
+
+    getModuleRecords(moduleKey).forEach((record) => {
+      const orgId = Number(record?.organization_id || 0);
+      if (!orgId) return;
+
+      if (!offenseMapByOrg.has(orgId)) {
+        offenseMapByOrg.set(orgId, new Map());
+      }
+
+      const orgMap = offenseMapByOrg.get(orgId);
+      const current = orgMap.get(offenseKey) || { offense: offenseText, count: 0 };
+      orgMap.set(offenseKey, { offense: current.offense || offenseText, count: current.count + 1 });
+    });
+  });
+
+  return offenseMapByOrg;
+}
+
+function buildTopOffenseRow(organizationId, meta, orgMap, typeOverride) {
+  const name = meta?.name || `Organization ${organizationId}`;
+  const type = typeOverride || String(meta?.type || "organization").trim().toLowerCase() || "organization";
+
+  if (!orgMap || !orgMap.size) {
+    return {
+      organizationId,
+      name,
+      type,
+      topOffense: null,
+      topOffenseCount: 0,
+      totalOffenseRecords: 0,
+    };
+  }
+
+  const entries = Array.from(orgMap.values());
+  const totalOffenseRecords = entries.reduce((sum, item) => sum + Number(item.count || 0), 0);
+  const top = entries.sort((left, right) => {
+    if (Number(right.count || 0) !== Number(left.count || 0)) {
+      return Number(right.count || 0) - Number(left.count || 0);
+    }
+    return String(left.offense || "").localeCompare(String(right.offense || ""));
+  })[0];
+
+  return {
+    organizationId,
+    name,
+    type,
+    topOffense: String(top?.offense || "").trim() || null,
+    topOffenseCount: Number(top?.count || 0),
+    totalOffenseRecords,
+  };
+}
+
+function buildLocalCampusTopOffenseByOrganization() {
+  const offenseMapByOrg = buildLocalOffenseMapByOrganization();
+  const collegeAggregate = new Map();
+
+  Array.from(organizationDirectory.entries()).forEach(([organizationId, meta]) => {
+    if (String(meta?.type || "").trim().toLowerCase() !== "college") return;
+    const orgMap = offenseMapByOrg.get(organizationId);
+    if (!orgMap) return;
+
+    orgMap.forEach((entry, offenseKey) => {
+      const current = collegeAggregate.get(offenseKey) || { offense: entry.offense, count: 0 };
+      collegeAggregate.set(offenseKey, {
+        offense: current.offense || entry.offense,
+        count: Number(current.count || 0) + Number(entry.count || 0),
+      });
+    });
+  });
+
+  return Array.from(organizationDirectory.entries())
+    .filter(([, meta]) => String(meta?.type || "").trim().toLowerCase() === "campus")
+    .map(([organizationId, meta]) => {
+      const orgMap = String(meta?.name || "").trim().toLowerCase() === "alangilan"
+        ? collegeAggregate
+        : offenseMapByOrg.get(organizationId);
+
+      return buildTopOffenseRow(organizationId, meta, orgMap, "campus");
+    })
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+function getCampusDisplayOrder(name) {
+  const normalized = String(name || "").trim().toLowerCase();
+  const order = ["alangilan", "balayan", "lobo", "mabini"];
+  const index = order.indexOf(normalized);
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+}
+
+function buildLocalCollegeTopOffenseByOrganization() {
+  const offenseMapByOrg = buildLocalOffenseMapByOrganization();
+
+  return Array.from(organizationDirectory.entries())
+    .filter(([, meta]) => String(meta?.type || "").trim().toLowerCase() === "college")
+    .map(([organizationId, meta]) => buildTopOffenseRow(organizationId, meta, offenseMapByOrg.get(organizationId), "college"))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+function mergeCampusBreakdown(campusRows) {
+  const countsById = new Map();
+
+  (Array.isArray(campusRows) ? campusRows : []).forEach((row) => {
+    const organizationId = Number(row?.organizationId || row?.organization_id || 0);
+    if (!organizationId) return;
+    countsById.set(organizationId, Number(row?.count || 0));
+  });
+
+  const directoryRows = Array.from(organizationDirectory.entries()).map(([organizationId, meta]) => ({
+    organizationId,
+    name: meta?.name || `Organization ${organizationId}`,
+    type: meta?.type || "organization",
+    count: countsById.get(organizationId) || 0,
+  }));
+
+  if (directoryRows.length) {
+    return directoryRows.sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return String(a.name).localeCompare(String(b.name));
+    });
+  }
+
+  return Array.from(countsById.entries())
+    .map(([organizationId, count]) => ({
+      organizationId,
+      name: `Organization ${organizationId}`,
+      type: "organization",
+      count,
+    }))
+    .sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return String(a.name).localeCompare(String(b.name));
+    });
+}
+
+function hasAnyPositiveCampusCount(rows) {
+  return Array.isArray(rows) && rows.some((row) => Number(row?.count || 0) > 0);
+}
+
 function normalizeAnalyticsSummary(data) {
   const modules = Array.isArray(data?.modules)
     ? data.modules.map((module) => ({
@@ -782,6 +1310,39 @@ function normalizeAnalyticsSummary(data) {
         count: Number(module.count || 0),
         completed: Number(module.completed || 0),
         pending: Number(module.pending || 0),
+      }))
+    : [];
+
+  const campus = Array.isArray(data?.campus)
+    ? data.campus
+        .map((item) => ({
+          organizationId: Number(item.organizationId || 0),
+          name: String(item.name || "").trim(),
+          type: String(item.type || "").trim().toLowerCase(),
+          count: Number(item.count || 0),
+        }))
+        .filter((item) => item.name)
+    : [];
+
+  const campusTopOffense = Array.isArray(data?.campusTopOffense)
+    ? data.campusTopOffense.map((item) => ({
+        organizationId: Number(item.organizationId || 0),
+        name: String(item.name || "").trim(),
+        type: String(item.type || "").trim().toLowerCase(),
+        topOffense: item.topOffense ? String(item.topOffense).trim() : null,
+        topOffenseCount: Number(item.topOffenseCount || 0),
+        totalOffenseRecords: Number(item.totalOffenseRecords || 0),
+      }))
+    : [];
+
+  const collegeTopOffense = Array.isArray(data?.collegeTopOffense)
+    ? data.collegeTopOffense.map((item) => ({
+        organizationId: Number(item.organizationId || 0),
+        name: String(item.name || "").trim(),
+        type: String(item.type || "").trim().toLowerCase(),
+        topOffense: item.topOffense ? String(item.topOffense).trim() : null,
+        topOffenseCount: Number(item.topOffenseCount || 0),
+        totalOffenseRecords: Number(item.totalOffenseRecords || 0),
       }))
     : [];
 
@@ -795,6 +1356,9 @@ function normalizeAnalyticsSummary(data) {
       goodMoralFlags: Number(data?.totals?.goodMoralFlags || 0),
     },
     modules,
+    campus,
+    campusTopOffense,
+    collegeTopOffense,
     status: {
       completed: Number(data?.status?.completed || data?.totals?.completedRecords || 0),
       pending: Number(data?.status?.pending || data?.totals?.pendingRecords || 0),
@@ -816,6 +1380,23 @@ function normalizeAnalyticsSummary(data) {
 
 function getAnalyticsSummary() {
   return analyticsSummary || buildLocalAnalyticsSummary();
+}
+
+function shouldPreferLocalAnalytics(remoteSummary, localSummary) {
+  const remoteTotal = Number(remoteSummary?.totals?.totalRecords || 0);
+  const localTotal = Number(localSummary?.totals?.totalRecords || 0);
+  if (localTotal > 0 && remoteTotal === 0) {
+    return true;
+  }
+
+  const remoteModuleTotal = Array.isArray(remoteSummary?.modules)
+    ? remoteSummary.modules.reduce((sum, module) => sum + Number(module?.count || 0), 0)
+    : 0;
+  const localModuleTotal = Array.isArray(localSummary?.modules)
+    ? localSummary.modules.reduce((sum, module) => sum + Number(module?.count || 0), 0)
+    : 0;
+
+  return localModuleTotal > 0 && remoteModuleTotal === 0;
 }
 
 function getBusiestDay(trend) {
@@ -844,10 +1425,10 @@ function getAttentionModule(modules) {
 }
 
 function getTopOffenseBreakdown(limit = 6) {
-  const rows = ANALYTICS_MODULES.map((module) => ({
-    key: module.key,
-    name: module.label,
-    count: getModuleRecords(module.key).length,
+  const rows = TOP_OFFENSE_MODULES.map((moduleKey) => ({
+    key: moduleKey,
+    name: TOP_OFFENSE_LABELS[moduleKey] || moduleKey,
+    count: getModuleRecords(moduleKey).length,
   }))
     .sort((left, right) => {
       if (right.count !== left.count) return right.count - left.count;
@@ -1068,6 +1649,99 @@ function initializeInsightModal() {
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && analyticsInsightModal && !analyticsInsightModal.hidden) {
       closeInsightModal();
+    }
+  });
+}
+
+function formatSanctionSelection(article, section) {
+  return `${article} - ${section}`;
+}
+
+function renderSanctionPicker() {
+  if (!sanctionPickerList) return;
+  const selected = String(activeSanctionInput?.value || "").trim();
+
+  sanctionPickerList.innerHTML = SANCTIONS_BY_ARTICLE.map((entry, index) => {
+    const rows = entry.sections
+      .map((row) => {
+        const selection = formatSanctionSelection(entry.article, row.section);
+        const isSelected = selection === selected;
+        return `
+          <button
+            type="button"
+            class="sanction-picker-option ${isSelected ? "is-selected" : ""}"
+            data-sanction-article="${escapeHtml(entry.article)}"
+            data-sanction-section="${escapeHtml(row.section)}"
+          >
+            <strong>${escapeHtml(row.section)}</strong>
+            <span>${escapeHtml(row.description)}</span>
+          </button>
+        `;
+      })
+      .join("");
+
+    return `
+      <details class="sanction-picker-article" ${index === 0 ? "open" : ""}>
+        <summary>${escapeHtml(entry.article)}</summary>
+        <div class="sanction-picker-article-body">${rows}</div>
+      </details>
+    `;
+  }).join("");
+}
+
+function openSanctionPicker(input) {
+  if (!sanctionPickerModal || !sanctionPickerList || !input) return;
+  activeSanctionInput = input;
+  renderSanctionPicker();
+  sanctionPickerModal.hidden = false;
+}
+
+function closeSanctionPicker() {
+  if (!sanctionPickerModal) return;
+  sanctionPickerModal.hidden = true;
+  activeSanctionInput = null;
+}
+
+function initializeSanctionPicker() {
+  if (!sanctionPickerModal || !sanctionPickerList) return;
+
+  const sanctionInputs = [minorSanctionInput, majorSanctionInput].filter(Boolean);
+  sanctionInputs.forEach((input) => {
+    input.readOnly = true;
+    input.setAttribute("aria-haspopup", "dialog");
+    input.setAttribute("autocomplete", "off");
+    input.addEventListener("click", () => openSanctionPicker(input));
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openSanctionPicker(input);
+    });
+  });
+
+  sanctionPickerModal.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    if (target.closest("[data-sanction-modal-close='true']")) {
+      closeSanctionPicker();
+      return;
+    }
+
+    const option = target.closest("[data-sanction-article][data-sanction-section]");
+    if (!option || !activeSanctionInput) return;
+
+    const article = option.getAttribute("data-sanction-article") || "";
+    const section = option.getAttribute("data-sanction-section") || "";
+    const value = formatSanctionSelection(article, section);
+    activeSanctionInput.value = value;
+    activeSanctionInput.dispatchEvent(new Event("input", { bubbles: true }));
+    activeSanctionInput.dispatchEvent(new Event("change", { bubbles: true }));
+    closeSanctionPicker();
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && sanctionPickerModal && !sanctionPickerModal.hidden) {
+      closeSanctionPicker();
     }
   });
 }
@@ -1332,8 +2006,176 @@ function renderAnalyticsDonutChart(container, segments) {
   `;
 }
 
+function renderAnalyticsCampusChart(container, campusData) {
+  if (!container) return;
+
+  const buildLegendRows = (rows, getColor) => rows
+    .map((campus) => {
+      const typeLabel = campus.type === "campus" ? "Campus" : campus.type === "college" ? "College" : "Org";
+      const rowColor = typeof getColor === "function" ? getColor(campus) : "#cbd5e1";
+      return `
+        <div class="analytics-campus-row ${Number(campus.count || 0) === 0 ? "is-zero" : ""}">
+          <span class="analytics-campus-swatch" style="background:${rowColor};"></span>
+          <span class="analytics-campus-name">${escapeHtml(campus.name || "")}</span>
+          <span class="analytics-campus-count">${Number(campus.count || 0)}</span>
+          <span class="analytics-campus-type">${typeLabel}</span>
+        </div>
+      `;
+    })
+    .join("");
+
+  if (!campusData || !campusData.length) {
+    container.innerHTML = `
+      <div class="analytics-campus-wrap analytics-donut-wrap no-graph">
+        <div class="analytics-campus-list">
+          <div class="analytics-chart-empty" style="min-height:auto; padding:12px 14px;">No campus data available yet.</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const total = campusData.reduce((sum, campus) => sum + campus.count, 0);
+  if (!total) {
+    const zeroLegend = buildLegendRows(campusData);
+
+    container.innerHTML = `
+      <div class="analytics-campus-wrap analytics-donut-wrap no-graph">
+        <div class="analytics-campus-list">${zeroLegend}</div>
+      </div>
+    `;
+    return;
+  }
+
+  const size = 280;
+  const radius = 92;
+  const strokeWidth = 28;
+  const circumference = 2 * Math.PI * radius;
+  let accumulated = 0;
+
+  const fixedOrgColors = {
+    alangilan: "#a41321",
+    mabini: "#0f766e",
+    balayan: "#1d4ed8",
+    lobo: "#0891b2",
+    cics: "#ec4899",
+    coe: "#f59e0b",
+    cet: "#64748b",
+    cafad: "#059669",
+  };
+
+  const fallbackPalette = [
+    "#a41321", "#ec4899", "#0891b2", "#0f766e", "#1d4ed8", "#64748b", "#059669", "#f59e0b",
+  ];
+
+  const hashString = (text) => {
+    let hash = 0;
+    const normalized = String(text || "");
+    for (let i = 0; i < normalized.length; i += 1) {
+      hash = (hash << 5) - hash + normalized.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash);
+  };
+
+  const getOrganizationColor = (campus) => {
+    const nameKey = String(campus.name || "").trim().toLowerCase();
+    if (nameKey && fixedOrgColors[nameKey]) {
+      return fixedOrgColors[nameKey];
+    }
+    const key = campus.organizationId || nameKey || campus.name || "organization";
+    return fallbackPalette[hashString(key) % fallbackPalette.length];
+  };
+
+  const circles = campusData
+    .filter((campus) => campus.count > 0)
+    .map((campus) => {
+      const dashLength = (campus.count / total) * circumference;
+      const color = getOrganizationColor(campus);
+      const percent = total ? Math.round((campus.count / total) * 100) : 0;
+      const typeLabel = campus.type === "campus"
+        ? "Campus"
+        : campus.type === "college"
+          ? "College"
+          : "Organization";
+      const tooltip = `${campus.name}: ${campus.count} (${percent}%)`;
+      const circle = `
+        <circle
+          cx="${size / 2}"
+          cy="${size / 2}"
+          r="${radius}"
+          fill="none"
+          stroke="${color}"
+          stroke-width="${strokeWidth}"
+          stroke-linecap="round"
+          stroke-dasharray="${dashLength} ${circumference - dashLength}"
+          stroke-dashoffset="${-accumulated}"
+          transform="rotate(-90 ${size / 2} ${size / 2})"
+          data-campus-name="${escapeHtml(campus.name)}"
+          data-campus-type="${escapeHtml(typeLabel)}"
+          data-campus-count="${campus.count}"
+          data-campus-percent="${percent}"
+        >
+        </circle>
+      `;
+      accumulated += dashLength;
+      return { circle, color, typeLabel, tooltip, ...campus };
+    });
+
+  const legendsMarkup = buildLegendRows(campusData, getOrganizationColor);
+
+  container.innerHTML = `
+    <div class="analytics-campus-wrap analytics-donut-wrap">
+      <div class="analytics-campus-chart-shell">
+        <svg viewBox="0 0 ${size} ${size}" class="analytics-svg analytics-donut-svg" role="img" aria-label="Campus distribution chart">
+          <circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="none" stroke="rgba(15, 23, 42, 0.08)" stroke-width="${strokeWidth}"></circle>
+          ${circles.map((c) => c.circle).join("")}
+          <text x="${size / 2}" y="${size / 2 - 14}" class="analytics-donut-value">${total}</text>
+          <text x="${size / 2}" y="${size / 2 + 8}" class="analytics-donut-label">records</text>
+        </svg>
+        <div class="analytics-campus-tooltip" aria-hidden="true"></div>
+      </div>
+      <div class="analytics-campus-list">
+        ${legendsMarkup}
+      </div>
+    </div>
+  `;
+
+  const tooltip = container.querySelector(".analytics-campus-tooltip");
+  const chartShell = container.querySelector(".analytics-campus-chart-shell");
+  const svg = container.querySelector(".analytics-donut-svg");
+  const showTooltip = (event, circle) => {
+    if (!tooltip || !circle || !chartShell) return;
+    const name = circle.getAttribute("data-campus-name") || "";
+    const type = circle.getAttribute("data-campus-type") || "";
+    const count = circle.getAttribute("data-campus-count") || "0";
+    const percent = circle.getAttribute("data-campus-percent") || "0";
+    tooltip.innerHTML = `<strong>${escapeHtml(name)}</strong><span>${escapeHtml(type)} · ${count} · ${percent}%</span>`;
+    tooltip.classList.add("is-visible");
+    const rect = chartShell.getBoundingClientRect();
+    const x = Math.min(Math.max(event.clientX - rect.left + 14, 12), rect.width - 180);
+    const y = Math.min(Math.max(event.clientY - rect.top + 14, 12), rect.height - 64);
+    tooltip.style.left = `${x}px`;
+    tooltip.style.top = `${y}px`;
+  };
+
+  const hideTooltip = () => {
+    if (tooltip) {
+      tooltip.classList.remove("is-visible");
+    }
+  };
+
+  svg?.querySelectorAll("circle[data-campus-name]").forEach((circle) => {
+    circle.addEventListener("pointerenter", (event) => showTooltip(event, circle));
+    circle.addEventListener("pointermove", (event) => showTooltip(event, circle));
+    circle.addEventListener("pointerleave", hideTooltip);
+  });
+}
+
 function renderAnalyticsModule(summary = null) {
-  const analytics = summary || getAnalyticsSummary();
+  const remoteSummary = summary || getAnalyticsSummary();
+  const localSummary = buildLocalAnalyticsSummary();
+  const analytics = shouldPreferLocalAnalytics(remoteSummary, localSummary) ? localSummary : remoteSummary;
   const activePeriod = getAcademicPeriodRange();
   const trendTitle = activePeriod ? `${activePeriod.semester} AY ${activePeriod.year}` : "Selected Academic Period";
   const totalRecords = analytics.totals.totalRecords;
@@ -1401,10 +2243,91 @@ function renderAnalyticsModule(summary = null) {
   renderAnalyticsBarList(analyticsModuleChart, analytics.modules);
   const moduleTrend = buildModuleTrendSeries(activePeriod);
   renderAnalyticsTrendChart(analyticsTrendChart, moduleTrend.labels, moduleTrend.series);
-  renderAnalyticsDonutChart(analyticsStatusChart, [
-    { label: "Completed", value: completedRecords, color: "#0f766e" },
-    { label: "Pending", value: pendingRecords, color: "#a41321" },
-  ]);
+
+  // Head in All Campuses mode sees the status card as campus/college distribution.
+  const remoteOrLocalCampus = Array.isArray(analytics.campus) ? analytics.campus : buildLocalCampusBreakdown();
+  let campusData = mergeCampusBreakdown(remoteOrLocalCampus);
+
+  // Defensive fallback: if grouped campus counts are all zero but records exist, rebuild from loaded rows.
+  if (!hasAnyPositiveCampusCount(campusData) && totalRecords > 0) {
+    campusData = mergeCampusBreakdown(buildLocalCampusBreakdown());
+  }
+  const showCampusBreakdown = canAccessAllOrganizations() && !selectedHeadOrganizationId;
+
+  if (showCampusBreakdown) {
+    const groupedSummary = campusData.map((item) => ({ name: item.name, count: item.count }));
+    console.debug("[Analytics][All Campus] totalRecords:", totalRecords, "groupedCampus:", groupedSummary);
+  }
+
+  if (showCampusBreakdown) {
+    if (analyticsStatusKicker) analyticsStatusKicker.textContent = "Records Distribution";
+    if (analyticsStatusTitle) analyticsStatusTitle.textContent = "By Campus & College";
+    if (analyticsStatusPill) analyticsStatusPill.textContent = "Organization breakdown";
+    const campusDistributionRows = campusData.filter((row) => !isAlangilanCampusOrganization(row));
+    renderAnalyticsCampusChart(analyticsStatusChart, campusDistributionRows);
+  } else {
+    if (analyticsStatusKicker) analyticsStatusKicker.textContent = "Process Health";
+    if (analyticsStatusTitle) analyticsStatusTitle.textContent = "Open vs Completed";
+    if (analyticsStatusPill) analyticsStatusPill.textContent = "Case status";
+    renderAnalyticsDonutChart(analyticsStatusChart, [
+      { label: "Completed", value: completedRecords, color: "#0f766e" },
+      { label: "Pending", value: pendingRecords, color: "#a41321" },
+    ]);
+  }
+
+  if (analyticsCollegeTopOffenseCard && analyticsCollegeTopOffenseList) {
+    const campusRows = Array.isArray(analytics.campusTopOffense) && analytics.campusTopOffense.length
+      ? analytics.campusTopOffense
+      : buildLocalCampusTopOffenseByOrganization();
+    const collegeRows = Array.isArray(analytics.collegeTopOffense) && analytics.collegeTopOffense.length
+      ? analytics.collegeTopOffense
+      : buildLocalCollegeTopOffenseByOrganization();
+
+    if (showCampusBreakdown && (campusRows.length || collegeRows.length)) {
+      analyticsCollegeTopOffenseCard.hidden = false;
+      if (analyticsCampusTopOffenseList) {
+        analyticsCampusTopOffenseList.innerHTML = campusRows
+          .sort((a, b) => {
+            const orderDiff = getCampusDisplayOrder(a.name) - getCampusDisplayOrder(b.name);
+            if (orderDiff !== 0) return orderDiff;
+            return String(a.name || "").localeCompare(String(b.name || ""));
+          })
+          .map((row) => `
+            <div class="analytics-college-offense-row">
+              <div class="analytics-college-offense-org">
+                <strong>${escapeHtml(row.name || "--")}</strong>
+                <span>${escapeHtml(String(row.type || "campus").toUpperCase())}</span>
+              </div>
+              <div class="analytics-college-offense-main">
+                <span class="analytics-college-offense-name">${escapeHtml(row.topOffense || "No offense record yet")}</span>
+                <span class="analytics-college-offense-meta">${row.topOffenseCount || 0} count</span>
+              </div>
+            </div>
+          `)
+          .join("");
+      }
+
+      analyticsCollegeTopOffenseList.innerHTML = collegeRows
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+        .map((row) => `
+          <div class="analytics-college-offense-row">
+            <div class="analytics-college-offense-org">
+              <strong>${escapeHtml(row.name || "--")}</strong>
+              <span>${escapeHtml(String(row.type || "college").toUpperCase())}</span>
+            </div>
+            <div class="analytics-college-offense-main">
+              <span class="analytics-college-offense-name">${escapeHtml(row.topOffense || "No offense record yet")}</span>
+              <span class="analytics-college-offense-meta">${row.topOffenseCount || 0} count</span>
+            </div>
+          </div>
+        `)
+        .join("");
+    } else {
+      analyticsCollegeTopOffenseCard.hidden = true;
+      if (analyticsCampusTopOffenseList) analyticsCampusTopOffenseList.innerHTML = "";
+      analyticsCollegeTopOffenseList.innerHTML = "";
+    }
+  }
 }
 
 function formatDashboardDetail(item) {
@@ -1509,7 +2432,192 @@ function flagGoodMoralFromMinor() {
   }));
 }
 
-function openPrintView() {
+function normalizeGoodMoralStudentKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getGoodMoralOffenseMatches(srCode) {
+  const normalizedSrCode = normalizeGoodMoralStudentKey(srCode);
+  const sortNewestFirst = (left, right) => {
+    const leftDate = new Date(left.date_of_complaint || left.date || 0).getTime();
+    const rightDate = new Date(right.date_of_complaint || right.date || 0).getTime();
+    return rightDate - leftDate;
+  };
+
+  const minorMatches = minorRecords
+    .filter((record) => normalizeGoodMoralStudentKey(record.sr_code) === normalizedSrCode)
+    .sort(sortNewestFirst);
+  const majorMatches = majorRecords
+    .filter((record) => normalizeGoodMoralStudentKey(record.sr_code) === normalizedSrCode)
+    .sort(sortNewestFirst);
+
+  return {
+    srCode: normalizedSrCode,
+    minorMatches,
+    majorMatches,
+    minorCount: minorMatches.length,
+    majorCount: majorMatches.length,
+    totalCount: minorMatches.length + majorMatches.length,
+  };
+}
+
+function buildGoodMoralOffenseBadges(record) {
+  const summary = getGoodMoralOffenseMatches(record.sr_code);
+  const studentLabel = escapeHtml(record.name || record.name_of_student || "Student");
+  const srCodeLabel = escapeHtml(record.sr_code || "");
+  const badges = [];
+
+  if (summary.minorCount > 0) {
+    badges.push(`
+      <button type="button" class="tag tag-alert goodmoral-offense-tag" data-goodmoral-offense-view="minor" data-goodmoral-offense-id="${escapeHtml(String(record.id || ""))}" aria-label="View ${summary.minorCount} minor offense record${summary.minorCount === 1 ? "" : "s"} for ${studentLabel} ${srCodeLabel}">
+        ${summary.minorCount} Minor Offense${summary.minorCount === 1 ? "" : "s"}
+      </button>
+    `);
+  }
+
+  if (summary.majorCount > 0) {
+    badges.push(`
+      <button type="button" class="tag tag-alert goodmoral-offense-tag" data-goodmoral-offense-view="major" data-goodmoral-offense-id="${escapeHtml(String(record.id || ""))}" aria-label="View ${summary.majorCount} major offense record${summary.majorCount === 1 ? "" : "s"} for ${studentLabel} ${srCodeLabel}">
+        ${summary.majorCount} Major Offense${summary.majorCount === 1 ? "" : "s"}
+      </button>
+    `);
+  }
+
+  return badges.join(" ");
+}
+
+function buildGoodMoralOffenseRecordCard(record, offenseLabel) {
+  const dateValue = formatDate(record.date_of_complaint || record.date || record.created_at);
+  const detail = [record.offense, record.sanction].filter((value) => String(value || "").trim()).join(" • ");
+  return `
+    <div class="analytics-insight-record-item">
+      <div>
+        <strong>${escapeHtml(record.name_of_student || record.name || "Unnamed Student")}</strong>
+        <span>${escapeHtml(offenseLabel)} • ${escapeHtml(dateValue)}</span>
+        <small>${escapeHtml(detail || "No offense details provided")}</small>
+      </div>
+      <small>${escapeHtml(record.sr_code || "")}</small>
+    </div>
+  `;
+}
+
+function closeGoodMoralOffenseModal() {
+  if (!goodmoralOffenseModal) return;
+  goodmoralOffenseModal.hidden = true;
+  pendingGoodmoralSubmission = null;
+  goodmoralOffenseModalBody.innerHTML = "";
+  goodmoralOffenseModalSubtitle.textContent = "";
+  if (goodmoralOffenseModalActions) {
+    goodmoralOffenseModalActions.hidden = false;
+  }
+}
+
+function openGoodMoralOffenseModal({ record, mode, offenseType, confirmText }) {
+  if (!goodmoralOffenseModal || !goodmoralOffenseModalTitle || !goodmoralOffenseModalBody || !record) return;
+
+  const summary = getGoodMoralOffenseMatches(record.sr_code);
+  const studentName = record.name || record.name_of_student || "Student";
+  const srCode = record.sr_code || "";
+  const offenseLabel = offenseType === "minor" ? "Minor Offenses" : offenseType === "major" ? "Major Offenses" : "Offense Records";
+
+  goodmoralOffenseModal.hidden = false;
+  goodmoralOffenseModalTitle.textContent = mode === "confirm" ? "Are you sure?" : offenseLabel;
+  goodmoralOffenseModalSubtitle.textContent = `${studentName}${srCode ? ` • ${srCode}` : ""}`;
+
+  if (mode === "confirm") {
+    const minorSection = summary.minorCount
+      ? `
+        <div class="goodmoral-offense-section">
+          <div class="goodmoral-offense-section-header">
+            <span class="goodmoral-offense-badge goodmoral-offense-badge-minor">${summary.minorCount}</span>
+            <h4>Minor Offense${summary.minorCount === 1 ? "" : "s"}</h4>
+          </div>
+          <div class="goodmoral-offense-section-records">
+            ${summary.minorMatches.map((item) => buildGoodMoralOffenseRecordCard(item, "Minor Offense")).join("")}
+          </div>
+        </div>
+      `
+      : `
+        <div class="goodmoral-offense-section">
+          <div class="goodmoral-offense-section-empty">
+            <span class="goodmoral-offense-empty-icon">—</span>
+            <span class="goodmoral-offense-empty-text">No Minor Offenses</span>
+          </div>
+        </div>
+      `;
+
+    const majorSection = summary.majorCount
+      ? `
+        <div class="goodmoral-offense-section">
+          <div class="goodmoral-offense-section-header">
+            <span class="goodmoral-offense-badge goodmoral-offense-badge-major">${summary.majorCount}</span>
+            <h4>Major Offense${summary.majorCount === 1 ? "" : "s"}</h4>
+          </div>
+          <div class="goodmoral-offense-section-records">
+            ${summary.majorMatches.map((item) => buildGoodMoralOffenseRecordCard(item, "Major Offense")).join("")}
+          </div>
+        </div>
+      `
+      : `
+        <div class="goodmoral-offense-section">
+          <div class="goodmoral-offense-section-empty">
+            <span class="goodmoral-offense-empty-icon">—</span>
+            <span class="goodmoral-offense-empty-text">No Major Offenses</span>
+          </div>
+        </div>
+      `;
+
+    goodmoralOffenseModalBody.innerHTML = `
+      ${minorSection}
+      ${majorSection}
+    `;
+    if (goodmoralOffenseModalActions) {
+      goodmoralOffenseModalActions.hidden = false;
+    }
+    if (goodmoralOffenseConfirmBtn) {
+      goodmoralOffenseConfirmBtn.textContent = confirmText || "Save Record";
+    }
+    return;
+  }
+
+  const filteredRecords = offenseType === "major" ? summary.majorMatches : summary.minorMatches;
+  const filteredLabel = offenseType === "major" ? "Major Offense" : "Minor Offense";
+  const badgeClass = offenseType === "major" ? "goodmoral-offense-badge-major" : "goodmoral-offense-badge-minor";
+  
+  goodmoralOffenseModalBody.innerHTML = `
+    <div class="goodmoral-offense-section">
+      <div class="goodmoral-offense-section-header">
+        <span class="goodmoral-offense-badge ${badgeClass}">${filteredRecords.length}</span>
+        <h4>${filteredLabel}${filteredRecords.length === 1 ? "" : "s"}</h4>
+      </div>
+      <div class="goodmoral-offense-section-records">
+        ${filteredRecords.length
+          ? filteredRecords.map((item) => buildGoodMoralOffenseRecordCard(item, filteredLabel)).join("")
+          : `<div class="goodmoral-offense-section-empty"><span class="goodmoral-offense-empty-icon">—</span><span class="goodmoral-offense-empty-text">No matching ${filteredLabel.toLowerCase()} records</span></div>`}
+      </div>
+    </div>
+  `;
+
+  if (goodmoralOffenseModalActions) {
+    goodmoralOffenseModalActions.hidden = true;
+  }
+}
+
+async function saveGoodMoralRecord(payload, editId) {
+  try {
+    if (editId) await updateRow(TABLES.goodmoral, editId, payload);
+    else await createRow(TABLES.goodmoral, payload);
+
+    setFormEditState(goodmoralForm, false);
+    goodmoralStatus.textContent = editId ? "Record updated." : "Record saved.";
+    await loadGoodmoralRecords();
+    await loadDashboard();
+  } catch (error) {
+    goodmoralStatus.textContent = error.message || "Something went wrong. Please try again.";
+  }
+}
+
+async function openPrintView() {
   const table = document.querySelector("#minor .table-wrap table");
 
   if (!table) return;
@@ -1519,7 +2627,7 @@ function openPrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -1548,7 +2656,7 @@ function openPrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -1566,12 +2674,9 @@ function openPrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
-function openMajorPrintView() {
+async function openMajorPrintView() {
   const table = document.querySelector("#major .table-wrap table");
   const title = document.querySelector("#major .log-title");
 
@@ -1582,7 +2687,7 @@ function openMajorPrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -1611,7 +2716,7 @@ function openMajorPrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -1626,12 +2731,9 @@ function openMajorPrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
-function openUniformPrintView() {
+async function openUniformPrintView() {
   const table = document.querySelector("#uniform .table-wrap table");
   const title = document.querySelector("#uniform .log-title");
 
@@ -1642,7 +2744,7 @@ function openUniformPrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -1671,7 +2773,7 @@ function openUniformPrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -1686,12 +2788,9 @@ function openUniformPrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
-function openGatepassPrintView() {
+async function openGatepassPrintView() {
   const table = document.querySelector("#gatepass .table-wrap table");
   const title = document.querySelector("#gatepass .log-title");
 
@@ -1702,7 +2801,7 @@ function openGatepassPrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -1731,7 +2830,7 @@ function openGatepassPrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -1746,12 +2845,9 @@ function openGatepassPrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
-function openGoodmoralPrintView() {
+async function openGoodmoralPrintView() {
   const table = document.querySelector("#goodmoral .table-wrap table");
   const title = document.querySelector("#goodmoral .log-title");
 
@@ -1762,7 +2858,7 @@ function openGoodmoralPrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -1791,7 +2887,7 @@ function openGoodmoralPrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -1806,12 +2902,9 @@ function openGoodmoralPrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
-function openIdreplacementPrintView() {
+async function openIdreplacementPrintView() {
   const table = document.querySelector("#idreplacement .table-wrap table");
   const title = document.querySelector("#idreplacement .log-title");
 
@@ -1822,7 +2915,7 @@ function openIdreplacementPrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -1851,7 +2944,7 @@ function openIdreplacementPrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -1866,12 +2959,9 @@ function openIdreplacementPrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
-function openLeaveofabsencePrintView() {
+async function openLeaveofabsencePrintView() {
   const table = document.querySelector("#leaveofabsence .table-wrap table");
   const title = document.querySelector("#leaveofabsence .log-title");
 
@@ -1882,7 +2972,7 @@ function openLeaveofabsencePrintView() {
   const printWindow = window.open("", "_blank", "width=980,height=720");
   if (!printWindow) return;
 
-  printWindow.document.write(`
+  await writePrintDocument(printWindow, `
     <!doctype html>
     <html>
       <head>
@@ -1911,7 +3001,7 @@ function openLeaveofabsencePrintView() {
       </head>
       <body>
         <div class="header-container">
-          <img src="assets/logo.png" alt="BSU Logo" class="header-logo" />
+          <img src="${getAssetUrl("assets/logo.png")}" alt="BSU Logo" class="header-logo" />
           <div class="header-text">
             <h1>Republic of the Philippines</h1>
             <h2>Batangas State University</h2>
@@ -1926,9 +3016,6 @@ function openLeaveofabsencePrintView() {
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
 const archiveConfig = {
@@ -2087,7 +3174,7 @@ function renderMajorRows(records) {
       <td>${record.sanction || ""}</td>
       <td>${formatDate(record.date_of_suspension)}</td>
       <td>${formatDate(record.date_of_post_counseling)}</td>
-      <td>${renderRecordActions(record.id)}</td>
+      <td>${renderMajorRecordActions(record.id)}</td>
     `;
     majorTableBody.appendChild(row);
   });
@@ -2159,16 +3246,14 @@ function renderGoodmoralRows(records) {
   }
 
   records.forEach((record, index) => {
-    const tag = record.has_minor_offense
-      ? `<span class="tag tag-alert">Minor Offense</span>`
-      : "";
+    const offenseBadges = buildGoodMoralOffenseBadges(record);
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${index + 1}</td>
       <td>${formatDate(record.date)}</td>
       <td>${record.time_in || ""}</td>
       <td>${record.time_out || ""}</td>
-      <td>${record.name || ""} ${tag}</td>
+      <td>${record.name || ""}${offenseBadges ? `<span class="goodmoral-offense-tags">${offenseBadges}</span>` : ""}</td>
       <td>${record.sr_code || ""}</td>
       <td>${record.course || ""}</td>
       <td>${record.sex === "M" ? "✔" : ""}</td>
@@ -2177,6 +3262,23 @@ function renderGoodmoralRows(records) {
       <td>${renderRecordActions(record.id)}</td>
     `;
     goodmoralTableBody.appendChild(row);
+  });
+}
+
+if (goodmoralTableBody) {
+  goodmoralTableBody.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const offenseButton = target.closest("[data-goodmoral-offense-view]");
+    if (!offenseButton) return;
+
+    const recordId = offenseButton.getAttribute("data-goodmoral-offense-id") || "";
+    const offenseType = offenseButton.getAttribute("data-goodmoral-offense-view") || "minor";
+    const record = goodmoralRecords.find((row) => String(row.id) === recordId) || null;
+    if (!record) return;
+
+    openGoodMoralOffenseModal({ record, mode: "view", offenseType });
   });
 }
 
@@ -2423,8 +3525,9 @@ function attachRowActions({ tableElement, tableName, getRecords, form, fields, r
   tableElement.addEventListener("click", async (event) => {
     const editButton = event.target.closest("[data-action='edit']");
     const archiveButton = event.target.closest("[data-action='archive']");
+    const dismissButton = event.target.closest("[data-action='dismiss']");
 
-    if ((editButton || archiveButton) && !canEditRecords()) {
+    if ((editButton || archiveButton || dismissButton) && !canEditRecords()) {
       alert("Read-only access: Head can view and export records only.");
       return;
     }
@@ -2455,6 +3558,21 @@ function attachRowActions({ tableElement, tableName, getRecords, form, fields, r
     } catch (error) {
       alert(error.message || "Unable to archive record.");
     }
+    }
+
+    if (dismissButton) {
+      const id = dismissButton.dataset.id;
+      if (!id) return;
+      const confirmed = window.confirm("Are you sure you want to move this case to dismissal?");
+      if (!confirmed) return;
+
+      try {
+        await dismissMajorRow(id);
+        sessionStorage.setItem("caseDismissalNotice", "Case moved to dismissal successfully.");
+        window.location.href = CASE_DISMISSAL_PAGE;
+      } catch (error) {
+        alert(error.message || "Unable to move case to dismissal.");
+      }
     }
   });
 }
@@ -2514,6 +3632,16 @@ function normalizeSemesterLabel(value) {
   }
 
   return "";
+}
+
+function getSemesterFilterCandidates(value) {
+  const normalized = normalizeSemesterLabel(value);
+  if (!normalized) return [];
+
+  const variants = [normalized];
+  if (normalized === "First Semester") variants.push("1st Semester");
+  if (normalized === "Second Semester") variants.push("2nd Semester");
+  return Array.from(new Set(variants));
 }
 
 function setAcademicPeriod(year, semester) {
@@ -2604,6 +3732,57 @@ function getAcademicPeriodRange() {
   };
 }
 
+function getAssetUrl(path) {
+  return new URL(path, window.location.href).href;
+}
+
+function waitForPrintImages(printWindow) {
+  const images = Array.from(printWindow.document.images || []);
+
+  if (images.length === 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let remaining = images.length;
+    let resolved = false;
+
+    const finish = () => {
+      if (resolved) return;
+      resolved = true;
+      resolve();
+    };
+
+    const markDone = () => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        finish();
+      }
+    };
+
+    images.forEach((image) => {
+      if (image.complete) {
+        markDone();
+        return;
+      }
+
+      image.addEventListener("load", markDone, { once: true });
+      image.addEventListener("error", markDone, { once: true });
+    });
+
+    setTimeout(finish, 1500);
+  });
+}
+
+async function writePrintDocument(printWindow, html) {
+  printWindow.document.open();
+  printWindow.document.write(html);
+  printWindow.document.close();
+  await waitForPrintImages(printWindow);
+  printWindow.focus();
+  printWindow.print();
+}
+
 function initializeAcademicPeriod() {
   const { year, semester } = getAcademicPeriod();
   setAcademicPeriod(year, semester);
@@ -2667,6 +3846,8 @@ async function loadAnalyticsSummary() {
 
     const query = new URLSearchParams();
     const period = getAcademicPeriodRange();
+    console.log("Selected Year:", period?.year || null);
+    console.log("Selected Semester:", period?.semester || null);
     if (canAccessAllOrganizations() && selectedHeadOrganizationId) {
       query.set("organization_id", String(selectedHeadOrganizationId));
     }
@@ -2704,23 +3885,13 @@ async function loadDashboard() {
     (item) => !String(item.sanction || "").trim() || !item.date_of_sanction
   ).length;
 
-  const start = new Date();
-  start.setDate(start.getDate() - 6);
-  const startMs = start.setHours(0, 0, 0, 0);
-  const nowMs = new Date().setHours(23, 59, 59, 999);
-  const resolvedThisWeek = [...minorRecords, ...majorRecords].filter((item) => {
-    if (!item.date_of_sanction) return false;
-    const value = new Date(item.date_of_sanction).getTime();
-    return !Number.isNaN(value) && value >= startMs && value <= nowMs;
-  }).length;
-
   const followUpsDue = [...uniformRecords, ...gatepassRecords, ...goodmoralRecords].filter(
     (item) => !String(item.time_out || "").trim()
   ).length;
 
   if (statActive) statActive.textContent = activeCases;
   if (statPending) statPending.textContent = pendingSanctions;
-  if (statResolved) statResolved.textContent = resolvedThisWeek;
+  if (statResolveCases) statResolveCases.textContent = activeCases - pendingSanctions;
   if (statFollowups) statFollowups.textContent = followUpsDue;
 }
 
@@ -2793,6 +3964,9 @@ async function reloadAllDataForCurrentScope() {
       Promise.resolve(getAcademicPeriodRange()),
     ]);
 
+    console.log("Selected Year:", period?.year || null);
+    console.log("Selected Semester:", period?.semester || null);
+
     const queryContext = { orgId, period };
     const [
       minorResult,
@@ -2802,7 +3976,6 @@ async function reloadAllDataForCurrentScope() {
       goodmoralResult,
       idreplacementResult,
       leaveofabsenceResult,
-      analyticsResult,
     ] = await Promise.allSettled([
       fetchTableRows(TABLES.minor, "date_of_complaint", queryContext),
       fetchTableRows(TABLES.major, "date_of_complaint", queryContext),
@@ -2811,7 +3984,6 @@ async function reloadAllDataForCurrentScope() {
       fetchTableRows(TABLES.goodmoral, "date", queryContext),
       fetchTableRows(TABLES.idreplacement, "date", queryContext),
       fetchTableRows(TABLES.leaveofabsence, "date", queryContext),
-      loadAnalyticsSummary(),
     ]);
 
     minorRecords = minorResult.status === "fulfilled" ? (minorResult.value || []) : [];
@@ -2833,7 +4005,9 @@ async function reloadAllDataForCurrentScope() {
     updateDashboardCounters();
     await loadDashboard();
 
-    if (analyticsResult.status === "rejected") {
+    try {
+      await loadAnalyticsSummary();
+    } catch {
       analyticsSummary = null;
       renderAnalyticsModule();
     }
@@ -2899,6 +4073,7 @@ if (reportButton) {
 
 switchTab(getPreferredTab(), { persist: false });
 initializeInsightModal();
+initializeSanctionPicker();
 
 
 if (recordForm) {
@@ -3012,21 +4187,51 @@ if (goodmoralForm) {
       goodmoralStatus.textContent = "Read-only access: Head can view and export only.";
       return;
     }
-    goodmoralStatus.textContent = "Saving record...";
     const formData = new FormData(goodmoralForm);
     const payload = Object.fromEntries(formData.entries());
     const editId = goodmoralForm.dataset.editId;
+    const offenseSummary = getGoodMoralOffenseMatches(payload.sr_code);
 
-    try {
-      if (editId) await updateRow(TABLES.goodmoral, editId, payload);
-      else await createRow(TABLES.goodmoral, payload);
+    if (offenseSummary.totalCount > 0) {
+      pendingGoodmoralSubmission = { payload, editId };
+      goodmoralStatus.textContent = "Existing offense records found. Review the popup before saving.";
+      openGoodMoralOffenseModal({
+        record: payload,
+        mode: "confirm",
+        confirmText: editId ? "Confirm Update" : "Save Record",
+      });
+      return;
+    }
 
-      setFormEditState(goodmoralForm, false);
-      goodmoralStatus.textContent = editId ? "Record updated." : "Record saved.";
-      await loadGoodmoralRecords();
-      await loadDashboard();
-    } catch (error) {
-      goodmoralStatus.textContent = error.message || "Something went wrong. Please try again.";
+    goodmoralStatus.textContent = "Saving record...";
+    await saveGoodMoralRecord(payload, editId);
+  });
+}
+
+if (goodmoralOffenseConfirmBtn) {
+  goodmoralOffenseConfirmBtn.addEventListener("click", async () => {
+    if (!pendingGoodmoralSubmission) return;
+    const { payload, editId } = pendingGoodmoralSubmission;
+    pendingGoodmoralSubmission = null;
+    closeGoodMoralOffenseModal();
+    goodmoralStatus.textContent = "Saving record...";
+    await saveGoodMoralRecord(payload, editId);
+  });
+}
+
+if (goodmoralOffenseModal) {
+  goodmoralOffenseModal.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest("[data-goodmoral-offense-close='true']")) {
+      closeGoodMoralOffenseModal();
+      return;
+    }
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && goodmoralOffenseModal && !goodmoralOffenseModal.hidden) {
+      closeGoodMoralOffenseModal();
     }
   });
 }
@@ -3131,7 +4336,6 @@ document.querySelectorAll("[data-archive]").forEach((button) => {
   });
 });
 
-reloadAllDataForCurrentScope();
 updateDashboardCounters();
 initializeAcademicPeriod();
 
@@ -3262,12 +4466,12 @@ attachCancelEdit(leaveofabsenceForm);
     }
 
     hasGlobalHeadAccess =
-      String(userAccount?.role || "").trim().toLowerCase() === ROLE_HEAD &&
-      String(userAccount?.organizations?.name || "").trim().toLowerCase() === "alangilan";
+      String(userAccount?.role || "").trim().toLowerCase() === ROLE_HEAD;
     
     if (userAccount && userAccount.organization_id) {
       localStorage.setItem("organizationId", String(userAccount.organization_id));
       currentOrganizationId = userAccount.organization_id;
+      currentUserId = session.user.id;
     }
 
     if (userAccount && userAccount.role === ROLE_ADMIN) {
@@ -3279,10 +4483,12 @@ attachCancelEdit(leaveofabsenceForm);
     if (userAccount && userAccount.role === ROLE_HEAD) {
       applyHeadInterfaceRestrictions();
       await initializeHeadOrganizationFilter();
-      await reloadAllDataForCurrentScope();
     }
+
+    await reloadAllDataForCurrentScope();
   } catch (error) {
     // user_accounts table doesn't exist or RLS blocking - ignore and continue
     console.log("Could not check user role, continuing anyway");
+    await reloadAllDataForCurrentScope();
   }
 })();

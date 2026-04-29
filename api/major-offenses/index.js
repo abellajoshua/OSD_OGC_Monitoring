@@ -4,6 +4,10 @@ const {
   getRequestUserContext,
   getScopedOrganizationId,
   applyOrganizationScope,
+  applyAcademicPeriodScope,
+  applyActiveRecordsScope,
+  logApiFlow,
+  getAcademicPeriodFromPayload,
   ensureRole,
   getErrorStatus,
 } = require("../_supabase");
@@ -34,11 +38,20 @@ module.exports = async (req, res) => {
         .order("date_of_complaint", { ascending: false })
         .order("id", { ascending: false });
       query = applyOrganizationScope(query, scopedOrganizationId);
+      query = applyAcademicPeriodScope(query, req.query);
+      query = applyActiveRecordsScope(query);
       const { data, error } = await query;
 
       if (error) {
         return res.status(500).json({ error: error.message });
       }
+
+      logApiFlow("major_offenses.GET", {
+        organizationId: scopedOrganizationId || null,
+        academicYear: String(req?.query?.academic_year || "").trim() || null,
+        semester: String(req?.query?.semester || "").trim() || null,
+        rowCount: (data || []).length,
+      });
 
       return res.status(200).json(data || []);
     }
@@ -46,23 +59,50 @@ module.exports = async (req, res) => {
     if (req.method === "POST") {
       ensureRole(context, ["coordinator"]);
       const payload = getPayload(req);
-      const missing = REQUIRED_FIELDS.filter((field) => !payload[field]);
+      const normalizedPayload = {
+        ...payload,
+        complainant: payload.complainant || payload.reported_by,
+        date_of_suspension: payload.date_of_suspension || payload.date_of_sanction,
+      };
+
+      const missing = REQUIRED_FIELDS.filter((field) => !normalizedPayload[field]);
       if (missing.length) {
         return res.status(400).json({ error: `Missing fields: ${missing.join(", ")}` });
       }
 
-      const { organization_id, ...safePayload } = payload;
+      const { organization_id, reported_by, date_of_sanction, ...safePayload } = normalizedPayload;
+      const academicPeriod = getAcademicPeriodFromPayload(safePayload);
+      if (!academicPeriod) {
+        return res.status(400).json({ error: "Missing or invalid academic_year/semester." });
+      }
+
+      logApiFlow("major_offenses.POST.payload", {
+        organizationId: context.organizationId,
+        payload: safePayload,
+      });
+
       const { data, error } = await supabase
         .from("major_offenses")
-        .insert({ ...safePayload, organization_id: context.organizationId })
-        .select("id")
+        .insert({
+          ...safePayload,
+          academic_year: academicPeriod.academicYear,
+          semester: academicPeriod.semester,
+          organization_id: context.organizationId,
+          archived: false,
+        })
+        .select("*")
         .single();
 
       if (error) {
         return res.status(500).json({ error: error.message });
       }
 
-      return res.status(201).json({ id: data.id });
+      logApiFlow("major_offenses.POST.inserted", {
+        id: data?.id || null,
+        organizationId: data?.organization_id || context.organizationId,
+      });
+
+      return res.status(201).json({ id: data.id, record: data });
     }
 
     return res.status(405).json({ error: "Method not allowed." });

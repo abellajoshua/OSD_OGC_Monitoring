@@ -4,7 +4,7 @@
 -- Includes:
 -- 1) Schema + migration-safe ALTERs
 -- 2) Cleanup/reset of old public data
--- 3) Organizations + required user accounts + sample records
+-- 3) Organizations + admin seed account
 -- 4) Grants + RLS policies (organization-based + role-based)
 -- ============================================================================
 
@@ -39,6 +39,7 @@ create table if not exists public.minor_offenses (
   date_of_suspension date not null,
   date_of_post_counseling date,
   archived boolean default false,
+  status text default 'active' check (status in ('active', 'dismissed')),
   academic_year text,
   semester text,
   organization_id bigint references public.organizations(id),
@@ -168,11 +169,22 @@ create table if not exists public.user_accounts (
 
 alter table if exists public.minor_offenses add column if not exists archived boolean default false;
 alter table if exists public.major_offenses add column if not exists archived boolean default false;
+alter table if exists public.major_offenses add column if not exists status text default 'active';
 alter table if exists public.non_wearing_uniform add column if not exists archived boolean default false;
 alter table if exists public.gatepass add column if not exists archived boolean default false;
 alter table if exists public.good_moral add column if not exists archived boolean default false;
 alter table if exists public.id_replacement add column if not exists archived boolean default false;
 alter table if exists public.leave_of_absence add column if not exists archived boolean default false;
+
+update public.major_offenses
+set status = case when archived then 'dismissed' else coalesce(status, 'active') end
+where status is null
+   or status not in ('active', 'dismissed');
+
+alter table public.major_offenses drop constraint if exists major_offenses_status_check;
+alter table public.major_offenses
+  add constraint major_offenses_status_check
+  check (status in ('active', 'dismissed'));
 
 alter table if exists public.minor_offenses add column if not exists academic_year text;
 alter table if exists public.minor_offenses add column if not exists semester text;
@@ -456,47 +468,21 @@ alter table public.user_accounts alter column organization_id drop not null;
 -- ============================================================================
 -- REQUIRED ACCOUNT SEED (AUTH + USER ACCOUNTS)
 -- ============================================================================
--- Default Password for all below: Pass@12345
-
--- Single Admin account (account management page)
+-- Default Password for admin: Pass@12345
 -- admin@example.com
--- Head account (single, view-only, Alangilan only)
--- alangilan.head@example.com
--- Coordinator accounts (one per org, can edit records):
--- cics.coordinator@example.com
--- coe.coordinator@example.com
--- cet.coordinator@example.com
--- cafad.coordinator@example.com
--- mabini.coordinator@example.com
--- balayan.coordinator@example.com
--- lobo.coordinator@example.com
-
--- Upsert helper pattern per email
 
 do $$
 declare
   v_email text;
   v_full_name text;
   v_role text;
-  v_org_name text;
-  v_org_id bigint;
   v_user_id uuid;
 begin
-  for v_email, v_full_name, v_role, v_org_name in
+  for v_email, v_full_name, v_role in
     select * from (values
-      ('admin@example.com', 'System Admin', 'admin', null),
-      ('alangilan.head@example.com', 'Alangilan Head', 'head', 'Alangilan'),
-      ('cics.coordinator@example.com', 'CICS Coordinator', 'coordinator', 'CICS'),
-      ('coe.coordinator@example.com', 'COE Coordinator', 'coordinator', 'COE'),
-      ('cet.coordinator@example.com', 'CET Coordinator', 'coordinator', 'CET'),
-      ('cafad.coordinator@example.com', 'CAFAD Coordinator', 'coordinator', 'CAFAD'),
-      ('mabini.coordinator@example.com', 'Mabini Coordinator', 'coordinator', 'Mabini'),
-      ('balayan.coordinator@example.com', 'Balayan Coordinator', 'coordinator', 'Balayan'),
-      ('lobo.coordinator@example.com', 'Lobo Coordinator', 'coordinator', 'Lobo')
-    ) as t(email, full_name, role, org_name)
+      ('admin@example.com', 'System Admin', 'admin')
+    ) as t(email, full_name, role)
   loop
-    select id into v_org_id from public.organizations where name = v_org_name limit 1;
-
     select id into v_user_id from auth.users where email = v_email limit 1;
 
     if v_user_id is null then
@@ -526,7 +512,7 @@ begin
         crypt('Pass@12345', gen_salt('bf')),
         now(),
         '{"provider":"email","providers":["email"]}'::jsonb,
-        jsonb_build_object('full_name', v_full_name, 'role', v_role, 'organization', v_org_name),
+        jsonb_build_object('full_name', v_full_name, 'role', v_role),
         now(),
         now(),
         '',
@@ -540,13 +526,13 @@ begin
       set
         encrypted_password = crypt('Pass@12345', gen_salt('bf')),
         email_confirmed_at = coalesce(email_confirmed_at, now()),
-        raw_user_meta_data = jsonb_build_object('full_name', v_full_name, 'role', v_role, 'organization', v_org_name),
+        raw_user_meta_data = jsonb_build_object('full_name', v_full_name, 'role', v_role),
         updated_at = now()
       where id = v_user_id;
     end if;
 
     insert into public.user_accounts (user_id, email, full_name, role, organization_id)
-    values (v_user_id, v_email, v_full_name, v_role, v_org_id)
+    values (v_user_id, v_email, v_full_name, v_role, null)
     on conflict (email) do update
       set user_id = excluded.user_id,
           full_name = excluded.full_name,
@@ -554,34 +540,6 @@ begin
           organization_id = excluded.organization_id;
   end loop;
 end $$;
-
--- Backfill org id if any null (safety)
-update public.user_accounts
-set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
-where organization_id is null
-  and role <> 'admin';
-
-update public.minor_offenses
-set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
-where organization_id is null;
-update public.major_offenses
-set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
-where organization_id is null;
-update public.non_wearing_uniform
-set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
-where organization_id is null;
-update public.gatepass
-set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
-where organization_id is null;
-update public.good_moral
-set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
-where organization_id is null;
-update public.id_replacement
-set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
-where organization_id is null;
-update public.leave_of_absence
-set organization_id = (select id from public.organizations where name = 'CICS' limit 1)
-where organization_id is null;
 
 alter table public.user_accounts alter column organization_id drop not null;
 
@@ -593,65 +551,251 @@ alter table public.user_accounts
   check (role = 'admin' or organization_id is not null);
 
 -- ============================================================================
--- SAMPLE RECORDS (KAUNTING INFOS)
+-- ACADEMIC PERIOD INTEGRITY
 -- ============================================================================
 
-insert into public.minor_offenses (
-  date_of_complaint, name_of_student, sr_code, year_program, sex, contact_number,
-  complainant, written_reply, date_of_hearing, offense, sanction,
-  date_of_suspension, date_of_post_counseling, archived, organization_id
-)
-select
-  '2026-03-01', 'Juan Dela Cruz', '21-10001', 'BSIT 3', 'Male', '09171234567',
-  'Prof. Ramos', 'Acknowledged warning.', '2026-03-03', 'Late submission', 'Written warning',
-  '2026-03-04', '2026-03-10', false,
-  (select id from public.organizations where name = 'CICS' limit 1);
+update public.minor_offenses
+set
+  academic_year = case
+    when extract(month from coalesce(date_of_complaint, created_at::date, current_date)) >= 8 then
+      to_char(coalesce(date_of_complaint, created_at::date, current_date), 'YYYY') || '-' || to_char((coalesce(date_of_complaint, created_at::date, current_date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date_of_complaint, created_at::date, current_date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date_of_complaint, created_at::date, current_date), 'YYYY')
+  end,
+  semester = case
+    when lower(trim(coalesce(semester, ''))) in ('1st semester', 'first semester', 'first', '1st') then 'First Semester'
+    when lower(trim(coalesce(semester, ''))) in ('2nd semester', 'second semester', 'second', '2nd') then 'Second Semester'
+    when lower(trim(coalesce(semester, ''))) like '%summer%' then 'Summer Class'
+    when extract(month from coalesce(date_of_complaint, created_at::date, current_date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date_of_complaint, created_at::date, current_date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null
+   or academic_year !~ '^[0-9]{4}-[0-9]{4}$'
+   or semester not in ('First Semester', 'Second Semester', 'Summer Class');
 
-insert into public.major_offenses (
-  date_of_complaint, name_of_student, sr_code, year_program, sex, contact_number,
-  complainant, written_reply, date_of_hearing, offense, sanction,
-  date_of_suspension, date_of_post_counseling, archived, organization_id
-)
-select
-  '2026-03-02', 'Maria Santos', '21-20002', 'BSEE 2', 'Female', '09179876543',
-  'Discipline Committee', 'Submitted written explanation.', '2026-03-05', 'Serious misconduct', '3-day suspension',
-  '2026-03-06', '2026-03-12', false,
-  (select id from public.organizations where name = 'COE' limit 1);
+update public.major_offenses
+set
+  academic_year = case
+    when extract(month from coalesce(date_of_complaint, created_at::date, current_date)) >= 8 then
+      to_char(coalesce(date_of_complaint, created_at::date, current_date), 'YYYY') || '-' || to_char((coalesce(date_of_complaint, created_at::date, current_date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date_of_complaint, created_at::date, current_date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date_of_complaint, created_at::date, current_date), 'YYYY')
+  end,
+  semester = case
+    when lower(trim(coalesce(semester, ''))) in ('1st semester', 'first semester', 'first', '1st') then 'First Semester'
+    when lower(trim(coalesce(semester, ''))) in ('2nd semester', 'second semester', 'second', '2nd') then 'Second Semester'
+    when lower(trim(coalesce(semester, ''))) like '%summer%' then 'Summer Class'
+    when extract(month from coalesce(date_of_complaint, created_at::date, current_date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date_of_complaint, created_at::date, current_date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null
+   or academic_year !~ '^[0-9]{4}-[0-9]{4}$'
+   or semester not in ('First Semester', 'Second Semester', 'Summer Class');
 
-insert into public.non_wearing_uniform (
-  date, time_in, time_out, name, sr_code, course, sex, reason, archived, organization_id
-)
-select
-  '2026-03-03', '08:00', '11:00', 'Pedro Reyes', '21-30003', 'BSCE', 'Male', 'No available uniform', false,
-  (select id from public.organizations where name = 'CET' limit 1);
+update public.non_wearing_uniform
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date, current_date)) >= 8 then
+      to_char(coalesce(date, created_at::date, current_date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date, current_date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date, current_date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date, current_date), 'YYYY')
+  end,
+  semester = case
+    when lower(trim(coalesce(semester, ''))) in ('1st semester', 'first semester', 'first', '1st') then 'First Semester'
+    when lower(trim(coalesce(semester, ''))) in ('2nd semester', 'second semester', 'second', '2nd') then 'Second Semester'
+    when lower(trim(coalesce(semester, ''))) like '%summer%' then 'Summer Class'
+    when extract(month from coalesce(date, created_at::date, current_date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date, current_date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null
+   or academic_year !~ '^[0-9]{4}-[0-9]{4}$'
+   or semester not in ('First Semester', 'Second Semester', 'Summer Class');
 
-insert into public.gatepass (
-  date, time_in, time_out, name, sr_code, course, sex, reason, archived, organization_id
-)
-select
-  '2026-03-04', '09:00', '12:00', 'Ana Lim', '21-40004', 'BFA', 'Female', 'Medical checkup', false,
-  (select id from public.organizations where name = 'CAFAD' limit 1);
+update public.gatepass
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date, current_date)) >= 8 then
+      to_char(coalesce(date, created_at::date, current_date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date, current_date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date, current_date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date, current_date), 'YYYY')
+  end,
+  semester = case
+    when lower(trim(coalesce(semester, ''))) in ('1st semester', 'first semester', 'first', '1st') then 'First Semester'
+    when lower(trim(coalesce(semester, ''))) in ('2nd semester', 'second semester', 'second', '2nd') then 'Second Semester'
+    when lower(trim(coalesce(semester, ''))) like '%summer%' then 'Summer Class'
+    when extract(month from coalesce(date, created_at::date, current_date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date, current_date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null
+   or academic_year !~ '^[0-9]{4}-[0-9]{4}$'
+   or semester not in ('First Semester', 'Second Semester', 'Summer Class');
 
-insert into public.good_moral (
-  date, time_in, time_out, name, sr_code, course, sex, purpose, archived, organization_id
-)
-select
-  '2026-03-05', '10:00', '10:30', 'Lito Cruz', '21-50005', 'BSBA', 'Male', 'Scholarship requirement', false,
-  (select id from public.organizations where name = 'Mabini' limit 1);
+update public.good_moral
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date, current_date)) >= 8 then
+      to_char(coalesce(date, created_at::date, current_date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date, current_date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date, current_date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date, current_date), 'YYYY')
+  end,
+  semester = case
+    when lower(trim(coalesce(semester, ''))) in ('1st semester', 'first semester', 'first', '1st') then 'First Semester'
+    when lower(trim(coalesce(semester, ''))) in ('2nd semester', 'second semester', 'second', '2nd') then 'Second Semester'
+    when lower(trim(coalesce(semester, ''))) like '%summer%' then 'Summer Class'
+    when extract(month from coalesce(date, created_at::date, current_date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date, current_date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null
+   or academic_year !~ '^[0-9]{4}-[0-9]{4}$'
+   or semester not in ('First Semester', 'Second Semester', 'Summer Class');
 
-insert into public.id_replacement (
-  date, time_in, time_out, name, sr_code, course, sex, reason, archived, organization_id
-)
-select
-  '2026-03-06', '13:00', '13:20', 'Cathy Sy', '21-60006', 'BSIT', 'Female', 'Lost ID', false,
-  (select id from public.organizations where name = 'Balayan' limit 1);
+update public.id_replacement
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date, current_date)) >= 8 then
+      to_char(coalesce(date, created_at::date, current_date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date, current_date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date, current_date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date, current_date), 'YYYY')
+  end,
+  semester = case
+    when lower(trim(coalesce(semester, ''))) in ('1st semester', 'first semester', 'first', '1st') then 'First Semester'
+    when lower(trim(coalesce(semester, ''))) in ('2nd semester', 'second semester', 'second', '2nd') then 'Second Semester'
+    when lower(trim(coalesce(semester, ''))) like '%summer%' then 'Summer Class'
+    when extract(month from coalesce(date, created_at::date, current_date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date, current_date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null
+   or academic_year !~ '^[0-9]{4}-[0-9]{4}$'
+   or semester not in ('First Semester', 'Second Semester', 'Summer Class');
 
-insert into public.leave_of_absence (
-  date, time_in, time_out, name, sr_code, course, sex, semester_period_covered, archived, organization_id
-)
-select
-  '2026-03-07', '14:00', '14:30', 'Mark Tan', '21-70007', 'BSTM', 'Male', '2nd Semester AY 2025-2026', false,
-  (select id from public.organizations where name = 'Lobo' limit 1);
+update public.leave_of_absence
+set
+  academic_year = case
+    when extract(month from coalesce(date, created_at::date, current_date)) >= 8 then
+      to_char(coalesce(date, created_at::date, current_date), 'YYYY') || '-' || to_char((coalesce(date, created_at::date, current_date) + interval '1 year'), 'YYYY')
+    else
+      to_char((coalesce(date, created_at::date, current_date) - interval '1 year'), 'YYYY') || '-' || to_char(coalesce(date, created_at::date, current_date), 'YYYY')
+  end,
+  semester = case
+    when lower(trim(coalesce(semester, ''))) in ('1st semester', 'first semester', 'first', '1st') then 'First Semester'
+    when lower(trim(coalesce(semester, ''))) in ('2nd semester', 'second semester', 'second', '2nd') then 'Second Semester'
+    when lower(trim(coalesce(semester, ''))) like '%summer%' then 'Summer Class'
+    when extract(month from coalesce(date, created_at::date, current_date)) between 8 and 12 then 'First Semester'
+    when extract(month from coalesce(date, created_at::date, current_date)) between 1 and 5 then 'Second Semester'
+    else 'Summer Class'
+  end
+where academic_year is null or semester is null
+   or academic_year !~ '^[0-9]{4}-[0-9]{4}$'
+   or semester not in ('First Semester', 'Second Semester', 'Summer Class');
+
+alter table public.minor_offenses alter column academic_year set not null;
+alter table public.minor_offenses alter column semester set not null;
+alter table public.major_offenses alter column academic_year set not null;
+alter table public.major_offenses alter column semester set not null;
+alter table public.non_wearing_uniform alter column academic_year set not null;
+alter table public.non_wearing_uniform alter column semester set not null;
+alter table public.gatepass alter column academic_year set not null;
+alter table public.gatepass alter column semester set not null;
+alter table public.good_moral alter column academic_year set not null;
+alter table public.good_moral alter column semester set not null;
+alter table public.id_replacement alter column academic_year set not null;
+alter table public.id_replacement alter column semester set not null;
+alter table public.leave_of_absence alter column academic_year set not null;
+alter table public.leave_of_absence alter column semester set not null;
+
+alter table public.minor_offenses drop constraint if exists minor_offenses_academic_year_format_check;
+alter table public.minor_offenses add constraint minor_offenses_academic_year_format_check check (academic_year ~ '^[0-9]{4}-[0-9]{4}$');
+alter table public.major_offenses drop constraint if exists major_offenses_academic_year_format_check;
+alter table public.major_offenses add constraint major_offenses_academic_year_format_check check (academic_year ~ '^[0-9]{4}-[0-9]{4}$');
+alter table public.non_wearing_uniform drop constraint if exists non_wearing_uniform_academic_year_format_check;
+alter table public.non_wearing_uniform add constraint non_wearing_uniform_academic_year_format_check check (academic_year ~ '^[0-9]{4}-[0-9]{4}$');
+alter table public.gatepass drop constraint if exists gatepass_academic_year_format_check;
+alter table public.gatepass add constraint gatepass_academic_year_format_check check (academic_year ~ '^[0-9]{4}-[0-9]{4}$');
+alter table public.good_moral drop constraint if exists good_moral_academic_year_format_check;
+alter table public.good_moral add constraint good_moral_academic_year_format_check check (academic_year ~ '^[0-9]{4}-[0-9]{4}$');
+alter table public.id_replacement drop constraint if exists id_replacement_academic_year_format_check;
+alter table public.id_replacement add constraint id_replacement_academic_year_format_check check (academic_year ~ '^[0-9]{4}-[0-9]{4}$');
+alter table public.leave_of_absence drop constraint if exists leave_of_absence_academic_year_format_check;
+alter table public.leave_of_absence add constraint leave_of_absence_academic_year_format_check check (academic_year ~ '^[0-9]{4}-[0-9]{4}$');
+
+alter table public.minor_offenses drop constraint if exists minor_offenses_semester_check;
+alter table public.minor_offenses add constraint minor_offenses_semester_check check (semester in ('First Semester', 'Second Semester', 'Summer Class'));
+alter table public.major_offenses drop constraint if exists major_offenses_semester_check;
+alter table public.major_offenses add constraint major_offenses_semester_check check (semester in ('First Semester', 'Second Semester', 'Summer Class'));
+alter table public.non_wearing_uniform drop constraint if exists non_wearing_uniform_semester_check;
+alter table public.non_wearing_uniform add constraint non_wearing_uniform_semester_check check (semester in ('First Semester', 'Second Semester', 'Summer Class'));
+alter table public.gatepass drop constraint if exists gatepass_semester_check;
+alter table public.gatepass add constraint gatepass_semester_check check (semester in ('First Semester', 'Second Semester', 'Summer Class'));
+alter table public.good_moral drop constraint if exists good_moral_semester_check;
+alter table public.good_moral add constraint good_moral_semester_check check (semester in ('First Semester', 'Second Semester', 'Summer Class'));
+alter table public.id_replacement drop constraint if exists id_replacement_semester_check;
+alter table public.id_replacement add constraint id_replacement_semester_check check (semester in ('First Semester', 'Second Semester', 'Summer Class'));
+alter table public.leave_of_absence drop constraint if exists leave_of_absence_semester_check;
+alter table public.leave_of_absence add constraint leave_of_absence_semester_check check (semester in ('First Semester', 'Second Semester', 'Summer Class'));
+
+create or replace function public.prevent_academic_period_change()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'UPDATE' then
+    if new.academic_year is distinct from old.academic_year
+       or new.semester is distinct from old.semester then
+      raise exception 'academic_year and semester are immutable and cannot be changed after record creation.';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_minor_offenses_immutable_period on public.minor_offenses;
+create trigger trg_minor_offenses_immutable_period
+before update on public.minor_offenses
+for each row execute function public.prevent_academic_period_change();
+
+drop trigger if exists trg_major_offenses_immutable_period on public.major_offenses;
+create trigger trg_major_offenses_immutable_period
+before update on public.major_offenses
+for each row execute function public.prevent_academic_period_change();
+
+drop trigger if exists trg_non_wearing_uniform_immutable_period on public.non_wearing_uniform;
+create trigger trg_non_wearing_uniform_immutable_period
+before update on public.non_wearing_uniform
+for each row execute function public.prevent_academic_period_change();
+
+drop trigger if exists trg_gatepass_immutable_period on public.gatepass;
+create trigger trg_gatepass_immutable_period
+before update on public.gatepass
+for each row execute function public.prevent_academic_period_change();
+
+drop trigger if exists trg_good_moral_immutable_period on public.good_moral;
+create trigger trg_good_moral_immutable_period
+before update on public.good_moral
+for each row execute function public.prevent_academic_period_change();
+
+drop trigger if exists trg_id_replacement_immutable_period on public.id_replacement;
+create trigger trg_id_replacement_immutable_period
+before update on public.id_replacement
+for each row execute function public.prevent_academic_period_change();
+
+drop trigger if exists trg_leave_of_absence_immutable_period on public.leave_of_absence;
+create trigger trg_leave_of_absence_immutable_period
+before update on public.leave_of_absence
+for each row execute function public.prevent_academic_period_change();
+
+create index if not exists idx_minor_offenses_archive_period_org on public.minor_offenses (organization_id, archived, academic_year, semester);
+create index if not exists idx_major_offenses_archive_period_org on public.major_offenses (organization_id, archived, status, academic_year, semester);
+create index if not exists idx_non_wearing_uniform_archive_period_org on public.non_wearing_uniform (organization_id, archived, academic_year, semester);
+create index if not exists idx_gatepass_archive_period_org on public.gatepass (organization_id, archived, academic_year, semester);
+create index if not exists idx_good_moral_archive_period_org on public.good_moral (organization_id, archived, academic_year, semester);
+create index if not exists idx_id_replacement_archive_period_org on public.id_replacement (organization_id, archived, academic_year, semester);
+create index if not exists idx_leave_of_absence_archive_period_org on public.leave_of_absence (organization_id, archived, academic_year, semester);
 
 -- ============================================================================
 -- INDEXES
