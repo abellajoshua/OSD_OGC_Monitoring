@@ -1,11 +1,16 @@
 {
   "version": 2,
+  "builds": [
+    { "src": "api/**/*.js", "use": "@vercel/node" },
+    { "src": "public/**", "use": "@vercel/static" }
+  ],
   "routes": [
-    { "src": "/", "dest": "/login.html" },
-    { "src": "/login", "dest": "/login.html" },
-    { "src": "/register", "dest": "/register.html" },
-    { "src": "/programs", "dest": "/programs.html" },
-    { "src": "/archive", "dest": "/archive.html" },
+    { "src": "/", "dest": "/public/login.html" },
+    { "src": "/login", "dest": "/public/login.html" },
+    { "src": "/register", "dest": "/public/register.html" },
+    { "src": "/programs", "dest": "/public/programs.html" },
+    { "src": "/archive", "dest": "/public/archive.html" },
+    { "src": "/api/(.*)", "dest": "/api/$1" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/public/$1" }
   ]
