@@ -17,30 +17,51 @@ function routeByRole(role) {
   window.location.href = "index.html";
 }
 
+async function getRegisteredUserAccount(supabase, userId) {
+  const { data, error } = await supabase
+    .from("user_accounts")
+    .select("role, organization_id")
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data;
+}
+
+async function signOutAndReject(supabase, message) {
+  await supabase.auth.signOut();
+  localStorage.removeItem("organizationId");
+  localStorage.removeItem("userRole");
+  localStorage.removeItem("headOrganizationFilterId");
+  statusEl.textContent = message;
+}
+
 async function redirectIfLoggedIn() {
   const supabase = await getSupabase();
   const {
     data: { session },
   } = await supabase.auth.getSession();
   if (session) {
-    // Load role + organization from database profile
     try {
-      const { data: userAccount } = await supabase
-        .from("user_accounts")
-        .select("role, organization_id")
-        .eq("user_id", session.user.id)
-        .single();
-      
+      const userAccount = await getRegisteredUserAccount(supabase, session.user.id);
+
       if (userAccount) {
         persistUserContext(userAccount);
         routeByRole(userAccount.role);
       } else {
-        window.location.href = "index.html";
+        await signOutAndReject(
+          supabase,
+          "This account is not registered by admin. Please use an approved account."
+        );
       }
     } catch (error) {
-      // user_accounts table doesn't exist - default to index
-      console.log("Could not check user role, defaulting to index");
-      window.location.href = "index.html";
+      await signOutAndReject(
+        supabase,
+        error?.message || "Unable to verify account registration. Please contact admin."
+      );
     }
   }
 }
@@ -65,15 +86,18 @@ if (loginForm) {
         return;
       }
 
-      statusEl.textContent = "Success! Redirecting...";
+      const userAccount = await getRegisteredUserAccount(supabase, data.user.id);
 
-      const { data: userAccount } = await supabase
-        .from("user_accounts")
-        .select("role, organization_id")
-        .eq("user_id", data.user.id)
-        .single();
+      if (!userAccount) {
+        await signOutAndReject(
+          supabase,
+          "This account is not registered by admin. Please contact the administrator."
+        );
+        return;
+      }
 
       persistUserContext(userAccount);
+      statusEl.textContent = "Success! Redirecting...";
       routeByRole(userAccount?.role);
     } catch (error) {
       statusEl.textContent =
