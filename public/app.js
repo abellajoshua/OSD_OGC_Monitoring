@@ -368,6 +368,8 @@ const TOP_OFFENSE_LABELS = {
 
 let minorRecords = [];
 let majorRecords = [];
+let goodmoralTagMinorRecords = [];
+let goodmoralTagMajorRecords = [];
 let uniformRecords = [];
 let gatepassRecords = [];
 let goodmoralRecords = [];
@@ -687,6 +689,21 @@ async function fetchTableRows(table, dateColumn, queryContext = null) {
 
   if (lastError) throw lastError;
   return [];
+}
+
+async function fetchGoodMoralTagRows(table, dateColumn, queryContext = null) {
+  const supabase = await getSupabase();
+  const primaryOrderColumn = dateColumn || "id";
+  const orgId = queryContext?.orgId !== undefined ? queryContext.orgId : await getScopedReadOrganizationId();
+  let query = supabase.from(table).select("*");
+
+  if (orgId) {
+    query = query.eq("organization_id", orgId);
+  }
+
+  const { data, error } = await query.order(primaryOrderColumn, { ascending: false }).order("id", { ascending: false });
+  if (error) throw error;
+  return data || [];
 }
 
 async function createRow(table, payload) {
@@ -2424,7 +2441,7 @@ function updateDashboardCounters() {
 function flagGoodMoralFromMinor() {
   if (!goodmoralRecords.length) return;
   const codeSet = new Set(
-    [...minorRecords, ...majorRecords].map((row) => String(row.sr_code || "").trim().toLowerCase())
+    [...goodmoralTagMinorRecords, ...goodmoralTagMajorRecords].map((row) => String(row.sr_code || "").trim().toLowerCase())
   );
   goodmoralRecords = goodmoralRecords.map((row) => ({
     ...row,
@@ -2438,16 +2455,18 @@ function normalizeGoodMoralStudentKey(value) {
 
 function getGoodMoralOffenseMatches(srCode) {
   const normalizedSrCode = normalizeGoodMoralStudentKey(srCode);
+  const minorTagRecords = goodmoralTagMinorRecords.length ? goodmoralTagMinorRecords : minorRecords;
+  const majorTagRecords = goodmoralTagMajorRecords.length ? goodmoralTagMajorRecords : majorRecords;
   const sortNewestFirst = (left, right) => {
     const leftDate = new Date(left.date_of_complaint || left.date || 0).getTime();
     const rightDate = new Date(right.date_of_complaint || right.date || 0).getTime();
     return rightDate - leftDate;
   };
 
-  const minorMatches = minorRecords
+  const minorMatches = minorTagRecords
     .filter((record) => normalizeGoodMoralStudentKey(record.sr_code) === normalizedSrCode)
     .sort(sortNewestFirst);
-  const majorMatches = majorRecords
+  const majorMatches = majorTagRecords
     .filter((record) => normalizeGoodMoralStudentKey(record.sr_code) === normalizedSrCode)
     .sort(sortNewestFirst);
 
@@ -3586,12 +3605,19 @@ function attachCancelEdit(form) {
 
 async function loadRecords() {
   try {
-    minorRecords = await fetchTableRows(TABLES.minor, "date_of_complaint");
+    const queryContext = { orgId: await getScopedReadOrganizationId(), period: getAcademicPeriodRange() };
+    const [periodRows, tagRows] = await Promise.all([
+      fetchTableRows(TABLES.minor, "date_of_complaint", queryContext),
+      fetchGoodMoralTagRows(TABLES.minor, "date_of_complaint", queryContext),
+    ]);
+    minorRecords = periodRows;
+    goodmoralTagMinorRecords = tagRows;
     flagGoodMoralFromMinor();
     applyMinorFilters();
     updateDashboardCounters();
   } catch (error) {
     minorRecords = [];
+    goodmoralTagMinorRecords = [];
     renderRows([]);
     updateDashboardCounters();
   }
@@ -3599,12 +3625,19 @@ async function loadRecords() {
 
 async function loadMajorRecords() {
   try {
-    majorRecords = await fetchTableRows(TABLES.major, "date_of_complaint");
+    const queryContext = { orgId: await getScopedReadOrganizationId(), period: getAcademicPeriodRange() };
+    const [periodRows, tagRows] = await Promise.all([
+      fetchTableRows(TABLES.major, "date_of_complaint", queryContext),
+      fetchGoodMoralTagRows(TABLES.major, "date_of_complaint", queryContext),
+    ]);
+    majorRecords = periodRows;
+    goodmoralTagMajorRecords = tagRows;
     flagGoodMoralFromMinor();
     applyMajorFilters();
     updateDashboardCounters();
   } catch (error) {
     majorRecords = [];
+    goodmoralTagMajorRecords = [];
     renderMajorRows([]);
     updateDashboardCounters();
   }
@@ -3934,7 +3967,15 @@ async function loadGatepassRecords() {
 
 async function loadGoodmoralRecords() {
   try {
-    goodmoralRecords = await fetchTableRows(TABLES.goodmoral, "date");
+    const queryContext = { orgId: await getScopedReadOrganizationId(), period: getAcademicPeriodRange() };
+    const [goodmoralRows, minorTagRows, majorTagRows] = await Promise.all([
+      fetchTableRows(TABLES.goodmoral, "date", queryContext),
+      fetchGoodMoralTagRows(TABLES.minor, "date_of_complaint", queryContext),
+      fetchGoodMoralTagRows(TABLES.major, "date_of_complaint", queryContext),
+    ]);
+    goodmoralRecords = goodmoralRows;
+    goodmoralTagMinorRecords = minorTagRows;
+    goodmoralTagMajorRecords = majorTagRows;
     flagGoodMoralFromMinor();
     applyGoodmoralFilters();
     updateDashboardCounters();
@@ -3984,6 +4025,8 @@ async function reloadAllDataForCurrentScope() {
     const [
       minorResult,
       majorResult,
+      goodmoralTagMinorResult,
+      goodmoralTagMajorResult,
       uniformResult,
       gatepassResult,
       goodmoralResult,
@@ -3992,6 +4035,8 @@ async function reloadAllDataForCurrentScope() {
     ] = await Promise.allSettled([
       fetchTableRows(TABLES.minor, "date_of_complaint", queryContext),
       fetchTableRows(TABLES.major, "date_of_complaint", queryContext),
+      fetchGoodMoralTagRows(TABLES.minor, "date_of_complaint", queryContext),
+      fetchGoodMoralTagRows(TABLES.major, "date_of_complaint", queryContext),
       fetchTableRows(TABLES.uniform, "date", queryContext),
       fetchTableRows(TABLES.gatepass, "date", queryContext),
       fetchTableRows(TABLES.goodmoral, "date", queryContext),
@@ -4001,6 +4046,8 @@ async function reloadAllDataForCurrentScope() {
 
     minorRecords = minorResult.status === "fulfilled" ? (minorResult.value || []) : [];
     majorRecords = majorResult.status === "fulfilled" ? (majorResult.value || []) : [];
+    goodmoralTagMinorRecords = goodmoralTagMinorResult.status === "fulfilled" ? (goodmoralTagMinorResult.value || []) : [];
+    goodmoralTagMajorRecords = goodmoralTagMajorResult.status === "fulfilled" ? (goodmoralTagMajorResult.value || []) : [];
     uniformRecords = uniformResult.status === "fulfilled" ? (uniformResult.value || []) : [];
     gatepassRecords = gatepassResult.status === "fulfilled" ? (gatepassResult.value || []) : [];
     goodmoralRecords = goodmoralResult.status === "fulfilled" ? (goodmoralResult.value || []) : [];

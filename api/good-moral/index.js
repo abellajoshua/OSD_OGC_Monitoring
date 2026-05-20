@@ -34,15 +34,20 @@ module.exports = async (req, res) => {
 
       let minorQuery = supabase.from("minor_offenses").select("sr_code");
       minorQuery = applyOrganizationScope(minorQuery, scopedOrganizationId);
-      minorQuery = applyAcademicPeriodScope(minorQuery, req.query);
-      minorQuery = applyActiveRecordsScope(minorQuery);
       const { data: minorData, error: minorError } = await minorQuery;
       if (minorError) return res.status(500).json({ error: minorError.message });
 
-      const codeSet = new Set((minorData || []).map((item) => String(item.sr_code || "").trim()));
+      let majorQuery = supabase.from("major_offenses").select("sr_code");
+      majorQuery = applyOrganizationScope(majorQuery, scopedOrganizationId);
+      const { data: majorData, error: majorError } = await majorQuery;
+      if (majorError) return res.status(500).json({ error: majorError.message });
+
+      const codeSet = new Set(
+        [...(minorData || []), ...(majorData || [])].map((item) => String(item.sr_code || "").trim().toLowerCase())
+      );
       const enriched = (goodMoral || []).map((record) => ({
         ...record,
-        has_minor_offense: codeSet.has(String(record.sr_code || "").trim()) ? 1 : 0,
+        has_minor_offense: codeSet.has(String(record.sr_code || "").trim().toLowerCase()) ? 1 : 0,
       }));
 
       logApiFlow("good_moral.GET", {
