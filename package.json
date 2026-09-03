@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "OSD & OGC Monitoring Websystem",
   "scripts": {
-    "start": "node dev-server.js"
+    "start": "node dev-server.js",
+    "seed:admin": "node scripts/seed-admin.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

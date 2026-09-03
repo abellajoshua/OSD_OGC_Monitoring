@@ -1,4 +1,4 @@
 window.APP_CONFIG = {
-  SUPABASE_URL: "https://fwbbxwnmchbuhwulrzhw.supabase.co",
-  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3YmJ4d25tY2hidWh3dWxyemh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1OTg3NTIsImV4cCI6MjA4ODE3NDc1Mn0.unSrCNshGFXmhaba3Gm7Zgm6jjQSThKX9UC6U5d_sBY",
+  SUPABASE_URL: "https://sxdounwkdfntidyzsfhe.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4ZG91bndrZGZudGlkeXpzZmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0MjQ3OTIsImV4cCI6MjEwNDAwMDc5Mn0.EUnBkWEvToUg2UF9NrcKfgl98ZxXqXRGVlLLgqqMwX4",
 };

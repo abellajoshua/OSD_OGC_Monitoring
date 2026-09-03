@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabaseClient.js?v=4";
+import { getSupabase } from "./supabaseClient.js?v=5";
 
 const menuButton = document.querySelector("#case-dismissal-menu-btn");
 const drawer = document.querySelector("#case-dismissal-drawer");

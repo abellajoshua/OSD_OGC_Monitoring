@@ -45,15 +45,18 @@ async function fetchServerConfig() {
 }
 
 async function loadConfig() {
-  const runtimeConfig = normalizeConfig(window.APP_CONFIG || {});
+  // Server env is the source of truth so a stale runtime-config.js cannot
+  // point the browser at a decommissioned Supabase project.
   const serverConfig = await fetchServerConfig();
-
-  if (runtimeConfig.SUPABASE_URL && runtimeConfig.SUPABASE_ANON_KEY) {
-    return runtimeConfig;
-  }
 
   if (serverConfig?.SUPABASE_URL && serverConfig?.SUPABASE_ANON_KEY) {
     return serverConfig;
+  }
+
+  const runtimeConfig = normalizeConfig(window.APP_CONFIG || {});
+
+  if (runtimeConfig.SUPABASE_URL && runtimeConfig.SUPABASE_ANON_KEY) {
+    return runtimeConfig;
   }
 
   return normalizeConfig(FALLBACK_CONFIG);

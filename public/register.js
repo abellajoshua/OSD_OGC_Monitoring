@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabaseClient.js?v=4";
+import { getSupabase } from "./supabaseClient.js?v=5";
 
 const registerForm = document.querySelector("#register-form");
 const statusEl = document.querySelector("#register-status");
