@@ -156,15 +156,24 @@ function parseOrganizationId(value) {
 function canAccessAllOrganizations(context) {
   if (!context) return false;
   const role = String(context.role || "").trim().toLowerCase();
-  return role === "head";
+  const organizationName = String(context.organizationName || "").trim().toLowerCase();
+  return role === "head" && organizationName === "alangilan";
 }
 
 function getScopedOrganizationId(req, context) {
   if (!context || !context.role) return null;
 
-  // Coordinators and heads are always restricted to their own organization.
-  if (context.role === "coordinator" || context.role === "head") {
+  // Coordinators are always restricted to their own organization.
+  if (context.role === "coordinator") {
     return context.organizationId;
+  }
+
+  // Head can read across all organizations; an explicit organization_id narrows the view
+  // (used by the head organization-filter dropdown). No filter = all organizations.
+  if (context.role === "head") {
+    return canAccessAllOrganizations(context)
+      ? parseOrganizationId(req?.query?.organization_id) || null
+      : context.organizationId;
   }
 
   // Admin is management-only; allow optional org scope for read-only tooling endpoints.

@@ -17,6 +17,7 @@ const brandTitle = document.querySelector(".brand-title");
 
 let currentOrganizationId = null;
 let currentUserRole = localStorage.getItem("userRole") || "";
+let currentUserOrganizationName = "";
 let dismissedCases = [];
 let selectedHeadOrganizationId = null;
 let headFilterInitialized = false;
@@ -192,6 +193,7 @@ function getCurrentUserContext() {
   return {
     role: String(currentUserRole || "").trim().toLowerCase(),
     organizationId: currentOrganizationId,
+    organizationName: currentUserOrganizationName,
   };
 }
 
@@ -205,6 +207,16 @@ function isAlangilanCampusOrganization(org) {
   return name === "alangilan" && type === "campus";
 }
 
+// Mirrors public.can_access_all_organizations() in supabase_rbac_migration.sql: a head account
+// only gets cross-organization access when assigned to Alangilan.
+function canAccessAllDismissalOrganizations() {
+  const context = getCurrentUserContext();
+  return (
+    context.role === "head" &&
+    String(context.organizationName || "").trim().toLowerCase() === "alangilan"
+  );
+}
+
 function canManageDismissals() {
   return getCurrentUserContext().role === "coordinator";
 }
@@ -215,14 +227,14 @@ function canViewDismissals() {
 }
 
 function getScopedDismissalOrganizationId() {
-  if (isHeadRole()) {
+  if (canAccessAllDismissalOrganizations()) {
     return selectedHeadOrganizationId || null;
   }
   return currentOrganizationId || null;
 }
 
 async function initializeHeadOrganizationFilter() {
-  if (!isHeadRole() || !headOrgFilterGroup || !headOrgFilterSelect) {
+  if (!canAccessAllDismissalOrganizations() || !headOrgFilterGroup || !headOrgFilterSelect) {
     if (headOrgFilterGroup) {
       headOrgFilterGroup.style.display = "none";
     }
@@ -310,12 +322,13 @@ async function requireDismissalAccess() {
 
   const { data: account } = await supabase
     .from("user_accounts")
-    .select("role, organization_id")
+    .select("role, organization_id, organizations(name)")
     .eq("user_id", session.user.id)
     .single();
 
   currentUserRole = String(account?.role || currentUserRole || "").trim().toLowerCase();
   currentOrganizationId = account?.organization_id || null;
+  currentUserOrganizationName = String(account?.organizations?.name || "").trim();
 
   if (currentOrganizationId) {
     localStorage.setItem("organizationId", String(currentOrganizationId));

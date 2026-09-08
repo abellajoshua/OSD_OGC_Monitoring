@@ -7,7 +7,6 @@
   "routes": [
     { "src": "/", "dest": "/public/login.html" },
     { "src": "/login", "dest": "/public/login.html" },
-    { "src": "/register", "dest": "/public/register.html" },
     { "src": "/programs", "dest": "/public/programs.html" },
     { "src": "/archive", "dest": "/public/archive.html" },
     { "src": "/api/(.*)", "dest": "/api/index.js" },

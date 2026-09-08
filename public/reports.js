@@ -85,12 +85,15 @@ async function checkHeadAccess() {
 
   if (error) {
     console.error("Error checking user role:", error);
-    // If user_accounts table doesn't exist (406 error), skip role check
-    if (error.code === "PGRST116" || error.message.includes("406")) {
-      console.log("user_accounts table not found, skipping role check");
-      return true;
-    }
-    alert(`Error checking user role: ${error.message}`);
+    // Fail closed: PGRST116 ("no rows") means this session has no user_accounts row,
+    // i.e. an unregistered account - deny access rather than granting it.
+    alert(
+      error.code === "PGRST116"
+        ? "This account is not registered by admin. Please contact the administrator."
+        : `Error checking user role: ${error.message}`
+    );
+    await supabase.auth.signOut();
+    window.location.href = "login.html";
     return false;
   }
 
