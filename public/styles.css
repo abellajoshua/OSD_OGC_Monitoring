@@ -2311,6 +2311,10 @@ tbody td {
   height: 42px;
 }
 
+.col-name {
+  text-align: left;
+}
+
 .footnote {
   margin-top: 12px;
   font-size: 12px;

@@ -3215,7 +3215,7 @@ function renderUniformRows(records) {
       <td>${formatDate(record.date)}</td>
       <td>${record.time_in || ""}</td>
       <td>${record.time_out || ""}</td>
-      <td>${record.name || ""}</td>
+      <td class="col-name">${record.name || ""}</td>
       <td>${record.sr_code || ""}</td>
       <td>${record.course || ""}</td>
       <td>${record.sex === "M" ? "✔" : ""}</td>
