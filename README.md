@@ -27,6 +27,12 @@ If you need to reset all operational records while keeping account data:
 4. Optional test data: run `supabase_seed_2024_2025.sql` to seed AY 2024-2025 records
    for First/Second/Summer with variable counts (5/3/2 per module).
 
+## RBAC / permissions migration
+If your database was set up before the coordinator/head access fix, run `supabase_rbac_migration.sql`
+in the Supabase SQL editor. It is idempotent (safe to re-run) and, unlike `supabase_full_setup.sql`,
+does **not** truncate any table. It corrects head accounts to read across all organizations (matching
+`public.can_access_all_organizations()`) and tightens `user_accounts` reads to each account's own row.
+
 ## Deploy to GitHub Pages
 1. Push to `main`.
 2. In GitHub repo settings, open **Pages**.

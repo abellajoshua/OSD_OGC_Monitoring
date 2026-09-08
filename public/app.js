@@ -413,6 +413,14 @@ function isAlangilanCampusOrganization(org) {
   return name === "alangilan" && type === "campus";
 }
 
+// Mirrors public.can_access_all_organizations() in supabase_rbac_migration.sql: a head account
+// only gets cross-organization access when assigned to Alangilan.
+function isHeadWithGlobalAccess(role, organizationName) {
+  const normalizedRole = String(role || "").trim().toLowerCase();
+  const normalizedOrgName = String(organizationName || "").trim().toLowerCase();
+  return normalizedRole === ROLE_HEAD && normalizedOrgName === "alangilan";
+}
+
 function ensureCoordinatorAccess() {
   if (!canEditRecords()) {
     throw new Error("Read-only access: Head can view and export records only.");
@@ -508,7 +516,7 @@ async function getCurrentOrganizationId() {
     .single();
 
   currentUserRole = String(account?.role || currentUserRole || "").trim().toLowerCase();
-  hasGlobalHeadAccess = String(account?.role || "").trim().toLowerCase() === ROLE_HEAD;
+  hasGlobalHeadAccess = isHeadWithGlobalAccess(account?.role, account?.organizations?.name);
   if (currentUserRole) {
     localStorage.setItem("userRole", currentUserRole);
   }
@@ -4525,9 +4533,11 @@ attachCancelEdit(leaveofabsenceForm);
       localStorage.setItem("userRole", currentUserRole);
     }
 
-    hasGlobalHeadAccess =
-      String(userAccount?.role || "").trim().toLowerCase() === ROLE_HEAD;
-    
+    hasGlobalHeadAccess = isHeadWithGlobalAccess(
+      userAccount?.role,
+      userAccount?.organizations?.name
+    );
+
     if (userAccount && userAccount.organization_id) {
       localStorage.setItem("organizationId", String(userAccount.organization_id));
       currentOrganizationId = userAccount.organization_id;
@@ -4547,8 +4557,12 @@ attachCancelEdit(leaveofabsenceForm);
 
     await reloadAllDataForCurrentScope();
   } catch (error) {
-    // user_accounts table doesn't exist or RLS blocking - ignore and continue
-    console.log("Could not check user role, continuing anyway");
-    await reloadAllDataForCurrentScope();
+    // Cannot confirm this session is a registered account - fail closed, same as auth-guard.js.
+    console.log("Could not verify account registration, signing out.", error);
+    await supabase.auth.signOut();
+    localStorage.removeItem("organizationId");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("headOrganizationFilterId");
+    window.location.href = "login.html";
   }
 })();
