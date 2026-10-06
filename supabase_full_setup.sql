@@ -468,21 +468,36 @@ alter table public.user_accounts alter column organization_id drop not null;
 -- ============================================================================
 -- REQUIRED ACCOUNT SEED (AUTH + USER ACCOUNTS)
 -- ============================================================================
--- Default Password for admin: Pass@12345
--- admin@example.com
+-- Default password for all seeded accounts: Pass@12345
+-- admin@example.com (admin)
+-- cics@example.com, coe@example.com, cet@example.com, cafad@example.com,
+-- balayan@example.com, lobo@example.com (coordinator, one per organization)
 
 do $$
 declare
   v_email text;
   v_full_name text;
   v_role text;
+  v_org_name text;
   v_user_id uuid;
+  v_org_id bigint;
 begin
-  for v_email, v_full_name, v_role in
+  for v_email, v_full_name, v_role, v_org_name in
     select * from (values
-      ('admin@example.com', 'System Admin', 'admin')
-    ) as t(email, full_name, role)
+      ('admin@example.com', 'System Admin', 'admin', null),
+      ('cics@example.com', 'CICS Coordinator', 'coordinator', 'CICS'),
+      ('coe@example.com', 'COE Coordinator', 'coordinator', 'COE'),
+      ('cet@example.com', 'CET Coordinator', 'coordinator', 'CET'),
+      ('cafad@example.com', 'CAFAD Coordinator', 'coordinator', 'CAFAD'),
+      ('balayan@example.com', 'Balayan Coordinator', 'coordinator', 'Balayan'),
+      ('lobo@example.com', 'Lobo Coordinator', 'coordinator', 'Lobo')
+    ) as t(email, full_name, role, org_name)
   loop
+    v_org_id := null;
+    if v_org_name is not null then
+      select id into v_org_id from public.organizations where name = v_org_name limit 1;
+    end if;
+
     select id into v_user_id from auth.users where email = v_email limit 1;
 
     if v_user_id is null then
@@ -532,7 +547,7 @@ begin
     end if;
 
     insert into public.user_accounts (user_id, email, full_name, role, organization_id)
-    values (v_user_id, v_email, v_full_name, v_role, null)
+    values (v_user_id, v_email, v_full_name, v_role, v_org_id)
     on conflict (email) do update
       set user_id = excluded.user_id,
           full_name = excluded.full_name,
