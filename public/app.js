@@ -370,6 +370,7 @@ let minorRecords = [];
 let majorRecords = [];
 let goodmoralTagMinorRecords = [];
 let goodmoralTagMajorRecords = [];
+let offenseCountMap = new Map();
 let uniformRecords = [];
 let gatepassRecords = [];
 let goodmoralRecords = [];
@@ -2457,6 +2458,51 @@ function flagGoodMoralFromMinor() {
   }));
 }
 
+// ==================== Student Offense Counts ====================
+// Total offenses per student = minor + major records combined, across all
+// academic periods (archived records included), keyed by normalized Sr-Code.
+
+function normalizeSrCodeKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function rebuildOffenseCountMap() {
+  const map = new Map();
+  const bump = (srCode, moduleKey) => {
+    const key = normalizeSrCodeKey(srCode);
+    if (!key) return;
+    const entry = map.get(key) || { total: 0, minor: 0, major: 0 };
+    entry[moduleKey] += 1;
+    entry.total += 1;
+    map.set(key, entry);
+  };
+
+  const minorSource = goodmoralTagMinorRecords.length ? goodmoralTagMinorRecords : minorRecords;
+  const majorSource = goodmoralTagMajorRecords.length ? goodmoralTagMajorRecords : majorRecords;
+
+  minorSource.forEach((record) => bump(record.sr_code, "minor"));
+  majorSource.forEach((record) => bump(record.sr_code, "major"));
+
+  offenseCountMap = map;
+  return map;
+}
+
+function getOffenseCount(srCode) {
+  const entry = offenseCountMap.get(normalizeSrCodeKey(srCode));
+  return entry ? entry.total : 0;
+}
+
+function renderOffenseCountBadge(srCode) {
+  const count = getOffenseCount(srCode);
+  if (!count) {
+    return `<span style="color:#9ca3af;">0</span>`;
+  }
+  if (count === 1) {
+    return `<span class="badge" title="1 total offense" style="padding:0.35rem 0.7rem;border-radius:6px;font-weight:700;font-size:0.8rem;background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);color:white;">1</span>`;
+  }
+  return `<span class="badge" title="${count} total offenses (repeat offender)" style="padding:0.35rem 0.6rem;border-radius:6px;font-weight:700;font-size:0.8rem;background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);color:white;white-space:nowrap;">${count} &middot; Repeat</span>`;
+}
+
 function normalizeGoodMoralStudentKey(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -3150,7 +3196,7 @@ function renderRows(records) {
   tableBody.innerHTML = "";
   if (!records.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="12">No records yet. Create the first entry below.</td>`;
+    row.innerHTML = `<td colspan="13">No records yet. Create the first entry below.</td>`;
     tableBody.appendChild(row);
     return;
   }
@@ -3161,6 +3207,7 @@ function renderRows(records) {
       <td>${formatDate(record.date_of_complaint)}</td>
       <td>${record.name_of_student || ""}</td>
       <td>${record.sr_code || ""}</td>
+      <td>${renderOffenseCountBadge(record.sr_code)}</td>
       <td>${record.year_program || ""}</td>
       <td>${record.contact_number || ""}</td>
       <td>${record.complainant || ""}</td>
@@ -3179,7 +3226,7 @@ function renderMajorRows(records) {
   majorTableBody.innerHTML = "";
   if (!records.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="15">No records yet. Create the first entry below.</td>`;
+    row.innerHTML = `<td colspan="16">No records yet. Create the first entry below.</td>`;
     majorTableBody.appendChild(row);
     return;
   }
@@ -3190,6 +3237,7 @@ function renderMajorRows(records) {
       <td>${formatDate(record.date_of_complaint)}</td>
       <td>${record.name_of_student || ""}</td>
       <td>${record.sr_code || ""}</td>
+      <td>${renderOffenseCountBadge(record.sr_code)}</td>
       <td>${record.year_program || ""}</td>
       <td>${record.sex === "M" ? "✔" : ""}</td>
       <td>${record.sex === "F" ? "✔" : ""}</td>
@@ -3332,6 +3380,7 @@ function withinDateRange(recordDate, from, to) {
 
 function applyMinorFilters() {
   if (!minorFilter) return;
+  rebuildOffenseCountMap();
   const query = minorFilter.querySelector("[data-filter='query']").value.trim();
   const from = minorFilter.querySelector("[data-filter='from']").value;
   const to = minorFilter.querySelector("[data-filter='to']").value;
@@ -3346,6 +3395,7 @@ function applyMinorFilters() {
 
 function applyMajorFilters() {
   if (!majorFilter) return;
+  rebuildOffenseCountMap();
   const query = majorFilter.querySelector("[data-filter='query']").value.trim();
   const from = majorFilter.querySelector("[data-filter='from']").value;
   const to = majorFilter.querySelector("[data-filter='to']").value;

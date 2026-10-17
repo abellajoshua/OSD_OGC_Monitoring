@@ -163,6 +163,21 @@ create table if not exists public.user_accounts (
   created_at timestamptz default now()
 );
 
+create table if not exists public.students (
+  id bigserial primary key,
+  sr_code text not null,
+  name text not null,
+  program text not null,
+  year_level text not null,
+  academic_year text not null check (academic_year ~ '^[0-9]{4}-[0-9]{4}$'),
+  semester text not null check (semester in ('First Semester', 'Second Semester', 'Summer Class')),
+  organization_id bigint not null references public.organizations(id),
+  created_by uuid references auth.users(id),
+  created_at timestamptz default now(),
+  constraint students_org_period_sr_code_key
+    unique (organization_id, academic_year, semester, sr_code)
+);
+
 -- ============================================================================
 -- LEGACY MIGRATIONS / ALTERS (SAFE FOR OLD DB)
 -- ============================================================================
@@ -839,6 +854,9 @@ create index if not exists gatepass_org_idx on public.gatepass (organization_id)
 create index if not exists good_moral_org_idx on public.good_moral (organization_id);
 create index if not exists id_replacement_org_idx on public.id_replacement (organization_id);
 create index if not exists leave_of_absence_org_idx on public.leave_of_absence (organization_id);
+create index if not exists students_org_period_idx on public.students (organization_id, academic_year, semester);
+create index if not exists students_sr_code_idx on public.students (sr_code);
+create index if not exists students_org_idx on public.students (organization_id);
 
 create index if not exists user_accounts_email_idx on public.user_accounts (email);
 create index if not exists user_accounts_user_id_idx on public.user_accounts (user_id);
@@ -859,6 +877,7 @@ grant select, insert, update, delete on table public.good_moral to authenticated
 grant select, insert, update, delete on table public.id_replacement to authenticated;
 grant select, insert, update, delete on table public.leave_of_absence to authenticated;
 grant select, insert, update, delete on table public.user_accounts to authenticated;
+grant select, insert, update, delete on table public.students to authenticated;
 
 grant usage, select on sequence public.organizations_id_seq to authenticated;
 grant usage, select on sequence public.minor_offenses_id_seq to authenticated;
@@ -869,6 +888,7 @@ grant usage, select on sequence public.good_moral_id_seq to authenticated;
 grant usage, select on sequence public.id_replacement_id_seq to authenticated;
 grant usage, select on sequence public.leave_of_absence_id_seq to authenticated;
 grant usage, select on sequence public.user_accounts_id_seq to authenticated;
+grant usage, select on sequence public.students_id_seq to authenticated;
 
 -- ============================================================================
 -- RLS HELPERS + POLICIES
@@ -940,6 +960,7 @@ alter table public.gatepass enable row level security;
 alter table public.good_moral enable row level security;
 alter table public.id_replacement enable row level security;
 alter table public.leave_of_absence enable row level security;
+alter table public.students enable row level security;
 
 -- drop old policies if any
 drop policy if exists organizations_read_all on public.organizations;
@@ -967,6 +988,8 @@ drop policy if exists id_replacement_select_same_org on public.id_replacement;
 drop policy if exists id_replacement_modify_coordinator_only on public.id_replacement;
 drop policy if exists leave_of_absence_select_same_org on public.leave_of_absence;
 drop policy if exists leave_of_absence_modify_coordinator_only on public.leave_of_absence;
+drop policy if exists students_select_scoped on public.students;
+drop policy if exists students_modify_admin_only on public.students;
 
 create policy organizations_read_all
 on public.organizations
@@ -1166,6 +1189,27 @@ using (
 with check (
   organization_id = public.current_user_organization_id()
   and public.current_user_role() = 'coordinator'
+);
+
+create policy students_select_scoped
+on public.students
+for select
+to authenticated
+using (
+  public.current_user_role() = 'admin'
+  or public.can_access_all_organizations()
+  or organization_id = public.current_user_organization_id()
+);
+
+create policy students_modify_admin_only
+on public.students
+for all
+to authenticated
+using (
+  public.current_user_role() = 'admin'
+)
+with check (
+  public.current_user_role() = 'admin'
 );
 
 commit;

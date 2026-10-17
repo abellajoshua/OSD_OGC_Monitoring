@@ -33,6 +33,17 @@ in the Supabase SQL editor. It is idempotent (safe to re-run) and, unlike `supab
 does **not** truncate any table. It corrects head accounts to read across all organizations (matching
 `public.can_access_all_organizations()`) and tightens `user_accounts` reads to each account's own row.
 
+## Student Details module
+Admin portal (`admin.html`) uploads or manually enters student details per campus:
+`sr_code`, `name`, `program`, `year_level`, `academic_year`, `semester`.
+- Run `supabase_students_migration.sql` once in the Supabase SQL Editor to create the `students`
+  table, grants, RLS policies, and indexes. Idempotent, safe to re-run.
+- Bulk import uses CSV columns: `sr_code,name,program,year_level,academic_year,semester`.
+  Campus comes from the admin dropdown. Rows upsert on
+  (organization_id, academic_year, semester, sr_code).
+- Coordinators get a read-only Student Records page (`students.html`, linked from the dashboard)
+  scoped to their own campus. Heads see all campuses. Only admins can write.
+
 ## Deploy to GitHub Pages
 1. Push to `main`.
 2. In GitHub repo settings, open **Pages**.

@@ -123,6 +123,43 @@ alter table public.good_moral enable row level security;
 alter table public.id_replacement enable row level security;
 alter table public.leave_of_absence enable row level security;
 
+-- Students table is added by supabase_students_migration.sql; guard in case
+-- this RBAC migration is run against a database created before that module.
+do $$
+begin
+  if to_regclass('public.students') is not null then
+    alter table public.students enable row level security;
+
+    drop policy if exists students_select_scoped on public.students;
+    drop policy if exists students_modify_admin_only on public.students;
+
+    execute $p$
+      create policy students_select_scoped
+      on public.students
+      for select
+      to authenticated
+      using (
+        public.current_user_role() = 'admin'
+        or public.can_access_all_organizations()
+        or organization_id = public.current_user_organization_id()
+      )
+    $p$;
+
+    execute $p$
+      create policy students_modify_admin_only
+      on public.students
+      for all
+      to authenticated
+      using (
+        public.current_user_role() = 'admin'
+      )
+      with check (
+        public.current_user_role() = 'admin'
+      )
+    $p$;
+  end if;
+end $$;
+
 -- ============================================================================
 -- 4) DROP OLD POLICIES (all known past and current names)
 -- ============================================================================

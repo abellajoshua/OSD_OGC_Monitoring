@@ -35,6 +35,10 @@ const nonWearingUniformIndexHandler = require("./non-wearing-uniform/index");
 const nonWearingUniformArchiveHandler = require("./non-wearing-uniform/archive");
 const nonWearingUniformByIdHandler = require("./non-wearing-uniform/[id]");
 
+const studentsIndexHandler = require("./students/index");
+const studentsBulkHandler = require("./students/bulk");
+const studentsByIdHandler = require("./students/[id]");
+
 function getQueryFromUrl(urlValue) {
   const url = new URL(urlValue || "/", "http://localhost");
   const query = {};
@@ -144,6 +148,15 @@ function parseRoute(pathname) {
     return {
       handler: nonWearingUniformByIdHandler,
       id: decodeURIComponent(path.slice("non-wearing-uniform/".length)),
+    };
+  }
+
+  if (path === "students") return { handler: studentsIndexHandler };
+  if (path === "students/bulk") return { handler: studentsBulkHandler };
+  if (path.startsWith("students/")) {
+    return {
+      handler: studentsByIdHandler,
+      id: decodeURIComponent(path.slice("students/".length)),
     };
   }
 

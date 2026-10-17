@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OSD & OGC Monitoring | Student Records</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+      }
+      .filter-grid label {
+        display: block;
+        font-weight: 700;
+        font-size: 0.8rem;
+        color: #374151;
+        margin-bottom: 0.35rem;
+      }
+      .filter-grid input,
+      .filter-grid select {
+        width: 100%;
+        padding: 0.6rem 0.8rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="ambient">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">
+          <img src="assets/logo.png" alt="Batangas State University logo" />
+        </div>
+        <div>
+          <p class="brand-title">Student Records</p>
+          <p class="brand-subtitle" id="campus-subtitle">Your campus student directory</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <a class="nav-btn" href="index.html">Back to Dashboard</a>
+        <button class="nav-btn" id="logout-btn">Logout</button>
+      </nav>
+    </header>
+
+    <main class="container-fluid container-xl">
+      <section class="sheet" style="margin-top: 28px;">
+        <div class="log-title">
+          <h2>Student Directory</h2>
+          <h3>Read-only view of uploaded student details</h3>
+        </div>
+
+        <div class="filter-grid">
+          <div>
+            <label for="students-academic-year">Academic Year</label>
+            <input type="text" id="students-academic-year" placeholder="2025-2026" />
+          </div>
+          <div>
+            <label for="students-semester">Semester</label>
+            <select id="students-semester">
+              <option value="">All Semesters</option>
+              <option value="First Semester">First Semester</option>
+              <option value="Second Semester">Second Semester</option>
+              <option value="Summer Class">Summer Class</option>
+            </select>
+          </div>
+          <div>
+            <label for="students-program">Program</label>
+            <input type="text" id="students-program" placeholder="BSIT" />
+          </div>
+          <div>
+            <label for="students-search">Search</label>
+            <input type="text" id="students-search" placeholder="Name or Sr-Code" />
+          </div>
+          <div style="display: flex; align-items: flex-end;">
+            <button class="primary" id="students-refresh-btn" type="button" style="width: 100%;">Refresh</button>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;">
+          <button class="ghost" id="students-export-btn" type="button">Download CSV</button>
+        </div>
+
+        <p class="form-status" id="students-status" aria-live="polite"></p>
+
+        <div class="table-wrap table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Sr-Code</th>
+                <th>Name</th>
+                <th>Program</th>
+                <th>Year Level</th>
+                <th>Academic Year</th>
+                <th>Semester</th>
+                <th>Offense Count</th>
+              </tr>
+            </thead>
+            <tbody id="students-table-body">
+              <tr>
+                <td colspan="7" class="text-center py-5">Loading students...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="runtime-config.js?v=5"></script>
+    <script type="module" src="auth-guard.js?v=5"></script>
+    <script type="module" src="students.js?v=2"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+  </body>
+</html>

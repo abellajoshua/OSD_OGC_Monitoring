@@ -9,9 +9,27 @@ const refreshBtn = document.querySelector("#refresh-btn");
 const organizationSelect = document.querySelector("#new-organization");
 const roleSelect = document.querySelector("#new-role");
 
+const studentsCampusSelect = document.querySelector("#students-campus");
+const studentsAcademicYearInput = document.querySelector("#students-academic-year");
+const studentsSemesterSelect = document.querySelector("#students-semester");
+const studentsSearchInput = document.querySelector("#students-search");
+const studentsRefreshBtn = document.querySelector("#students-refresh-btn");
+const studentsCsvFileInput = document.querySelector("#students-csv-file");
+const studentsUploadBtn = document.querySelector("#students-upload-btn");
+const studentsUploadSummary = document.querySelector("#students-upload-summary");
+const studentsTableBody = document.querySelector("#students-table-body");
+const studentsStatus = document.querySelector("#students-status");
+const studentsTemplateBtn = document.querySelector("#students-template-btn");
+const addStudentBtn = document.querySelector("#add-student-btn");
+const studentForm = document.querySelector("#student-form");
+const studentFormStatus = document.querySelector("#student-form-status");
+const studentModalLabel = document.querySelector("#studentModalLabel");
+const studentSaveBtn = document.querySelector("#student-save-btn");
+
 let currentUserAccount = null;
 let alangilanOrganizationId = null;
 let headAccountExists = false;
+let studentsCached = [];
 
 function showCreateError(message) {
   if (!createStatus) return;
@@ -541,6 +559,514 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// ==================== Student Details Module ====================
+
+const STUDENT_CSV_HEADERS = ["sr_code", "name", "program", "year_level", "academic_year", "semester"];
+
+async function loadStudentCampuses() {
+  if (!studentsCampusSelect) return;
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id, name, type")
+    .order("type", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    studentsCampusSelect.innerHTML = `<option value="">Failed to load campuses</option>`;
+    return;
+  }
+
+  studentsCampusSelect.innerHTML =
+    `<option value="">All Campuses</option>` +
+    (data || [])
+      .map((org) => `<option value="${org.id}">${escapeHtml(org.name)} (${escapeHtml(org.type)})</option>`)
+      .join("");
+}
+
+function setStudentsStatus(html) {
+  if (studentsStatus) studentsStatus.innerHTML = html;
+}
+
+async function loadStudents() {
+  if (!studentsTableBody) return;
+  studentsTableBody.innerHTML = `
+    <tr>
+      <td colspan="7" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status" style="width: 2.5rem; height: 2.5rem;">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="text-muted mt-3 mb-0" style="font-size: 1.125rem; font-weight: 500;">Loading students...</p>
+      </td>
+    </tr>
+  `;
+
+  try {
+    const token = await getAccessToken();
+    const params = new URLSearchParams();
+    const organizationId = studentsCampusSelect?.value || "";
+    const academicYear = (studentsAcademicYearInput?.value || "").trim();
+    const semester = studentsSemesterSelect?.value || "";
+    const search = (studentsSearchInput?.value || "").trim();
+
+    if (organizationId) params.set("organization_id", organizationId);
+    if (academicYear) params.set("academic_year", academicYear);
+    if (semester) params.set("semester", semester);
+    if (search) params.set("q", search);
+
+    const response = await fetch(`/api/students?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    });
+
+    const result = await parseApiResponse(response);
+
+    if (!response.ok) {
+      throw new Error(getResponseErrorMessage(result, "Failed to load students"));
+    }
+
+    studentsCached = Array.isArray(result) ? result : [];
+
+    if (!studentsCached.length) {
+      studentsTableBody.innerHTML = `
+        <tr>
+          <td colspan="7" class="text-center py-5">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="#d1d5db" style="margin-bottom: 1rem;">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+            </svg>
+            <p style="color: #6b7280; font-size: 1rem; margin: 0;">No student records found</p>
+            <small style="color: #9ca3af;">Upload a CSV or add a student manually</small>
+          </td>
+        </tr>
+      `;
+      setStudentsStatus("");
+      return;
+    }
+
+    studentsTableBody.innerHTML = studentsCached
+      .map(
+        (student) => `
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 1rem 1.5rem;">
+            <div style="font-weight: 600; color: #111827;">${escapeHtml(student.sr_code)}</div>
+          </td>
+          <td style="padding: 1rem 1.5rem; color: #374151;">${escapeHtml(student.name)}</td>
+          <td style="padding: 1rem 1.5rem; color: #374151;">${escapeHtml(student.program)}</td>
+          <td style="padding: 1rem 1.5rem; color: #374151;">${escapeHtml(student.year_level)}</td>
+          <td style="padding: 1rem 1.5rem; color: #374151;">${escapeHtml(student.academic_year)}</td>
+          <td style="padding: 1rem 1.5rem; color: #374151;">${escapeHtml(student.semester)}</td>
+          <td style="padding: 1rem 1.5rem;">
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm edit-student-btn" data-id="${student.id}" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 6px; padding: 0.5rem 0.9rem; font-weight: 600; font-size: 0.875rem;">Edit</button>
+              <button class="btn btn-sm delete-student-btn" data-id="${student.id}" data-sr-code="${escapeHtml(student.sr_code)}" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; border-radius: 6px; padding: 0.5rem 0.9rem; font-weight: 600; font-size: 0.875rem;">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `
+      )
+      .join("");
+
+    document.querySelectorAll(".edit-student-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const student = studentsCached.find((item) => String(item.id) === String(btn.dataset.id));
+        if (student) openStudentModal(student);
+      });
+    });
+
+    document.querySelectorAll(".delete-student-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const confirmMsg = `Delete student record?\n\nSr-Code: ${btn.dataset.srCode}\n\nThis action cannot be undone.`;
+        if (confirm(confirmMsg)) {
+          await deleteStudent(btn.dataset.id);
+        }
+      });
+    });
+
+    setStudentsStatus(`
+      <div class="alert alert-success" style="border: none; border-radius: 8px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 1rem; margin: 0;">
+        <strong>${studentsCached.length} ${studentsCached.length === 1 ? "student record" : "student records"}</strong> found
+      </div>
+    `);
+  } catch (error) {
+    console.error("Error loading students:", error);
+    setStudentsStatus(`
+      <div class="alert alert-danger" style="border: none; border-radius: 8px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 1rem; margin: 0;">
+        <strong>Error loading students:</strong> ${escapeHtml(error.message)}
+      </div>
+    `);
+    studentsTableBody.innerHTML = `
+      <tr>
+        <td colspan="7" class="text-center py-5">
+          <p style="color: #ef4444; font-weight: 600; margin: 0;">Error Loading Students</p>
+          <small style="color: #6b7280;">Check the error message above for details</small>
+        </td>
+      </tr>
+    `;
+  }
+}
+
+function downloadStudentsTemplate() {
+  const csv = [STUDENT_CSV_HEADERS.join(","), "21-01234,Juan Dela Cruz,BSIT,3rd Year,2025-2026,First Semester"].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "students-template.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let field = "";
+  let row = [];
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (inQuotes) {
+      if (char === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += char;
+      }
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ",") {
+      row.push(field);
+      field = "";
+    } else if (char === "\n" || char === "\r") {
+      if (char === "\r" && text[i + 1] === "\n") i += 1;
+      row.push(field);
+      field = "";
+      if (row.some((cell) => String(cell).trim() !== "")) {
+        rows.push(row);
+      }
+      row = [];
+    } else {
+      field += char;
+    }
+  }
+
+  row.push(field);
+  if (row.some((cell) => String(cell).trim() !== "")) {
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function mapCsvRows(parsedRows) {
+  if (!parsedRows.length) return { rows: [], error: "CSV file is empty." };
+
+  const header = parsedRows[0].map((cell) => String(cell).trim().toLowerCase());
+  const expected = STUDENT_CSV_HEADERS.map((h) => h.toLowerCase());
+  const missing = expected.filter((column) => !header.includes(column));
+
+  if (missing.length) {
+    return { rows: [], error: `CSV header missing columns: ${missing.join(", ")}` };
+  }
+
+  const rows = parsedRows.slice(1)
+    .map((cells) => {
+      const record = {};
+      header.forEach((column, index) => {
+        record[column] = String(cells[index] || "").trim();
+      });
+      return record;
+    })
+    .filter((record) => Object.values(record).some((value) => value !== ""));
+
+  return { rows, error: null };
+}
+
+async function uploadStudentsCsv() {
+  if (!studentsCsvFileInput || !studentsUploadBtn || !studentsUploadSummary) return;
+
+  const file = studentsCsvFileInput.files?.[0];
+  if (!file) {
+    studentsUploadSummary.innerHTML = `
+      <div class="alert alert-warning mb-0" style="border: none; border-radius: 8px; padding: 0.75rem 1rem;">Select a CSV file first.</div>
+    `;
+    return;
+  }
+
+  const organizationId = Number(studentsCampusSelect?.value || "");
+  if (!organizationId) {
+    studentsUploadSummary.innerHTML = `
+      <div class="alert alert-warning mb-0" style="border: none; border-radius: 8px; padding: 0.75rem 1rem;">Choose a campus from the Campus dropdown before uploading.</div>
+    `;
+    return;
+  }
+
+  studentsUploadBtn.disabled = true;
+  studentsUploadBtn.textContent = "Uploading...";
+
+  try {
+    const text = await file.text();
+    const parsed = parseCsv(String(text).replace(/^\uFEFF/, ""));
+    const { rows, error: mapError } = mapCsvRows(parsed);
+
+    if (mapError) {
+      throw new Error(mapError);
+    }
+
+    if (!rows.length) {
+      throw new Error("No data rows found in the CSV.");
+    }
+
+    const token = await getAccessToken();
+    const response = await fetch("/api/students/bulk", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        organization_id: organizationId,
+        rows,
+      }),
+    });
+
+    const result = await parseApiResponse(response);
+
+    if (!response.ok) {
+      throw new Error(getResponseErrorMessage(result, "Upload failed"));
+    }
+
+    const rejected = Number(result.rejected || 0);
+    const upserted = Number(result.upserted || 0);
+    const errorLines = Array.isArray(result.errors) ? result.errors.slice(0, 5) : [];
+
+    studentsUploadSummary.innerHTML = `
+      <div class="alert ${rejected ? "alert-warning" : "alert-success"} mb-0" style="border: none; border-radius: 8px; padding: 0.75rem 1rem;">
+        <strong>Upload complete.</strong> ${upserted} row(s) upserted, ${rejected} rejected.
+        ${errorLines.length ? `<br><small>${errorLines.map((line) => escapeHtml(line)).join("<br>")}${(result.errors || []).length > 5 ? "<br>..." : ""}</small>` : ""}
+      </div>
+    `;
+
+    studentsCsvFileInput.value = "";
+    await loadStudents();
+  } catch (error) {
+    console.error("Error uploading students CSV:", error);
+    studentsUploadSummary.innerHTML = `
+      <div class="alert alert-danger mb-0" style="border: none; border-radius: 8px; padding: 0.75rem 1rem;">
+        <strong>Error:</strong> ${escapeHtml(error.message)}
+      </div>
+    `;
+  } finally {
+    studentsUploadBtn.disabled = false;
+    studentsUploadBtn.textContent = "Upload CSV";
+  }
+}
+
+function getStudentModal() {
+  const modalElement = document.getElementById("studentModal");
+  return modalElement ? bootstrap.Modal.getOrCreateInstance(modalElement) : null;
+}
+
+function openStudentModal(student = null) {
+  if (!studentForm) return;
+
+  studentForm.reset();
+  studentFormStatus.innerHTML = "";
+
+  const isEdit = Boolean(student);
+  if (studentModalLabel) {
+    studentModalLabel.textContent = isEdit ? "Edit Student" : "Add Student";
+  }
+  if (studentSaveBtn) {
+    studentSaveBtn.textContent = isEdit ? "Update Student" : "Save Student";
+  }
+  document.querySelector("#student-id").value = student ? String(student.id) : "";
+
+  if (student) {
+    document.querySelector("#student-sr-code").value = student.sr_code || "";
+    document.querySelector("#student-name").value = student.name || "";
+    document.querySelector("#student-program").value = student.program || "";
+    document.querySelector("#student-year-level").value = student.year_level || "";
+    document.querySelector("#student-academic-year").value = student.academic_year || "";
+    document.querySelector("#student-semester").value = student.semester || "First Semester";
+  } else {
+    document.querySelector("#student-semester").value = studentsSemesterSelect?.value || "First Semester";
+    document.querySelector("#student-academic-year").value = (studentsAcademicYearInput?.value || "").trim();
+  }
+
+  const modal = getStudentModal();
+  if (modal) modal.show();
+}
+
+async function saveStudent(formData) {
+  const id = String(formData.get("id") || "").trim();
+  const token = await getAccessToken();
+
+  if (id) {
+    const response = await fetch(`/api/students/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        sr_code: formData.get("sr_code"),
+        name: formData.get("name"),
+        program: formData.get("program"),
+        year_level: formData.get("year_level"),
+        academic_year: formData.get("academic_year"),
+        semester: formData.get("semester"),
+      }),
+    });
+    const result = await parseApiResponse(response);
+    if (!response.ok) {
+      throw new Error(getResponseErrorMessage(result, "Failed to update student"));
+    }
+    return result;
+  }
+
+  const organizationId = Number(studentsCampusSelect?.value || "");
+  if (!organizationId) {
+    throw new Error("Choose a campus from the Campus dropdown before adding a student.");
+  }
+
+  const response = await fetch("/api/students", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      organization_id: organizationId,
+      sr_code: formData.get("sr_code"),
+      name: formData.get("name"),
+      program: formData.get("program"),
+      year_level: formData.get("year_level"),
+      academic_year: formData.get("academic_year"),
+      semester: formData.get("semester"),
+    }),
+  });
+
+  const result = await parseApiResponse(response);
+  if (!response.ok) {
+    throw new Error(getResponseErrorMessage(result, "Failed to add student"));
+  }
+  return result;
+}
+
+async function deleteStudent(id) {
+  try {
+    const token = await getAccessToken();
+    const response = await fetch(`/api/students/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const result = await parseApiResponse(response);
+    if (!response.ok) {
+      throw new Error(getResponseErrorMessage(result, "Failed to delete student"));
+    }
+
+    setStudentsStatus(`
+      <div class="alert alert-success" style="border: none; border-radius: 8px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 1rem; margin: 0;">
+        <strong>Student record deleted.</strong>
+      </div>
+    `);
+    await loadStudents();
+  } catch (error) {
+    console.error("Error deleting student:", error);
+    setStudentsStatus(`
+      <div class="alert alert-danger" style="border: none; border-radius: 8px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 1rem; margin: 0;">
+        <strong>Error:</strong> ${escapeHtml(error.message)}
+      </div>
+    `);
+  }
+}
+
+function bindStudentModuleEvents() {
+  if (studentsRefreshBtn) {
+    studentsRefreshBtn.addEventListener("click", () => loadStudents());
+  }
+
+  if (studentsSearchInput) {
+    let debounceTimer = null;
+    studentsSearchInput.addEventListener("input", () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => loadStudents(), 400);
+    });
+  }
+
+  if (studentsCampusSelect) {
+    studentsCampusSelect.addEventListener("change", () => loadStudents());
+  }
+
+  if (studentsAcademicYearInput) {
+    studentsAcademicYearInput.addEventListener("change", () => loadStudents());
+  }
+
+  if (studentsSemesterSelect) {
+    studentsSemesterSelect.addEventListener("change", () => loadStudents());
+  }
+
+  if (studentsTemplateBtn) {
+    studentsTemplateBtn.addEventListener("click", downloadStudentsTemplate);
+  }
+
+  if (studentsUploadBtn) {
+    studentsUploadBtn.addEventListener("click", uploadStudentsCsv);
+  }
+
+  if (addStudentBtn) {
+    addStudentBtn.addEventListener("click", () => openStudentModal(null));
+  }
+
+  if (studentForm) {
+    studentForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      studentFormStatus.innerHTML = `
+        <div class="alert alert-info" style="border: none; border-radius: 8px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 1rem;">
+          Saving student record...
+        </div>
+      `;
+
+      try {
+        const formData = new FormData(studentForm);
+        await saveStudent(formData);
+        const modal = getStudentModal();
+        if (modal) modal.hide();
+        await loadStudents();
+      } catch (error) {
+        studentFormStatus.innerHTML = `
+          <div class="alert alert-danger" style="border: none; border-radius: 8px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 1rem;">
+            <strong>Error:</strong> ${escapeHtml(error.message)}
+          </div>
+        `;
+      }
+    });
+  }
+
+  const studentModalElement = document.getElementById("studentModal");
+  if (studentModalElement) {
+    studentModalElement.addEventListener("show.bs.modal", () => {
+      studentModalElement.removeAttribute("inert");
+      studentModalElement.setAttribute("aria-hidden", "false");
+    });
+    studentModalElement.addEventListener("hidden.bs.modal", () => {
+      studentModalElement.setAttribute("inert", "");
+      studentModalElement.setAttribute("aria-hidden", "true");
+    });
+  }
+}
+
 // Form submit handler
 if (createUserForm) {
   createUserForm.addEventListener("submit", async (event) => {
@@ -616,10 +1142,13 @@ if (logoutBtn) {
 // Initialize on page load
 (async function init() {
   bindCreateUserModalGuards();
+  bindStudentModuleEvents();
   const isAdmin = await checkAdminAccess();
   if (isAdmin) {
     await loadOrganizations();
     await loadUsers();
+    await loadStudentCampuses();
+    await loadStudents();
     await checkServerEnvironmentStatus();
   }
 })();

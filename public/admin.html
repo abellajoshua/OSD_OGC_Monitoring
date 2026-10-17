@@ -163,6 +163,95 @@
           </div>
         </div>
       </div>
+
+      <!-- Student Details Module -->
+      <div class="row mt-4">
+        <div class="col-12">
+          <div class="card shadow-sm" style="border-radius: 16px; border: 1px solid #e5e7eb;">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2" style="background: linear-gradient(135deg, #a41321 0%, #8b0f1a 100%); color: white; padding: 1.5rem 2rem; border-radius: 16px 16px 0 0;">
+              <div class="d-flex align-items-center">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 0.75rem;">
+                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                </svg>
+                <h2 class="mb-0" style="font-size: 1.5rem; font-weight: 700;">Student Details</h2>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-light btn-sm" id="students-template-btn" style="border-radius: 8px; font-weight: 700; padding: 0.5rem 1.25rem;">Download CSV Template</button>
+                <button class="btn btn-light btn-sm" id="add-student-btn" style="border-radius: 8px; font-weight: 700; padding: 0.5rem 1.25rem;">+ Add Student</button>
+              </div>
+            </div>
+            <div class="card-body p-0">
+              <div style="padding: 1.5rem 2rem; border-bottom: 1px solid #e5e7eb;">
+                <div class="row g-3 align-items-end">
+                  <div class="col-12 col-md-3">
+                    <label for="students-campus" class="form-label fw-bold mb-1" style="color: #374151; font-size: 0.875rem;">Campus</label>
+                    <select class="form-select" id="students-campus" style="border-radius: 8px; border: 2px solid #e5e7eb;">
+                      <option value="">Loading campuses...</option>
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-2">
+                    <label for="students-academic-year" class="form-label fw-bold mb-1" style="color: #374151; font-size: 0.875rem;">Academic Year</label>
+                    <input type="text" class="form-control" id="students-academic-year" placeholder="2025-2026" style="border-radius: 8px; border: 2px solid #e5e7eb;" />
+                  </div>
+                  <div class="col-6 col-md-2">
+                    <label for="students-semester" class="form-label fw-bold mb-1" style="color: #374151; font-size: 0.875rem;">Semester</label>
+                    <select class="form-select" id="students-semester" style="border-radius: 8px; border: 2px solid #e5e7eb;">
+                      <option value="">All Semesters</option>
+                      <option value="First Semester">First Semester</option>
+                      <option value="Second Semester">Second Semester</option>
+                      <option value="Summer Class">Summer Class</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-3">
+                    <label for="students-search" class="form-label fw-bold mb-1" style="color: #374151; font-size: 0.875rem;">Search</label>
+                    <input type="text" class="form-control" id="students-search" placeholder="Name or Sr-Code" style="border-radius: 8px; border: 2px solid #e5e7eb;" />
+                  </div>
+                  <div class="col-12 col-md-2 d-flex gap-2">
+                    <button class="btn btn-outline-secondary flex-grow-1" id="students-refresh-btn" style="border-radius: 8px; font-weight: 700;">Refresh</button>
+                  </div>
+                </div>
+                <div class="row g-3 align-items-center mt-1">
+                  <div class="col-12 col-md-4">
+                    <label for="students-csv-file" class="form-label fw-bold mb-1" style="color: #374151; font-size: 0.875rem;">Bulk Upload CSV</label>
+                    <input type="file" class="form-control" id="students-csv-file" accept=".csv,text/csv" style="border-radius: 8px; border: 2px solid #e5e7eb;" />
+                    <small class="text-muted">Columns: sr_code, name, program, year_level, academic_year, semester. Campus from dropdown above.</small>
+                  </div>
+                  <div class="col-12 col-md-3 d-flex gap-2 align-items-end">
+                    <button class="btn flex-grow-1" id="students-upload-btn" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; border: none; border-radius: 8px; font-weight: 700; padding: 0.55rem 1.25rem;">Upload CSV</button>
+                  </div>
+                  <div class="col-12 col-md-5" id="students-upload-summary"></div>
+                </div>
+              </div>
+              <div id="students-status" style="padding: 1.5rem 2rem;"></div>
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.95rem;">
+                  <thead style="background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%); border-bottom: 2px solid #e5e7eb;">
+                    <tr>
+                      <th style="padding: 1rem 2rem; font-weight: 700; color: #374151; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">Sr-Code</th>
+                      <th style="padding: 1rem 2rem; font-weight: 700; color: #374151; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">Name</th>
+                      <th style="padding: 1rem 2rem; font-weight: 700; color: #374151; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">Program</th>
+                      <th style="padding: 1rem 2rem; font-weight: 700; color: #374151; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">Year Level</th>
+                      <th style="padding: 1rem 2rem; font-weight: 700; color: #374151; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">Academic Year</th>
+                      <th style="padding: 1rem 2rem; font-weight: 700; color: #374151; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">Semester</th>
+                      <th style="padding: 1rem 2rem; font-weight: 700; color: #374151; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; width: 170px;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="students-table-body">
+                    <tr>
+                      <td colspan="7" class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status" style="width: 2.5rem; height: 2.5rem;">
+                          <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="text-muted mt-3 mb-0" style="font-size: 1.125rem; font-weight: 500;">Loading students...</p>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
 
     <!-- Create User Modal -->
@@ -215,6 +304,58 @@
                     <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                   </svg>
                   Create Account
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-lg" data-bs-dismiss="modal" style="border-radius: 10px; font-weight: 600;">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student Modal (Add / Edit) -->
+    <div class="modal fade" id="studentModal" tabindex="-1" aria-labelledby="studentModalLabel" aria-hidden="true" inert>
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 16px; border: none; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
+          <div class="modal-header" style="background: linear-gradient(135deg, #a41321 0%, #8b0f1a 100%); color: white; padding: 1.5rem 2rem; border-radius: 16px 16px 0 0; border: none;">
+            <h3 class="modal-title" id="studentModalLabel" style="font-weight: 700; font-size: 1.5rem;">Add Student</h3>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" style="padding: 2rem;">
+            <form id="student-form">
+              <input type="hidden" id="student-id" name="id" value="" />
+              <div class="mb-3">
+                <label for="student-sr-code" class="form-label fw-bold" style="color: #374151;">Sr-Code <span class="text-danger">*</span></label>
+                <input type="text" class="form-control form-control-lg" id="student-sr-code" name="sr_code" required placeholder="e.g. 21-01234" style="border-radius: 10px; border: 2px solid #e5e7eb; padding: 0.875rem;" />
+              </div>
+              <div class="mb-3">
+                <label for="student-name" class="form-label fw-bold" style="color: #374151;">Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control form-control-lg" id="student-name" name="name" required placeholder="Juan Dela Cruz" style="border-radius: 10px; border: 2px solid #e5e7eb; padding: 0.875rem;" />
+              </div>
+              <div class="mb-3">
+                <label for="student-program" class="form-label fw-bold" style="color: #374151;">Program <span class="text-danger">*</span></label>
+                <input type="text" class="form-control form-control-lg" id="student-program" name="program" required placeholder="BSIT" style="border-radius: 10px; border: 2px solid #e5e7eb; padding: 0.875rem;" />
+              </div>
+              <div class="mb-3">
+                <label for="student-year-level" class="form-label fw-bold" style="color: #374151;">Year Level <span class="text-danger">*</span></label>
+                <input type="text" class="form-control form-control-lg" id="student-year-level" name="year_level" required placeholder="3rd Year" style="border-radius: 10px; border: 2px solid #e5e7eb; padding: 0.875rem;" />
+              </div>
+              <div class="mb-3">
+                <label for="student-academic-year" class="form-label fw-bold" style="color: #374151;">Academic Year <span class="text-danger">*</span></label>
+                <input type="text" class="form-control form-control-lg" id="student-academic-year" name="academic_year" required placeholder="2025-2026" style="border-radius: 10px; border: 2px solid #e5e7eb; padding: 0.875rem;" />
+              </div>
+              <div class="mb-4">
+                <label for="student-semester" class="form-label fw-bold" style="color: #374151;">Semester <span class="text-danger">*</span></label>
+                <select class="form-select form-select-lg" id="student-semester" name="semester" required style="border-radius: 10px; border: 2px solid #e5e7eb; padding: 0.875rem;">
+                  <option value="First Semester">First Semester</option>
+                  <option value="Second Semester">Second Semester</option>
+                  <option value="Summer Class">Summer Class</option>
+                </select>
+              </div>
+              <div id="student-form-status" class="mb-3"></div>
+              <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-lg" id="student-save-btn" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; border: none; border-radius: 10px; padding: 1rem; font-weight: 700; font-size: 1.125rem; box-shadow: 0 4px 6px rgba(22, 163, 74, 0.3);">
+                  Save Student
                 </button>
                 <button type="button" class="btn btn-outline-secondary btn-lg" data-bs-dismiss="modal" style="border-radius: 10px; font-weight: 600;">Cancel</button>
               </div>
