@@ -37,6 +37,7 @@ const nonWearingUniformByIdHandler = require("./non-wearing-uniform/[id]");
 
 const studentsIndexHandler = require("./students/index");
 const studentsBulkHandler = require("./students/bulk");
+const studentsLookupHandler = require("./students/lookup");
 const studentsByIdHandler = require("./students/[id]");
 
 function getQueryFromUrl(urlValue) {
@@ -153,6 +154,7 @@ function parseRoute(pathname) {
 
   if (path === "students") return { handler: studentsIndexHandler };
   if (path === "students/bulk") return { handler: studentsBulkHandler };
+  if (path === "students/lookup") return { handler: studentsLookupHandler };
   if (path.startsWith("students/")) {
     return {
       handler: studentsByIdHandler,

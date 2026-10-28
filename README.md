@@ -43,6 +43,8 @@ Admin portal (`admin.html`) uploads or manually enters student details per campu
   (organization_id, academic_year, semester, sr_code).
 - Coordinators get a read-only Student Records page (`students.html`, linked from the dashboard)
   scoped to their own campus. Heads see all campuses. Only admins can write.
+- Coordinator record forms auto-fill the student name when the entered SR Code matches a
+  student record for their campus (`GET /api/students/lookup?sr_code=...`).
 
 ## Deploy to GitHub Pages
 1. Push to `main`.

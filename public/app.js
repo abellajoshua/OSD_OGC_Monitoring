@@ -2503,6 +2503,144 @@ function renderOffenseCountBadge(srCode) {
   return `<span class="badge" title="${count} total offenses (repeat offender)" style="padding:0.35rem 0.6rem;border-radius:6px;font-weight:700;font-size:0.8rem;background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);color:white;white-space:nowrap;">${count} &middot; Repeat</span>`;
 }
 
+// ==================== Student Name Auto-fill ====================
+// Coordinator forms look up the entered SR Code against the admin-managed
+// students table (own campus only) and fill the student name on a match.
+
+const STUDENT_LOOKUP_MIN_LENGTH = 4;
+const STUDENT_LOOKUP_DEBOUNCE_MS = 400;
+const studentLookupCache = new Map();
+
+async function lookupStudentBySrCode(srCode) {
+  const key = normalizeSrCodeKey(srCode);
+  if (!key) return null;
+  if (studentLookupCache.has(key)) return studentLookupCache.get(key);
+
+  try {
+    const supabase = await getSupabase();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return null;
+
+    const query = new URLSearchParams({ sr_code: String(srCode).trim() });
+    const period = getAcademicPeriodRange();
+    if (period) {
+      query.set("academic_year", period.year);
+      query.set("semester", period.semester);
+    }
+
+    const response = await fetch(`/api/students/lookup?${query.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      cache: "no-store",
+    });
+
+    const data = await parseApiResponse(response);
+    if (!response.ok) {
+      throw new Error(data?.error || `Student lookup failed (${response.status})`);
+    }
+
+    const student = data?.found ? data.student || null : null;
+    studentLookupCache.set(key, student);
+    return student;
+  } catch (error) {
+    logDataFlow("Student lookup failed", { srCode, message: error.message });
+    return null;
+  }
+}
+
+function attachStudentAutofill(form, nameFieldName) {
+  if (!form) return;
+  const srCodeInput = form.querySelector('[name="sr_code"]');
+  const nameInput = form.querySelector(`[name="${nameFieldName}"]`);
+  if (!srCodeInput || !nameInput) return;
+
+  const hint = document.createElement("small");
+  hint.className = "autofill-hint";
+  hint.hidden = true;
+  nameInput.insertAdjacentElement("afterend", hint);
+
+  let debounceTimer = null;
+
+  const setHint = (message, state) => {
+    hint.textContent = message;
+    hint.dataset.state = state || "";
+    hint.hidden = !message;
+  };
+
+  const clearAutofilledName = () => {
+    if (nameInput.dataset.autofilled === "true") {
+      nameInput.value = "";
+      delete nameInput.dataset.autofilled;
+    }
+  };
+
+  const runLookup = async () => {
+    clearTimeout(debounceTimer);
+    // Never overwrite the name of a record that is being edited.
+    if (form.dataset.editId) return;
+
+    const srCode = srCodeInput.value.trim();
+    if (srCode.length < STUDENT_LOOKUP_MIN_LENGTH) {
+      clearAutofilledName();
+      setHint("");
+      return;
+    }
+
+    const student = await lookupStudentBySrCode(srCode);
+    // Ignore stale responses for a code the user has since changed.
+    if (srCodeInput.value.trim() !== srCode || form.dataset.editId) return;
+
+    if (!student) {
+      clearAutofilledName();
+      setHint("No student record found for this SR Code.", "missing");
+      return;
+    }
+
+    const canOverwrite = !nameInput.value.trim() || nameInput.dataset.autofilled === "true";
+    if (canOverwrite) {
+      nameInput.value = student.name || "";
+      nameInput.dataset.autofilled = "true";
+      setHint("✔ Matched student record.", "matched");
+    } else if (nameInput.value.trim().toLowerCase() !== String(student.name || "").trim().toLowerCase()) {
+      setHint(`Student record name: ${student.name}`, "mismatch");
+    } else {
+      setHint("✔ Matched student record.", "matched");
+    }
+  };
+
+  srCodeInput.addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runLookup, STUDENT_LOOKUP_DEBOUNCE_MS);
+  });
+  srCodeInput.addEventListener("change", runLookup);
+
+  nameInput.addEventListener("input", () => {
+    delete nameInput.dataset.autofilled;
+  });
+
+  form.addEventListener("reset", () => {
+    clearTimeout(debounceTimer);
+    delete nameInput.dataset.autofilled;
+    setHint("");
+  });
+}
+
+function initializeStudentAutofill() {
+  if (!canEditRecords()) return;
+  [
+    [recordForm, "name_of_student"],
+    [majorForm, "name_of_student"],
+    [uniformForm, "name"],
+    [gatepassForm, "name"],
+    [goodmoralForm, "name"],
+    [idreplacementForm, "name"],
+    [leaveofabsenceForm, "name"],
+  ].forEach(([form, nameFieldName]) => attachStudentAutofill(form, nameFieldName));
+}
+
 function normalizeGoodMoralStudentKey(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -4604,6 +4742,8 @@ attachCancelEdit(leaveofabsenceForm);
       applyHeadInterfaceRestrictions();
       await initializeHeadOrganizationFilter();
     }
+
+    initializeStudentAutofill();
 
     await reloadAllDataForCurrentScope();
   } catch (error) {

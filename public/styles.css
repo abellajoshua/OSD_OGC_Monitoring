@@ -2524,6 +2524,20 @@ tbody td {
   color: var(--muted);
 }
 
+.autofill-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.autofill-hint[data-state="matched"] {
+  color: #15803d;
+}
+
+.autofill-hint[data-state="mismatch"] {
+  color: #b45309;
+}
+
 .archive-links {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

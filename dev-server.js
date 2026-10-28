@@ -33,6 +33,7 @@ const leaveOfAbsenceByIdHandler = require("./api/leave-of-absence/[id]");
 const leaveOfAbsenceArchiveHandler = require("./api/leave-of-absence/archive");
 const studentsHandler = require("./api/students/index");
 const studentsBulkHandler = require("./api/students/bulk");
+const studentsLookupHandler = require("./api/students/lookup");
 const studentsByIdHandler = require("./api/students/[id]");
 const createUserHandler = require("./api/admin/create-user");
 const deleteUserHandler = require("./api/admin/delete-user");
@@ -116,6 +117,7 @@ app.all("/api/leave-of-absence/:id", (req, res) => {
 
 app.all("/api/students", (req, res) => studentsHandler(req, res));
 app.all("/api/students/bulk", (req, res) => studentsBulkHandler(req, res));
+app.all("/api/students/lookup", (req, res) => studentsLookupHandler(req, res));
 app.all("/api/students/:id", (req, res) => {
   req.query = { ...req.query, id: req.params.id };
   return studentsByIdHandler(req, res);
